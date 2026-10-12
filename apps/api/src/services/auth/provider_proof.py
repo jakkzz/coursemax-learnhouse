@@ -10,6 +10,7 @@ no tokens, subjects, email addresses or provider response bodies. No provider
 credentials or tokens are retained by this module.
 """
 
+import asyncio
 from dataclasses import dataclass, field
 import hmac
 import json
@@ -26,6 +27,7 @@ GOOGLE_ISSUERS = ("https://accounts.google.com", "accounts.google.com")
 LINE_ISSUER = "https://access.line.me"
 MAX_RESPONSE_BYTES = 64 * 1024
 MAX_TOKEN_BYTES = 16 * 1024
+PROVIDER_TIMEOUT_SECONDS = 5.0
 _EMAIL = TypeAdapter(EmailStr)
 
 
@@ -62,20 +64,31 @@ def _inputs(token: str, client_id: str, nonce: str | None) -> None:
 async def _json_response(
     client: httpx.AsyncClient, method: str, url: str, *, data: dict | None = None
 ) -> dict:
+    # Build an independent request: never forward a reused client's native auth,
+    # cookies or internal-service headers to a provider. Reuse only its transport.
+    request = httpx.Request(
+        method, url, data=data, headers={"Accept": "application/json"},
+        extensions={"timeout": dict.fromkeys(
+            ("connect", "read", "write", "pool"), PROVIDER_TIMEOUT_SECONDS
+        )},
+    )
     try:
-        async with client.stream(
-            method, url, data=data, timeout=5.0, follow_redirects=False
-        ) as response:
-            if response.status_code != 200:
-                if url == LINE_VERIFY_URL and 400 <= response.status_code < 500 and response.status_code != 429:
-                    raise ProviderProofError("invalid_provider_token")
-                raise ProviderProofError("provider_unavailable")
-            chunks = bytearray()
-            async for chunk in response.aiter_bytes(chunk_size=8192):
-                if len(chunks) + len(chunk) > MAX_RESPONSE_BYTES:
+        # A read timeout alone does not bound a slow trickle of response bytes.
+        async with asyncio.timeout(PROVIDER_TIMEOUT_SECONDS):
+            response = await client.send(request, stream=True, auth=None, follow_redirects=False)
+            try:
+                if response.status_code != 200:
+                    if url == LINE_VERIFY_URL and 400 <= response.status_code < 500 and response.status_code != 429:
+                        raise ProviderProofError("invalid_provider_token")
                     raise ProviderProofError("provider_unavailable")
-                chunks.extend(chunk)
-    except httpx.HTTPError:
+                chunks = bytearray()
+                async for chunk in response.aiter_bytes(chunk_size=8192):
+                    if len(chunks) + len(chunk) > MAX_RESPONSE_BYTES:
+                        raise ProviderProofError("provider_unavailable")
+                    chunks.extend(chunk)
+            finally:
+                await response.aclose()
+    except (httpx.HTTPError, TimeoutError):
         raise ProviderProofError("provider_unavailable") from None
     try:
         value = json.loads(chunks)

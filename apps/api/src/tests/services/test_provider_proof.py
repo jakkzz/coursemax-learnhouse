@@ -1,6 +1,8 @@
 """Offline tests: no provider accounts, network, database or session writes."""
+import asyncio
 import time
 import unittest
+from unittest.mock import patch
 from urllib.parse import parse_qs
 
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -225,6 +227,28 @@ class ProviderProofTests(unittest.IsolatedAsyncioTestCase):
         async with httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200, text="not JSON"))) as client:
             with self.assertRaisesRegex(ProviderProofError, "^provider_unavailable$"):
                 await verify_line_liff_token("test.line.token", client_id="line-test-channel", provider_namespace="line-provider-A", client=client)
+
+    async def test_reused_client_credentials_are_not_forwarded_to_provider(self):
+        def handler(request):
+            self.assertNotIn("authorization", request.headers)
+            self.assertNotIn("cookie", request.headers)
+            self.assertNotIn("x-internal-key", request.headers)
+            return httpx.Response(200, json=self.line)
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            headers={"Authorization": "Bearer private-native-token", "X-Internal-Key": "private-key"},
+            cookies={"LH_access": "private-native-cookie"}, auth=("private-user", "private-password"),
+        ) as client:
+            await verify_line_liff_token("test.line.token", client_id="line-test-channel", provider_namespace="line-provider-A", client=client)
+
+    async def test_total_provider_deadline_is_bounded(self):
+        async def handler(request):
+            await asyncio.sleep(1)
+            return httpx.Response(200, json=self.line)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with patch("src.services.auth.provider_proof.PROVIDER_TIMEOUT_SECONDS", 0.01):
+                with self.assertRaisesRegex(ProviderProofError, "^provider_unavailable$"):
+                    await verify_line_liff_token("test.line.token", client_id="line-test-channel", provider_namespace="line-provider-A", client=client)
 
     async def test_bad_token_inputs_make_no_network_request(self):
         for token in ["", None, "\ud800", "x" * (MAX_TOKEN_BYTES + 1)]:

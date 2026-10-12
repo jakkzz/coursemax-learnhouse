@@ -128,6 +128,7 @@ def initialize(directory: Path, domain: str, admin_email: str) -> None:
         "NEXT_PUBLIC_LEARNHOUSE_HTTPS": "true",
         "NEXT_PUBLIC_COLLAB_URL": f"wss://{domain}/collab",
         "LEARNHOUSE_INTERNAL_API_URL": "http://127.0.0.1:9000/api/v1/",
+        "LEARNHOUSE_INTERNAL_BACKEND_URL": "http://127.0.0.1:9000/",
         "LEARNHOUSE_API_URL": "http://127.0.0.1:9000",
         "NEXTAUTH_URL": base,
         "NEXTAUTH_SECRET": secrets.token_urlsafe(48),

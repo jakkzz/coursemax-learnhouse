@@ -28,14 +28,17 @@ Object.keys(env).forEach((key) => {
 // Server-side requests may use a private API route behind an evaluator gateway.
 // Keep it OUT of the browser config: the browser must use the public origin.
 const serverRuntimeConfig = { ...runtimeConfig };
-if (env.LEARNHOUSE_INTERNAL_API_URL) {
-  const internalUrl = new URL(env.LEARNHOUSE_INTERNAL_API_URL);
+for (const [privateKey, runtimeKey] of [
+  ['LEARNHOUSE_INTERNAL_API_URL', 'NEXT_PUBLIC_LEARNHOUSE_API_URL'],
+  ['LEARNHOUSE_INTERNAL_BACKEND_URL', 'NEXT_PUBLIC_LEARNHOUSE_BACKEND_URL'],
+]) {
+  if (!env[privateKey]) continue;
+  const internalUrl = new URL(env[privateKey]);
   if (!['http:', 'https:'].includes(internalUrl.protocol) ||
       internalUrl.username || internalUrl.password || internalUrl.search || internalUrl.hash) {
-    throw new Error('LEARNHOUSE_INTERNAL_API_URL must be a credential-free HTTP(S) URL');
+    throw new Error(`${privateKey} must be a credential-free HTTP(S) URL`);
   }
-  serverRuntimeConfig.NEXT_PUBLIC_LEARNHOUSE_API_URL =
-    internalUrl.toString().replace(/\/?$/, '/');
+  serverRuntimeConfig[runtimeKey] = internalUrl.toString().replace(/\/?$/, '/');
 }
 
 // Write server-only runtime config JSON file.

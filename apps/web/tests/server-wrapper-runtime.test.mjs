@@ -31,13 +31,17 @@ const publicUrl = 'https://learn.example.com/api/v1/'
 test('internal API is server-only; browser retains public API and no secrets', () => {
   const { writes, started } = run({
     NEXT_PUBLIC_LEARNHOUSE_API_URL: publicUrl,
+    NEXT_PUBLIC_LEARNHOUSE_BACKEND_URL: 'https://learn.example.com/',
     LEARNHOUSE_INTERNAL_API_URL: 'http://127.0.0.1:9000/api/v1',
+    LEARNHOUSE_INTERNAL_BACKEND_URL: 'http://127.0.0.1:9000',
     LEARNHOUSE_AUTH_JWT_SECRET_KEY: 'private-test-secret',
     LEARNHOUSE_GOOGLE_CLIENT_SECRET: 'private-google-secret',
   })
   const server = JSON.parse(writes.get('/virtual/runtime-config.json'))
   const browser = writes.get('/virtual/public/runtime-config.js')
   assert.equal(server.NEXT_PUBLIC_LEARNHOUSE_API_URL, 'http://127.0.0.1:9000/api/v1/')
+  assert.equal(server.NEXT_PUBLIC_LEARNHOUSE_BACKEND_URL, 'http://127.0.0.1:9000/')
+  assert.ok(browser.includes('https://learn.example.com/'))
   assert.ok(browser.includes(publicUrl))
   assert.ok(!browser.includes('127.0.0.1'))
   assert.ok(!browser.includes('private-'))
@@ -57,5 +61,6 @@ for (const url of [
 ]) {
   test(`invalid internal URL rejected: ${url}`, () => {
     assert.throws(() => run({ LEARNHOUSE_INTERNAL_API_URL: url }))
+    assert.throws(() => run({ LEARNHOUSE_INTERNAL_BACKEND_URL: url }))
   })
 }

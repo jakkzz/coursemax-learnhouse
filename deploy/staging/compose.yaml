@@ -1,0 +1,122 @@
+name: learnhouse-staging
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: '3'
+
+services:
+  app:
+    # Upstream dev-45cf5d4, immutable manifest; local tracked overlays below.
+    image: ghcr.io/learnhouse/app@sha256:0aca30cd7b772bebfb75c8e4e54613ab4391adb2d4e05403992867388169514f
+    restart: unless-stopped
+    env_file:
+      - ${LEARNHOUSE_RUNTIME_DIR:?Set private runtime directory}/app.env
+    volumes:
+      - content:/app/api/content
+      - ../../apps/web/server-wrapper.js:/app/web/server-wrapper.js:ro
+      - ../../docker/nginx.conf:/etc/nginx/http.d/default.conf:ro
+    networks: [data, edge, outbound]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD-SHELL, 'curl -fsS http://127.0.0.1:9000/api/v1/health >/dev/null && curl -fsS http://127.0.0.1:8000/api/health >/dev/null && curl -fsS http://127.0.0.1:4000/health >/dev/null']
+      interval: 20s
+      timeout: 10s
+      retries: 6
+      start_period: 120s
+    mem_limit: 1536m
+    cpus: 1.5
+    pids_limit: 256
+    logging: *logging
+
+  db:
+    image: pgvector/pgvector@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
+    restart: unless-stopped
+    env_file:
+      - ${LEARNHOUSE_RUNTIME_DIR:?Set private runtime directory}/db.env
+    volumes:
+      - database:/var/lib/postgresql/data
+    networks: [data]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U learnhouse -d learnhouse']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    mem_limit: 512m
+    cpus: 0.5
+    pids_limit: 128
+    logging: *logging
+
+  redis:
+    image: redis@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    restart: unless-stopped
+    command: [redis-server, --appendonly, 'yes', --maxmemory, 80mb, --maxmemory-policy, noeviction]
+    volumes:
+      - redis:/data
+    networks: [data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    mem_limit: 128m
+    cpus: 0.25
+    pids_limit: 64
+    logging: *logging
+
+  gateway:
+    # Started only after native signup policy and restore checks pass.
+    profiles: [public]
+    image: nginx@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94
+    restart: unless-stopped
+    volumes:
+      - ${LEARNHOUSE_RUNTIME_DIR:?Set private runtime directory}/gateway.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${LEARNHOUSE_RUNTIME_DIR:?Set private runtime directory}/preview.htpasswd:/run/secrets/preview.htpasswd:ro
+    networks: [edge, proxy]
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD-SHELL, 'nginx -t -q']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      traefik.enable: 'true'
+      traefik.docker.network: main_network
+      traefik.http.routers.learnhouse-staging.rule: Host(`${LEARNHOUSE_HOST:?Set hostname}`)
+      traefik.http.routers.learnhouse-staging.entrypoints: https
+      traefik.http.routers.learnhouse-staging.tls: 'true'
+      traefik.http.routers.learnhouse-staging.tls.certresolver: dns-cloudflare
+      traefik.http.routers.learnhouse-staging.observability.accesslogs: 'false'
+      traefik.http.routers.learnhouse-staging.service: learnhouse-staging
+      traefik.http.services.learnhouse-staging.loadbalancer.server.port: '80'
+      traefik.http.routers.learnhouse-staging-http.rule: Host(`${LEARNHOUSE_HOST:?Set hostname}`)
+      traefik.http.routers.learnhouse-staging-http.entrypoints: http
+      traefik.http.routers.learnhouse-staging-http.middlewares: learnhouse-staging-https
+      traefik.http.routers.learnhouse-staging-http.service: learnhouse-staging
+      traefik.http.middlewares.learnhouse-staging-https.redirectscheme.scheme: https
+    mem_limit: 64m
+    cpus: 0.25
+    pids_limit: 64
+    logging: *logging
+
+networks:
+  data:
+    internal: true
+  edge:
+    internal: true
+  outbound: {}
+  proxy:
+    external: true
+    name: main_network
+
+volumes:
+  database: {}
+  redis: {}
+  content: {}

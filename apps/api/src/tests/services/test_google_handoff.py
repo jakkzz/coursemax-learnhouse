@@ -126,6 +126,7 @@ class GoogleHandoffTests(unittest.IsolatedAsyncioTestCase):
         variants += [dict(registration_emails=value) for value in (
             {'a@example.com'}, frozenset({'not-email'}), frozenset({None}), frozenset({b'a@example.com'}),
         )]
+        variants += [dict(public_registration=value) for value in ('true', 1, None)]
         variants += [dict(client=OAuthClient('line', 'fixture', 'https://learn.example.com', 'reviewed-provider'))]
         for changes in variants:
             with self.subTest(changes=list(changes)), self.assertRaisesRegex(GoogleHandoffError, '^invalid_google_configuration$'):
@@ -152,6 +153,23 @@ class GoogleHandoffTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result.proof.verified_email, email)
             self.assertFalse(hasattr(result, 'role'))
             self.assertFalse(hasattr(result, 'institution_verified'))
+
+    async def test_public_registration_accepts_unlisted_verified_emails_only(self):
+        config = replace(self.config, public_registration=True)
+        self.assertTrue(config.registration_enabled)
+        self.assertFalse(config.registration_emails)
+        for email in ('newvisitor@gmail.com', 'reader@example.ac.th'):
+            await self.start('register')
+            self.claim_changes = {'email': email}
+            result = await self.finish(config=config)
+            self.assertEqual(result.proof.verified_email, email)
+            self.assertFalse(hasattr(result, 'role'))
+        for changes in ({'email_verified': False}, {'email': None}):
+            await self.start('register')
+            self.claim_changes = changes
+            with self.assertRaises(GoogleHandoffError):
+                await self.finish(config=config)
+            await self.assert_spent()
 
     async def test_registration_is_deny_by_default_and_no_domain_wildcard(self):
         for allowlist in (frozenset(), frozenset({'someone@gmail.com'}), frozenset({'teacher@example.ac.th'})):

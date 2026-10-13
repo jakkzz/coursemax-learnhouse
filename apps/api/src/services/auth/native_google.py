@@ -1,7 +1,8 @@
 """Native Google ownership/admission integration; no email merges or notifications.
 
-Caller owns the transaction. Registration requires the explicit handoff allowlist
-and a unique native email index; it never invokes multi-commit signup helpers.
+Caller owns the transaction. Registration requires verified handoff admission
+(public mode or explicit allowlist) and a unique native email index; it never
+invokes multi-commit signup helpers.
 """
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -57,8 +58,8 @@ async def complete_native_google(db, verified, *, org_id):
         if user is None or binding is None:
             raise HTTPException(409, 'Google identity changed. Restart sign-in.')
     elif verified.intent == 'register':
-        # This result is produced only after the handoff's exact email allowlist
-        # check. Existing identities must choose signin, not create duplicates.
+        # Handoff admission verifies email and public/allowlist policy first.
+        # Existing identities must choose signin, not create duplicates.
         try:
             await resolve_identity_owner(db, proof)
         except IdentityConflict as error:

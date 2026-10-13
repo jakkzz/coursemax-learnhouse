@@ -8,7 +8,7 @@ This is internal server data, NOT a JSON response or permission to issue a sessi
 Callers must enforce native identity ownership, account/session lifecycle, MFA and
 organization admission. Signin must never silently fall back to registration.
 Link actors must come from a currently verified native session, not browser input.
-The registration allowlist is admission only, never an identity/merge or role key.
+Public/allowlist registration policy is admission only, never an identity/merge or role key.
 """
 
 import asyncio
@@ -42,6 +42,11 @@ class GoogleHandoffConfig:
     client: OAuthClient
     client_secret: str = field(repr=False)
     registration_emails: frozenset[str] = field(default_factory=frozenset, repr=False)
+    public_registration: bool = False
+
+    @property
+    def registration_enabled(self):
+        return self.public_registration or bool(self.registration_emails)
 
     def __post_init__(self):
         if (
@@ -61,6 +66,8 @@ class GoogleHandoffConfig:
         ):
             raise GoogleHandoffError("invalid_google_configuration")
 
+        if type(self.public_registration) is not bool:
+            raise GoogleHandoffError("invalid_google_configuration")
         if not isinstance(self.registration_emails, frozenset) or len(self.registration_emails) > 1000:
             raise GoogleHandoffError("invalid_google_configuration")
 
@@ -170,13 +177,15 @@ async def complete_google_handoff(
         raise GoogleHandoffError("provider_unavailable") from None
 
     if consumed.intent == "register":
-        if not config.registration_emails:
+        if not config.registration_enabled:
             raise GoogleHandoffError("registration_not_allowed")
 
         verified_email_normalized = (
             proof.verified_email.lower() if proof.verified_email else None
         )
-        if verified_email_normalized not in config.registration_emails:
+        if not verified_email_normalized or (
+            not config.public_registration and verified_email_normalized not in config.registration_emails
+        ):
             raise GoogleHandoffError("email_not_allowed")
 
     return VerifiedGoogleHandoff(

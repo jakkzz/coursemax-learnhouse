@@ -866,7 +866,7 @@ const LoginClient = (props: LoginClientProps) => {
                 {googleAllowed && googleCapability.registration && (
                   <button type="button" onClick={() => handleGoogleSignIn('register')} disabled={isSubmitting || googleLoading}
                     className="w-full rounded-lg p-3 text-sm font-medium text-black underline underline-offset-4 disabled:opacity-50">
-                    {t('auth.google_create_account', { defaultValue: 'Create an invited account with Google' })}
+                    {t('auth.google_create_account', { defaultValue: 'Sign up with Google' })}
                   </button>
                 )}
 

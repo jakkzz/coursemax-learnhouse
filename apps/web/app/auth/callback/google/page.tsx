@@ -45,7 +45,7 @@ export default function GoogleCallbackPage() {
       const conflict = reason.message.includes('already uses this email') || reason.message.includes('not linked')
       setError(conflict
         ? t('auth.google_link_existing', { defaultValue: 'Sign in using your existing method, then link Google from your account. Your accounts will not be merged automatically.' })
-        : t('auth.google_restart', { defaultValue: 'Google sign-in could not be completed. Please restart sign-in. Registration is by invitation during staging.' }))
+        : t('auth.google_restart', { defaultValue: 'Google sign-in could not be completed. Please try again.' }))
     })
   }, [t])
 

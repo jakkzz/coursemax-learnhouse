@@ -47,7 +47,8 @@ def settings():
         allowed = json.loads(os.getenv('LEARNHOUSE_GOOGLE_REGISTRATION_EMAILS', '[]'))
         if not isinstance(allowed, list) or not all(isinstance(x, str) for x in allowed):
             raise ValueError()
-        handoff = GoogleHandoffConfig(client, os.environ['GOOGLE_CLIENT_SECRET'], frozenset(allowed))
+        handoff = GoogleHandoffConfig(client, os.environ['GOOGLE_CLIENT_SECRET'], frozenset(allowed),
+            public_registration=os.getenv('LEARNHOUSE_GOOGLE_PUBLIC_REGISTRATION_ENABLED', 'false').lower() == 'true')
         org_id = int(os.environ['LEARNHOUSE_GOOGLE_ORG_ID'])
         secret = os.environ['LEARNHOUSE_OAUTH_TRANSACTION_SECRET'].encode()
         deployment = os.environ['LEARNHOUSE_OAUTH_DEPLOYMENT']
@@ -123,7 +124,7 @@ async def capabilities(db: AsyncSession = Depends(get_db_session)):
         await enforce_login_auth_method(db, config.org_id, 'google')
     except HTTPException:
         return {'google': False, 'registration': False}
-    return {'google': True, 'registration': bool(config.handoff.registration_emails)}
+    return {'google': True, 'registration': config.handoff.registration_enabled}
 
 
 @router.post('/start')
@@ -131,7 +132,7 @@ async def start(request: Request, response: Response, body: StartBody, db: Async
     config = settings()
     boundary(request, config)
     await enforce_login_auth_method(db, config.org_id, 'google')
-    if body.intent == 'register' and not config.handoff.registration_emails:
+    if body.intent == 'register' and not config.handoff.registration_enabled:
         raise HTTPException(403, 'Registration is by invitation during staging')
     async with resources(config) as (redis, transactions):
         await throttle(redis, request, config, 'start')

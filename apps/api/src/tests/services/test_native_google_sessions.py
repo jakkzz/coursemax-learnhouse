@@ -296,7 +296,7 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
         consume_mfa_challenge(pending)
 
     @asynccontextmanager
-    async def http_flow(self, allow_registration=True):
+    async def http_flow(self, allow_registration=True, public_registration=False):
         from fastapi import FastAPI, Depends
         from types import SimpleNamespace
         from src.core.events.database import get_db_session
@@ -307,7 +307,8 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
         from src.tests.services.test_google_handoff import Store
         oauth = OAuthClient('google', 'native-test-client', 'https://learn.example.com', 'global')
         config = google_router.Settings(GoogleHandoffConfig(oauth, 'fixture-secret',
-            frozenset({self.google.verified_email}) if allow_registration else frozenset()),
+            frozenset({self.google.verified_email}) if allow_registration else frozenset(),
+            public_registration=public_registration),
             1, 'native-http', b'x' * 32)
         store = Store()
         transactions = OAuthTransactions(store, deployment=config.deployment, secret=config.secret)
@@ -371,6 +372,20 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
             replay = await client.post('/auth/google/complete', json=body)
             self.assertEqual(replay.status_code, 409)
             self.assertEqual(len(self.google_requests), request_count)
+        self.assertEqual(tuple(await self.counts()), (1, 1, 4))
+
+    async def test_http_public_registration_unlisted_email_creates_only_learner(self):
+        from sqlmodel import select
+        async with self.http_flow(allow_registration=False, public_registration=True) as client:
+            self.assertEqual((await client.get('/auth/google/capabilities')).json(),
+                             {'google': True, 'registration': True})
+            body = await self.start_http(client, 'register')
+            response = await client.post('/auth/google/complete', json=body)
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual((await client.get('/profile')).json()['id'], 4)
+        async with self.sessions() as db:
+            membership = (await db.exec(select(UserOrganization).where(UserOrganization.user_id == 4))).one()
+            self.assertEqual(membership.role_id, 4)
         self.assertEqual(tuple(await self.counts()), (1, 1, 4))
 
     async def test_http_cancel_consumes_state_and_unknown_signin_never_registers(self):

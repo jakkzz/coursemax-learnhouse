@@ -79,6 +79,33 @@ class TestGetProfile:
 
 
 class TestGetUserById:
+    async def test_account_settings_owner_email_not_filtered_out(self, client, admin_user):
+        response = await client.get(f'/api/v1/users/id/{admin_user.id}')
+        assert response.status_code == 200
+        body = response.json()
+        assert body['email'] == admin_user.email
+        for field in ('extra_metadata', 'is_superadmin', 'signup_method', 'password'):
+            assert field not in body
+
+    async def test_other_user_email_remains_redacted(self, client, regular_user):
+        response = await client.get(f'/api/v1/users/id/{regular_user.id}')
+        assert response.status_code == 200
+        assert 'email' not in response.json()
+
+    async def test_api_token_id_collision_is_not_account_owner(self, client, app, org, regular_user):
+        from src.db.users import APITokenUser
+        token = APITokenUser(id=regular_user.id, org_id=org.id, created_by_user_id=regular_user.id)
+        app.dependency_overrides[get_authenticated_user] = lambda: token
+        response = await client.get(f'/api/v1/users/id/{regular_user.id}')
+        assert response.status_code == 200
+        assert 'email' not in response.json()
+
+    async def test_public_username_and_uuid_lookups_still_redact_owner_email(self, client, admin_user):
+        for path in (f'/api/v1/users/username/{admin_user.username}', f'/api/v1/users/uuid/{admin_user.user_uuid}'):
+            response = await client.get(path)
+            assert response.status_code == 200
+            assert 'email' not in response.json()
+
     async def test_get_user_by_id(self, client):
         mock_user = _mock_user_public()
         with patch(

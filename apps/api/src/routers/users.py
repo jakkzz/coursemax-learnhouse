@@ -27,6 +27,7 @@ from src.db.users import (
     UserCreate,
     UserRead,
     UserReadPublic,
+    UserReadSelf,
     UserSession,
     UserUpdate,
     UserUpdatePassword,
@@ -314,12 +315,12 @@ async def api_create_user_without_org(
 
 @router.get(
     "/id/{user_id}",
-    response_model=UserReadPublic,
+    response_model=Union[UserReadSelf, UserReadPublic],
     tags=["users"],
     summary="Get user by ID",
-    description="Get a user by numeric ID. Requires authentication to prevent user enumeration attacks. Sensitive fields (`is_superadmin`, `signup_method`) are excluded.",
+    description="Get a user by numeric ID. Only the authenticated account owner receives their native email; all other callers receive a redacted public view. Platform/internal fields are excluded.",
     responses={
-        200: {"description": "Public view of the user.", "model": UserReadPublic},
+        200: {"description": "Owner account-settings view or redacted public view."},
         401: {"description": "Authentication required"},
     },
 )
@@ -329,13 +330,14 @@ async def api_get_user_by_id(
     db_session: AsyncSession = Depends(get_db_session),
     current_user: PublicUser = Depends(get_authenticated_user),
     user_id: int,
-) -> UserReadPublic:
+) -> Union[UserReadSelf, UserReadPublic]:
     """
     Get User by ID.
 
     SECURITY: Requires authentication to prevent user enumeration attacks.
-    Anonymous users cannot access this endpoint.
-    Returns a restricted view: sensitive fields (is_superadmin, signup_method) are excluded.
+    Anonymous users cannot access this endpoint. Only the validated session owner
+    receives native email for Account Settings; other callers remain redacted.
+    Platform/internal metadata is always excluded.
     """
     return await read_user_by_id(request, db_session, current_user, user_id)
 

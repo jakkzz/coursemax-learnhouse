@@ -36,6 +36,7 @@ from src.db.users import (
     UserCreate,
     UserRead,
     UserReadPublic,
+    UserReadSelf,
     UserRoleWithOrg,
     UserSession,
     UserUpdate,
@@ -933,7 +934,8 @@ async def read_user_by_id(
     Get user by ID.
 
     SECURITY: Returns 404 with generic message to prevent user enumeration.
-    Returns UserReadPublic to exclude sensitive fields (is_superadmin, signup_method).
+    The session owner receives their native email for Account Settings; other
+    callers receive only UserReadPublic. Internal/platform fields stay excluded.
     """
     # Get user
     statement = select(User).where(User.id == user_id)
@@ -945,6 +947,8 @@ async def read_user_by_id(
             detail="Resource not found",  # Generic message prevents enumeration
         )
 
+    if isinstance(current_user, PublicUser) and current_user.id == user.id and current_user.user_uuid == user.user_uuid:
+        return UserReadSelf.model_validate(user)
     return UserReadPublic.model_validate(user)
 
 

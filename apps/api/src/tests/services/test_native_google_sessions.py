@@ -339,6 +339,8 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
                 yield db
         app = FastAPI()
         app.include_router(google_router.router, prefix='/auth/google')
+        from src.routers.users import router as users_router
+        app.include_router(users_router, prefix='/users')
         app.dependency_overrides[get_db_session] = database
         @app.get('/profile')
         async def profile(user=Depends(get_current_user)):
@@ -375,6 +377,19 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
             self.assertEqual(replay.status_code, 409)
             self.assertEqual(len(self.google_requests), request_count)
         self.assertEqual(tuple(await self.counts()), (1, 1, 4))
+
+    async def test_google_account_settings_reads_stored_verified_email_privately(self):
+        async with self.http_flow(allow_registration=False, public_registration=True) as client:
+            body=await self.start_http(client,'register')
+            response=await client.post('/auth/google/complete',json=body)
+            self.assertEqual(response.status_code,200,response.text)
+            own=await client.get('/users/id/4')
+            self.assertEqual(own.status_code,200,own.text)
+            self.assertEqual(own.json()['email'],self.google.verified_email.lower())
+            self.assertNotIn('extra_metadata',own.json())
+            other=await client.get('/users/id/1')
+            self.assertEqual(other.status_code,200,other.text)
+            self.assertNotIn('email',other.json())
 
     async def test_http_public_registration_unlisted_email_creates_only_learner(self):
         from sqlmodel import select

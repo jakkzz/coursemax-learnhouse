@@ -124,6 +124,15 @@ class UserReadPublic(SQLModel):
     profile: Optional[dict] = None
 
 
+class UserReadSelf(UserReadPublic):
+    """Account-settings view for the authenticated owner only.
+
+    Keep public lookups redacted; do not expose platform/internal metadata even
+    to this lightweight self lookup. Email comes from the native account record.
+    """
+    email: str
+
+
 class UserReadAuthor(SQLModel):
     """Minimal author projection for community comments/discussions.
 

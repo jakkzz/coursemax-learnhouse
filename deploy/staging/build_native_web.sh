@@ -34,7 +34,8 @@ docker run -d --pull=never --name "$NAME" --memory 4096m --cpus 1 --read-only --
     timeout 180 bun install --frozen-lockfile --ignore-scripts --network-concurrency 2 &&
     /app/api/.venv/bin/python -B /budget.py &&
     timeout 480 bun run build &&
-    timeout 240 bun node_modules/typescript/bin/tsc --noEmit && touch /scratch/build-success
+    rm -rf .next/cache &&
+    timeout 240 node node_modules/typescript/bin/tsc --noEmit && touch /scratch/build-success
     echo BUILD_FINISHED
     sleep 600
   ' > "$OUT/container-id"

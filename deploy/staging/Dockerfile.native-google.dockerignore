@@ -1,0 +1,9 @@
+# Native runtime is an already validated artifact, including traced node_modules
+# and .next files. Do not inherit the source-build exclusions for those trees.
+**/.git
+**/.env
+**/.env.*
+**/__pycache__
+**/*.pyc
+apps/web/node_modules
+apps/web/.next

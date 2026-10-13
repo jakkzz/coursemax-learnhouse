@@ -32,7 +32,7 @@ docker run -d --pull=never --name "$NAME" --memory 4096m --cpus 1 --read-only --
     cd /scratch/web
     timeout 180 bun install --frozen-lockfile --ignore-scripts --network-concurrency 2 &&
     /app/api/.venv/bin/python -B /budget.py &&
-    timeout 480 bun run build --webpack && touch /scratch/build-success
+    timeout 480 bun run build && touch /scratch/build-success
     echo BUILD_FINISHED
     sleep 600
   ' > "$OUT/container-id"

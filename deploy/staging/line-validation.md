@@ -44,8 +44,9 @@ no-login real-provider authorization preflight returned200 and reached LINE's
 login page. No credentials were entered and no consent/callback/identity linking
 was performed; this is not real sign-in acceptance.
 
-**Real LINE consent/link/sign-in, provider MFA/refresh/unlink lifecycle and actual
-LINE-device LIFF access still need owner acceptance.** SDK cached-token retry after
+**Owner subsequently reported “works now” for LINE.** This accepts the owner's
+tested path, not every provider lifecycle edge. Provider MFA/refresh/unlink and
+actual LINE-device LIFF access still need separately observed acceptance. SDK cached-token retry after
 native-session loss is explicitly fail-closed with Google recovery. This is native
 identity access, not the later official roster-owned classroom/task/attendance port.
 

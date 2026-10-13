@@ -100,8 +100,11 @@ async def complete_native_google(db, verified, *, org_id):
             raise HTTPException(503, 'Learner role is not configured')
         rights = role.rights if isinstance(role.rights, dict) else role.rights.model_dump()
         if rights.get('dashboard', {}).get('action_access') or any(
-            bucket.get(action) for bucket in rights.values() if isinstance(bucket, dict)
+            bucket.get(action) for name, bucket in rights.items() if isinstance(bucket, dict)
             for action in ('action_create', 'action_update', 'action_delete')
+            # Native learners may start discussions. This is not authoring or
+            # staff access; global discussion moderation remains prohibited.
+            if not (name == 'discussions' and action == 'action_create')
         ):
             raise HTTPException(503, 'Learner role needs review')
         from src.security.features_utils.usage import check_limits_with_usage

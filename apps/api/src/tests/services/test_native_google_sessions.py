@@ -394,6 +394,35 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
             self.assertEqual(membership.role_id, 4)
         self.assertEqual(tuple(await self.counts()), (1, 1, 4))
 
+    async def test_http_standard_learner_discussion_creation_allows_public_signup(self):
+        async with self.sessions.begin() as db:
+            role = await db.get(Role, 4)
+            rights = dict(role.rights) if isinstance(role.rights, dict) else role.rights.model_dump()
+            rights['discussions'] = {'action_create': True, 'action_read': True,
+                'action_update': False, 'action_update_own': True,
+                'action_delete': False, 'action_delete_own': True}
+            role.rights = rights
+            db.add(role)
+        async with self.http_flow(allow_registration=False, public_registration=True) as client:
+            body = await self.start_http(client, 'register')
+            response = await client.post('/auth/google/complete', json=body)
+            self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(tuple(await self.counts()), (1, 1, 4))
+
+    async def test_http_discussion_global_moderation_still_blocks_registration(self):
+        async with self.sessions.begin() as db:
+            role = await db.get(Role, 4)
+            rights = dict(role.rights) if isinstance(role.rights, dict) else role.rights.model_dump()
+            rights['discussions'] = {'action_create': True, 'action_update': True}
+            role.rights = rights
+            db.add(role)
+        async with self.http_flow(allow_registration=False, public_registration=True) as client:
+            body = await self.start_http(client, 'register')
+            response = await client.post('/auth/google/complete', json=body)
+            self.assertEqual(response.status_code, 503)
+            self.assertIn('Learner role needs review', response.text)
+        self.assertEqual(tuple(await self.counts()), (0, 0, 3))
+
     async def test_http_public_continue_never_merges_existing_email(self):
         from dataclasses import replace
         self.google = replace(self.google, verified_email='fixture1@example.com')

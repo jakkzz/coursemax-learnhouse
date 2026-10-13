@@ -1,4 +1,7 @@
-# LINE identity port — prepared, not deployed or activated
+# LINE identity port — deployed to staging
+
+Current release/observed acceptance scope: [line-validation.md](line-validation.md).
+The configuration example still defaults disabled; staging activation was explicit.
 
 The owner approved explicit linking → linked-only sign-in → lifecycle validation →
 LINE in-app access. This is the identity slice, not the later academic roster/task

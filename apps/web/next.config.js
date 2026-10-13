@@ -166,7 +166,9 @@ const nextConfig = {
     ...(process.env.LEARNHOUSE_BUILD_CPUS ? { cpus: Number(process.env.LEARNHOUSE_BUILD_CPUS) } : {}),
     ...(process.env.LEARNHOUSE_BUILD_LOW_MEMORY === 'true' ? {
       webpackMemoryOptimizations: true, webpackBuildWorker: true,
-      turbopackGc: true, turbopackPluginRuntimeStrategy: 'workerThreads',
+      turbopackGc: true,
+      // Isolated Linux build only; any worker teardown abort fails the build.
+      turbopackPluginRuntimeStrategy: 'forceWorkerThreads',
     } : {}),
     optimizePackageImports: [
       '@phosphor-icons/react',

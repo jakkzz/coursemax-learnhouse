@@ -187,3 +187,18 @@ This resource-gated harness uses pinned **already cached** API/Redis images,
 secrets. The two disposable containers share only a private temporary Unix socket.
 It runs all proof/transaction unit tests plus the real Redis integration tests.
 The fixture disables persistence and removes only its own socket/container.
+
+## Optional provider profile enrichment (default-off)
+
+`provider_profile.py` extracts optional attributes only after provider verification;
+malformed enrichment never changes identity validity. `profile_import.py` connects
+Google only after native login succeeds (not a pending MFA challenge), initializes
+eligible empty names once, and schedules optional avatars after commit/response.
+`provider_avatar.py` pins public destination IPs while preserving verified original
+TLS/SNI, bounds download/decoded pixels and re-encodes metadata-free native PNG.
+Private import state preserves manual edits and durable bounded retry leases.
+Display-name/locale hints are private; LINE and language preferences stay unchanged.
+
+See [the complete deployment/acceptance contract](../../../../../deploy/staging/google-profile-import.md).
+No activation is implied by source/tests. Run isolated PostgreSQL and Redis harnesses
+plus `bash deploy/staging/test_provider_profile.sh` offline.

@@ -77,6 +77,20 @@ class ProviderProofTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.requests[0].method, "GET")
         self.assertNotIn("authorization", self.requests[0].headers)
 
+    async def test_verified_google_optional_profile_and_malformed_profile_nonblocking(self):
+        p=await self.google_proof({**self.google,'given_name':'ทดสอบ','family_name':'Fixture',
+            'picture':'https://lh3.googleusercontent.com/a','locale':'th-TH'})
+        self.assertEqual(p.profile.given_name,'ทดสอบ');self.assertEqual(p.profile.locale,'th')
+        for key in ('given_name','family_name','picture','locale'):
+            p=await self.google_proof({**self.google,key:{'invalid':'fixture'}})
+            self.assertEqual(p.subject,self.google['sub'])
+        self.assertNotIn('ทดสอบ',repr(p))
+
+    async def test_verified_line_optional_profile_never_imports_email_as_verified(self):
+        p=await self.line_proof({**self.line,'name':'ชื่อเล่น หลายคำ','picture':'https://profile.line-scdn.net/fixture'})
+        self.assertEqual(p.profile.display_name,'ชื่อเล่น หลายคำ');self.assertIsNone(p.verified_email)
+        self.assertIsNone(p.profile.given_name);self.assertIsNone(p.profile.family_name)
+
     async def test_google_canonicalizes_only_documented_issuer_alias(self):
         proof = await self.google_proof({**self.google, "iss": "accounts.google.com"})
         self.assertEqual(proof.issuer, "https://accounts.google.com")

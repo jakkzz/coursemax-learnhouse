@@ -18,6 +18,7 @@ from src.db.organizations import Organization
 from src.db.roles import Role
 from src.db.user_organizations import UserOrganization
 from src.db.users import User
+from src.db.provider_profile_import import ProviderProfileImport
 from src.services.auth.google_handoff import VerifiedGoogleHandoff
 from src.services.auth.native_google import complete_native_google
 from src.services.auth.oauth_transactions import LinkActor
@@ -79,7 +80,7 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
     async def asyncSetUp(self):
         await super().asyncSetUp()
         async with self.engine.begin() as conn:
-            for table in (Organization.__table__, Role.__table__, UserOrganization.__table__):
+            for table in (Organization.__table__, Role.__table__, UserOrganization.__table__, ProviderProfileImport.__table__):
                 await conn.run_sync(table.create)
         async with self.sessions.begin() as db:
             db.add(Organization(id=1, name='Fixture', slug='default', email='fixture@example.com', org_uuid='org_fixture'))
@@ -326,7 +327,8 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
             now = int(datetime.now(timezone.utc).timestamp())
             token = jwt.encode({'iss': 'https://accounts.google.com', 'aud': oauth.client_id,
                 'sub': self.google.subject, 'email': self.google.verified_email,
-                'email_verified': True, 'nonce': self.nonce, 'iat': now - 1, 'exp': now + 120},
+                'email_verified': True, 'nonce': self.nonce, 'iat': now - 1, 'exp': now + 120,
+                'given_name': 'Provider', 'family_name': 'Fixture', 'picture': 'https://lh3.googleusercontent.com/a/fixture'},
                 self.google_key, algorithm='RS256', headers={'kid': 'native-fixture'})
             return httpx.Response(200, json={'id_token': token, 'access_token': 'never-to-browser'})
         @asynccontextmanager
@@ -393,6 +395,168 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
             membership = (await db.exec(select(UserOrganization).where(UserOrganization.user_id == 4))).one()
             self.assertEqual(membership.role_id, 4)
         self.assertEqual(tuple(await self.counts()), (1, 1, 4))
+
+    async def test_create_all_first_bootstrap_and_empty_downgrade(self):
+        # Parent case predates this FK-dependent optional table. Remove only its
+        # empty disposable fixture before testing the historical migration.
+        async with self.engine.begin() as conn:
+            await conn.run_sync(ProviderProfileImport.__table__.drop)
+        await super().test_create_all_first_bootstrap_and_empty_downgrade()
+
+    async def _profile_fixture(self):
+        from src.services.auth.provider_profile import ProviderProfile
+        from src.services.auth.profile_import import prepare_import
+        ident, _ = await self.login(intent='register')
+        proof=replace(self.google,profile=ProviderProfile(given_name='Provider',family_name='Fixture',
+            picture='https://lh3.googleusercontent.com/a/fixture',locale='th'))
+        with patch.dict(os.environ,{'LEARNHOUSE_GOOGLE_PROFILE_IMPORT_ENABLED':'true'}):
+            async with self.sessions.begin() as db:
+                user=await db.get(User,ident)
+                self.assertTrue(await prepare_import(db,user,VerifiedGoogleHandoff(proof,'continue','/home')))
+        return ident, proof
+
+    async def test_profile_fills_once_and_manual_clear_remains_empty(self):
+        from src.services.auth.profile_import import prepare_import,cancel_import
+        ident,proof=await self._profile_fixture()
+        with patch.dict(os.environ,{'LEARNHOUSE_GOOGLE_PROFILE_IMPORT_ENABLED':'true'}):
+            async with self.sessions.begin() as db:
+                user=await db.get(User,ident);self.assertEqual(user.first_name,'Provider')
+                user.first_name='';db.add(user);await cancel_import(db,ident)
+            async with self.sessions.begin() as db:
+                user=await db.get(User,ident)
+                self.assertFalse(await prepare_import(db,user,VerifiedGoogleHandoff(proof,'continue','/home')))
+                self.assertEqual(user.first_name,'')
+
+    async def test_profile_pre_feature_edits_and_linked_password_profile_not_backfilled(self):
+        from src.services.auth.profile_import import prepare_import
+        from src.services.auth.provider_profile import ProviderProfile
+        ident,_=await self.login(intent='register')
+        proof=replace(self.google,profile=ProviderProfile(given_name='Provider',picture='https://lh3.googleusercontent.com/a'))
+        with patch.dict(os.environ,{'LEARNHOUSE_GOOGLE_PROFILE_IMPORT_ENABLED':'true'}):
+            async with self.sessions.begin() as db:
+                user=await db.get(User,ident);user.update_date='user-edited-before-feature'
+                self.assertFalse(await prepare_import(db,user,VerifiedGoogleHandoff(proof,'continue','/home')))
+                self.assertEqual(user.first_name,'')
+            async with self.sessions.begin() as db:
+                user=await db.get(User,1)
+                self.assertFalse(await prepare_import(db,user,VerifiedGoogleHandoff(proof,'link','/home')))
+                self.assertEqual(user.first_name,'Synthetic')
+
+    async def test_profile_existing_native_names_and_avatar_preserved(self):
+        from src.services.auth.profile_import import prepare_import
+        from src.services.auth.provider_profile import ProviderProfile
+        ident,_=await self.login(intent='register')
+        with patch.dict(os.environ,{'LEARNHOUSE_GOOGLE_PROFILE_IMPORT_ENABLED':'true'}):
+            async with self.sessions.begin() as db:
+                user=await db.get(User,ident);user.first_name='Manual';user.avatar_image='original.png'
+                proof=replace(self.google,profile=ProviderProfile(given_name='Provider',picture='https://lh3.googleusercontent.com/a'))
+                self.assertFalse(await prepare_import(db,user,VerifiedGoogleHandoff(proof,'continue','/home')))
+                self.assertEqual(user.first_name,'Manual');self.assertEqual(user.avatar_image,'original.png')
+
+    async def test_profile_avatar_success_canonical_and_cache_refreshed(self):
+        from src.services.auth.profile_import import import_avatar
+        from src.tests.services.test_provider_profile import image_bytes
+        ident,_=await self._profile_fixture();stager=AsyncMock(return_value='canonical.png');remover=AsyncMock()
+        with patch.dict(os.environ,{'LEARNHOUSE_GOOGLE_PROFILE_IMPORT_ENABLED':'true'}), patch('src.routers.users._invalidate_session_cache') as invalidate:
+            await import_avatar(ident,sessions=self.sessions,downloader=AsyncMock(return_value=image_bytes()),stager=stager,remover=remover)
+        async with self.sessions() as db:
+            self.assertEqual((await db.get(User,ident)).avatar_image,'canonical.png')
+            row=await db.get(ProviderProfileImport,ident);self.assertEqual(row.status,'complete');self.assertIsNone(row.picture_url)
+        self.assertNotIn(b'remove-this',stager.call_args.args[0]);remover.assert_not_called();invalidate.assert_called_once_with(ident)
+
+    async def test_profile_download_failure_retries_bounded_and_login_survives(self):
+        from src.services.auth.profile_import import import_avatar
+        ident,_=await self._profile_fixture();fetch=AsyncMock(side_effect=RuntimeError('private-provider-url'))
+        with patch.dict(os.environ,{'LEARNHOUSE_GOOGLE_PROFILE_IMPORT_ENABLED':'true'}):
+            for _ in range(4):await import_avatar(ident,sessions=self.sessions,downloader=fetch)
+        self.assertEqual(fetch.await_count,3)
+        async with self.sessions() as db:
+            row=await db.get(ProviderProfileImport,ident);self.assertEqual(row.status,'failed');self.assertIsNone(row.picture_url)
+            self.assertFalse((await db.get(User,ident)).avatar_image)
+        self.assertEqual((await self.login())[0],ident)
+
+    async def test_profile_manual_avatar_wins_during_download_and_staged_cleanup(self):
+        from src.services.auth.profile_import import import_avatar,cancel_import
+        from src.tests.services.test_provider_profile import image_bytes
+        ident,_=await self._profile_fixture()
+        async def stage(data,uid):
+            async with self.sessions.begin() as db:
+                user=await db.get(User,ident);user.avatar_image='manual.png';db.add(user);await cancel_import(db,ident)
+            return 'unused-provider.png'
+        remover=AsyncMock()
+        with patch.dict(os.environ,{'LEARNHOUSE_GOOGLE_PROFILE_IMPORT_ENABLED':'true'}):
+            await import_avatar(ident,sessions=self.sessions,downloader=AsyncMock(return_value=image_bytes()),stager=stage,remover=remover)
+        async with self.sessions() as db:self.assertEqual((await db.get(User,ident)).avatar_image,'manual.png')
+        self.assertEqual(remover.call_args.args[1],'unused-provider.png')
+
+    async def test_profile_missing_table_optional_savepoint_preserves_http_login(self):
+        async with self.engine.begin() as conn:await conn.run_sync(ProviderProfileImport.__table__.drop)
+        with patch.dict(os.environ,{'LEARNHOUSE_GOOGLE_PROFILE_IMPORT_ENABLED':'true'}):
+            async with self.http_flow(allow_registration=False,public_registration=True) as client:
+                body=await self.start_http(client,'register')
+                response=await client.post('/auth/google/complete',json=body)
+                self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(tuple(await self.counts()),(1,1,4))
+
+    async def test_profile_mfa_pending_does_not_import_or_schedule(self):
+        with patch.dict(os.environ,{'LEARNHOUSE_GOOGLE_PROFILE_IMPORT_ENABLED':'true'}), patch('src.services.auth.profile_import.import_avatar',new=AsyncMock()) as worker, patch('src.services.auth.session.is_mfa_active',new=AsyncMock(return_value=True)):
+            async with self.http_flow(allow_registration=False,public_registration=True) as client:
+                body=await self.start_http(client,'register');response=await client.post('/auth/google/complete',json=body)
+                self.assertEqual(response.status_code,200);self.assertTrue(response.json()['mfa_required'])
+        worker.assert_not_awaited()
+        async with self.sessions() as db:self.assertIsNone(await db.get(ProviderProfileImport,4))
+
+    async def test_profile_duplicate_workers_download_only_once(self):
+        import asyncio
+        from src.services.auth.profile_import import import_avatar
+        from src.tests.services.test_provider_profile import image_bytes
+        ident,_=await self._profile_fixture();started=asyncio.Event();release=asyncio.Event();count=0
+        async def fetch(provider,url):
+            nonlocal count
+            count+=1;started.set();await release.wait();return image_bytes()
+        with patch.dict(os.environ,{'LEARNHOUSE_GOOGLE_PROFILE_IMPORT_ENABLED':'true'}), patch('src.routers.users._invalidate_session_cache'):
+            first=asyncio.create_task(import_avatar(ident,sessions=self.sessions,downloader=fetch,stager=AsyncMock(return_value='one.png')))
+            await started.wait();await import_avatar(ident,sessions=self.sessions,downloader=fetch)
+            release.set();await first
+        self.assertEqual(count,1)
+
+    async def test_profile_expired_last_lease_finalizes_without_new_download(self):
+        from src.services.auth.profile_import import import_avatar
+        from datetime import timedelta
+        ident,_=await self._profile_fixture()
+        async with self.sessions.begin() as db:
+            row=await db.get(ProviderProfileImport,ident);row.status='busy';row.attempts=3
+            row.lease_until=datetime.now(timezone.utc)-timedelta(seconds=100);db.add(row)
+        fetch=AsyncMock()
+        with patch.dict(os.environ,{'LEARNHOUSE_GOOGLE_PROFILE_IMPORT_ENABLED':'true'}):
+            await import_avatar(ident,sessions=self.sessions,downloader=fetch)
+        fetch.assert_not_awaited()
+        async with self.sessions() as db:
+            row=await db.get(ProviderProfileImport,ident);self.assertEqual(row.status,'failed');self.assertIsNone(row.picture_url)
+
+    async def test_profile_migration_matches_bootstrap_and_refuses_wrong_table(self):
+        import importlib.util
+        from pathlib import Path
+        from alembic.operations import Operations
+        from alembic.migration import MigrationContext
+        path=Path('/app/api/migrations/versions/e92d7f04ab16_optional_provider_profile_import.py')
+        spec=importlib.util.spec_from_file_location('profile_fixture_migration',path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+        def migrate(conn):
+            with Operations.context(MigrationContext.configure(conn)):m.upgrade()
+        async with self.engine.begin() as conn:
+            await conn.run_sync(migrate);await conn.run_sync(ProviderProfileImport.__table__.drop);await conn.run_sync(migrate);await conn.run_sync(migrate)
+        async with self.engine.begin() as conn:
+            await conn.execute(text('ALTER TABLE providerprofileimport DROP CONSTRAINT ck_profile_import_attempts'))
+        with self.assertRaisesRegex(RuntimeError,'schema needs review'):
+            async with self.engine.begin() as conn:await conn.run_sync(migrate)
+
+    async def test_profile_http_preparation_background_scheduled_after_success(self):
+        with patch.dict(os.environ,{'LEARNHOUSE_GOOGLE_PROFILE_IMPORT_ENABLED':'true'}), patch('src.services.auth.profile_import.import_avatar',new=AsyncMock()) as worker:
+            async with self.http_flow(allow_registration=False,public_registration=True) as client:
+                body=await self.start_http(client,'register')
+                response=await client.post('/auth/google/complete',json=body)
+                self.assertEqual(response.status_code,200,response.text);self.assertEqual(response.json()['user']['first_name'],'Provider')
+        worker.assert_awaited_once_with(4)
 
     async def test_http_standard_learner_discussion_creation_allows_public_signup(self):
         async with self.sessions.begin() as db:

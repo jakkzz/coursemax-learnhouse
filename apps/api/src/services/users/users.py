@@ -526,8 +526,8 @@ async def update_user(
     current_user: PublicUser | AnonymousUser,
     user_object: UserUpdate,
 ):
-    # Get user
-    statement = select(User).where(User.id == user_id)
+    # Serialize manual edits against optional provider avatar attachment.
+    statement = select(User).where(User.id == user_id).with_for_update()
     user = (await db_session.execute(statement)).scalars().first()
 
     if not user:
@@ -620,6 +620,9 @@ async def update_user(
     if email_changed:
         user.email_verified = False
         user.email_verified_at = None
+    if {'first_name', 'last_name', 'avatar_image'}.intersection(user_data):
+        from src.services.auth.profile_import import cancel_import
+        await cancel_import(db_session, user.id)
 
     for key, value in user_data.items():
         if key not in _PROTECTED_FIELDS:
@@ -756,8 +759,8 @@ async def update_user_avatar(
     current_user: PublicUser | AnonymousUser,
     avatar_file: UploadFile | None = None,
 ):
-    # Get user
-    statement = select(User).where(User.id == current_user.id)
+    # Serialize manual avatars against optional provider attachment.
+    statement = select(User).where(User.id == current_user.id).with_for_update()
     user = (await db_session.execute(statement)).scalars().first()
 
     if not user:
@@ -768,6 +771,8 @@ async def update_user_avatar(
 
     # RBAC check
     await rbac_check(request, current_user, "update", user.user_uuid, db_session)
+    from src.services.auth.profile_import import cancel_import
+    await cancel_import(db_session, user.id)
 
     # Upload avatar with security validation
     if avatar_file and avatar_file.filename:

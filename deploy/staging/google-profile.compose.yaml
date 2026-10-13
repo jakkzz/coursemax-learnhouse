@@ -1,0 +1,6 @@
+# Optional API-only profile enrichment. Apply only after reviewed schema/build.
+# Existing native Google deployment does not include this override.
+services:
+  app:
+    environment:
+      LEARNHOUSE_GOOGLE_PROFILE_IMPORT_ENABLED: ${LEARNHOUSE_GOOGLE_PROFILE_IMPORT_ENABLED:-false}

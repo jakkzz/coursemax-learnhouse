@@ -37,6 +37,7 @@ docker run --rm --pull=never --network none --read-only \
   --memory 192m --cpus 0.5 --pids-limit 64 --tmpfs /tmp:rw,size=16m \
   -v "$SCRATCH:/scratch" \
   -v "$ROOT/apps/api/src/services/auth/provider_proof.py:/app/api/src/services/auth/provider_proof.py:ro" \
+  -v "$ROOT/apps/api/src/services/auth/provider_profile.py:/app/api/src/services/auth/provider_profile.py:ro" \
   -v "$ROOT/apps/api/src/services/auth/oauth_transactions.py:/app/api/src/services/auth/oauth_transactions.py:ro" \
   -v "$ROOT/apps/api/src/services/auth/google_handoff.py:/app/api/src/services/auth/google_handoff.py:ro" \
   -v "$ROOT/apps/api/src/tests/services/test_provider_proof.py:/app/api/src/tests/services/test_provider_proof.py:ro" \

@@ -4,9 +4,10 @@ from dataclasses import dataclass, field
 import hashlib
 import json
 import os
+import logging
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
 from sqlalchemy.exc import IntegrityError
@@ -162,8 +163,9 @@ async def start(request: Request, response: Response, body: StartBody, db: Async
 
 
 @router.post('/complete')
-async def complete(request: Request, response: Response, body: CompleteBody, db: AsyncSession = Depends(get_db_session)):
+async def complete(request: Request, response: Response, body: CompleteBody, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db_session)):
     config = settings()
+    profile_queued = False
     boundary(request, config)
     actor = await actor_for(request, db, body.intent)
     try:
@@ -175,6 +177,15 @@ async def complete(request: Request, response: Response, body: CompleteBody, db:
                     intent=body.intent, code=body.code, provider_error=body.provider_error,
                     actor=actor, client=http)
         user, session = await complete_native_google(db, verified, org_id=config.org_id)
+        if not session.mfa_required:
+            from src.services.auth.profile_import import enabled, prepare_import
+            if enabled():
+                try:
+                    async with db.begin_nested():
+                        profile_queued = await prepare_import(db, user, verified)
+                except Exception:
+                    logging.getLogger(__name__).warning('Optional provider profile import unavailable')
+                    await db.refresh(user)
         await db.commit()
     except (GoogleHandoffError, IdentityConflict, IntegrityError) as error:
         await db.rollback()
@@ -183,6 +194,9 @@ async def complete(request: Request, response: Response, body: CompleteBody, db:
     except BaseException:
         await db.rollback()
         raise
+    if profile_queued:
+        from src.services.auth.profile_import import import_avatar
+        background_tasks.add_task(import_avatar, user.id)
     response.headers['Cache-Control'] = 'no-store'
     # Keep shared binding cookie until TTL for concurrent tabs; state is single-use.
     if session.mfa_required:

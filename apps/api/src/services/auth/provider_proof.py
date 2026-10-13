@@ -1,7 +1,8 @@
 """Server-side provider proof, not account resolution or session issuance.
 
-Not wired to a login route yet. Callers must first consume a browser-bound,
-server-created OAuth transaction; its nonce is NOT a client-supplied claim.
+Google's native login route first consumes a browser-bound, server-created OAuth
+transaction; its nonce is NOT a client-supplied claim. LINE primitives remain
+unactivated. Optional profile attributes are captured only after verification.
 Google/LINE subjects subsequently require persisted ownership checks. In
 particular, verified LINE proof does not authorize registration or linking.
 
@@ -20,6 +21,7 @@ from typing import Literal
 import httpx
 import jwt
 from pydantic import EmailStr, TypeAdapter, ValidationError
+from src.services.auth.provider_profile import ProviderProfile, extract_profile
 
 GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs"
 LINE_VERIFY_URL = "https://api.line.me/oauth2/v2.1/verify"
@@ -42,6 +44,7 @@ class ProviderProof:
     namespace: str
     subject: str = field(repr=False)
     verified_email: str | None = field(default=None, repr=False)
+    profile: ProviderProfile | None = field(default=None, repr=False)
 
 
 def _opaque(value: object, maximum: int = 255) -> bool:
@@ -178,7 +181,8 @@ async def verify_google_id_token(
         email = str(_EMAIL.validate_python(claims.get("email")))
     except ValidationError:
         raise ProviderProofError("invalid_provider_token") from None
-    return ProviderProof("google", GOOGLE_ISSUERS[0], "global", subject, email)
+    return ProviderProof("google", GOOGLE_ISSUERS[0], "global", subject, email,
+                         extract_profile('google', claims))
 
 
 async def _verify_line(
@@ -198,7 +202,8 @@ async def _verify_line(
         raise ProviderProofError("invalid_provider_token")
     subject = _claims(claims, nonce)
     # LINE email, if supplied, is not proof of our Google verified-email policy.
-    return ProviderProof("line", LINE_ISSUER, provider_namespace, subject)
+    return ProviderProof("line", LINE_ISSUER, provider_namespace, subject,
+                         profile=extract_profile('line', claims))
 
 
 async def verify_line_oauth_token(

@@ -36,8 +36,10 @@ match the original cryptographically bound intent. Link actor/session context mu
 always come from verified native authentication, not request JSON.
 
 These primitives are not connected to existing native OAuth routes. Unit tests
-exercise an atomic in-memory store and the Redis command contract; an isolated real
-Redis concurrency/expiry test is still required before route activation.
+exercise an atomic in-memory store and the Redis command contract. The opt-in
+integration suite also runs the real Lua script against disposable Redis, including
+32 simultaneous callbacks, expiry, malformed records and context/actor isolation.
+Native HTTP/cookie integration and provider-account acceptance are still required.
 
 ## Before connecting a route
 
@@ -63,4 +65,18 @@ python -m unittest discover -s src/tests/services -p test_oauth_transactions.py 
 Tests generate ephemeral signing keys and use HTTPX mock transports. They do not
 contact providers, need credentials, create accounts or write a database. They
 prove verifier/transaction contracts, not an end-to-end OAuth or account-linking
-flow. Transaction tests use only the Python standard library.
+flow. Transaction unit tests use only the Python standard library.
+
+## Real Redis integration
+
+From the repository root:
+
+```sh
+bash deploy/staging/test_oauth_redis.sh
+```
+
+This resource-gated harness uses pinned **already cached** API/Redis images,
+`--pull=never`, no TCP networking, no host ports and no application volumes or
+secrets. The two disposable containers share only a private temporary Unix socket.
+It runs all proof/transaction unit tests plus the real Redis integration tests.
+The fixture disables persistence and removes only its own socket/container.

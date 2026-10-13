@@ -98,6 +98,7 @@ services:
       traefik.http.services.learnhouse-staging.loadbalancer.server.port: '80'
       traefik.http.routers.learnhouse-staging-http.rule: Host(`${LEARNHOUSE_HOST:?Set hostname}`)
       traefik.http.routers.learnhouse-staging-http.entrypoints: http
+      traefik.http.routers.learnhouse-staging-http.observability.accesslogs: 'false'
       traefik.http.routers.learnhouse-staging-http.middlewares: learnhouse-staging-https
       traefik.http.routers.learnhouse-staging-http.service: learnhouse-staging
       traefik.http.middlewares.learnhouse-staging-https.redirectscheme.scheme: https

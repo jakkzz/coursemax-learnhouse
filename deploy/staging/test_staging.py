@@ -62,6 +62,11 @@ class RuntimeTests(unittest.TestCase):
         self.assertIn("~^POST:/api/signup/?$ 1;", config)
         self.assertNotIn("Domain=", config)
 
+    def test_both_public_routers_suppress_callback_url_logging(self):
+        compose = (ROOT / "compose.yaml").read_text()
+        for router in ("learnhouse-staging", "learnhouse-staging-http"):
+            self.assertIn(f"traefik.http.routers.{router}.observability.accesslogs: 'false'", compose)
+
     def test_token_injection_rejected(self):
         with self.assertRaises(ValueError):
             runtime.gateway_config("learn.example.com", '"; return 200;')

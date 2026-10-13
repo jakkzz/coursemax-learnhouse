@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next'
 import { resendVerificationEmail } from '@services/auth/auth'
 import AuthLayout from '@components/Auth/AuthLayout'
 import LineSignIn from '@components/Auth/LineSignIn'
+import ProviderButton from '@components/Auth/ProviderButton'
 import TurnstileWidget, { useTurnstileRequired, verifyTurnstileToken, type TurnstileWidgetHandle } from '@components/Auth/TurnstileWidget'
 import { useLHAnalytics, AnalyticsEvent } from '@services/analytics'
 import { getAllowedAuthMethods } from '@services/auth/authMethods'
@@ -49,6 +50,7 @@ const LoginClient = (props: LoginClientProps) => {
   const magicLoginAllowed = allowedMethods.has('magic_login')
   const [googleCapability, setGoogleCapability] = useState({ google: false, registration: false, public_registration: false })
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [lineBusy, setLineBusy] = useState(false)
   const googleAllowed = googleCapability.google && allowedMethods.has('google')
   useEffect(() => {
     let active = true
@@ -60,7 +62,8 @@ const LoginClient = (props: LoginClientProps) => {
   }, [])
   const ssoAllowed = allowedMethods.has('sso')
   // SSO counts only once it is actually configured for the org (ssoEnabled).
-  const hasAlternativeMethods = googleAllowed || magicLoginAllowed || (ssoAllowed && ssoEnabled)
+  const [lineAvailable, setLineAvailable] = useState(false)
+  const hasAlternativeMethods = googleAllowed || (allowedMethods.has('line') && lineAvailable) || magicLoginAllowed || (ssoAllowed && ssoEnabled)
 
   // A signed-in user has nothing to do on /login → bounce to the hub. The proxy
   // does this best-effort, but pages must self-handle it too (mirrors signup.tsx).
@@ -232,7 +235,7 @@ const LoginClient = (props: LoginClientProps) => {
   }, [mfaCode, useBackupCode, mfaSubmitting, mfaToken]) // eslint-disable-line
 
   const handleGoogleSignIn = async (intent: 'signin' | 'register' = 'signin') => {
-    if (googleLoading) return
+    if (googleLoading || lineBusy || isSubmitting) return
     setGoogleLoading(true)
     track(AnalyticsEvent.LoginGoogleClicked)
     try {
@@ -343,6 +346,7 @@ const LoginClient = (props: LoginClientProps) => {
     validateOnBlur: true,
     validateOnChange: true,
     onSubmit: async (values, {validateForm, setErrors, setSubmitting}) => {
+      if (googleLoading || lineBusy) return
       setIsSubmitting(true)
       setError('')
       setErrorType(null)
@@ -765,18 +769,17 @@ const LoginClient = (props: LoginClientProps) => {
             </p>
 
             <div className="mt-8">
-              {googleAllowed && (
-                <div className="mb-6">
-                  <button type="button"
+              <div className="space-y-3">
+                {googleAllowed && (
+                  <ProviderButton provider="google" primary
                     onClick={() => handleGoogleSignIn(googleCapability.public_registration ? 'register' : 'signin')}
-                    disabled={isSubmitting || googleLoading}
-                    className="flex justify-center items-center w-full bg-black hover:bg-neutral-800 text-white space-x-3 font-semibold p-3 rounded-lg border border-black transition-all text-base disabled:opacity-50">
-                    <img src="https://fonts.gstatic.com/s/i/productlogos/googleg/v6/24px.svg" alt="" className="w-5 h-5" />
-                    <span>{googleLoading ? t('common.loading') : googleCapability.public_registration ? t('auth.google_continue') : t('auth.sign_in_with_google')}</span>
-                  </button>
-                  {passwordAllowed && <p className="mt-5 text-center text-sm text-black/70">{t('auth.google_password_alternative')}</p>}
-                </div>
-              )}
+                    disabled={isSubmitting || googleLoading || lineBusy} aria-busy={googleLoading}>
+                    {googleLoading ? t('common.loading') : googleCapability.public_registration ? t('auth.google_continue') : t('auth.sign_in_with_google')}
+                  </ProviderButton>
+                )}
+                {allowedMethods.has('line') && <LineSignIn disabled={isSubmitting || googleLoading} onAvailabilityChange={setLineAvailable} onBusyChange={setLineBusy} />}
+              </div>
+              {passwordAllowed && hasAlternativeMethods && <p className="my-6 text-center text-sm text-neutral-600">{t('auth.google_password_alternative')}</p>}
               {passwordAllowed && (
               <FormLayout onSubmit={formik.handleSubmit}>
                 <FormField name="email">
@@ -836,8 +839,8 @@ const LoginClient = (props: LoginClientProps) => {
 
                 <Form.Submit asChild>
                   <button
-                    disabled={isSubmitting || (turnstileRequired && !turnstileToken)}
-                    className="box-border w-full inline-flex h-[44px] rounded-lg items-center justify-center bg-black hover:bg-black/85 text-white px-[15px] font-bold text-[14px] leading-none mt-2 transition-all disabled:opacity-50"
+                    disabled={isSubmitting || googleLoading || lineBusy || (turnstileRequired && !turnstileToken)}
+                    className="box-border w-full inline-flex min-h-12 rounded-lg items-center justify-center bg-black hover:bg-black/85 text-white px-4 py-3 font-semibold text-base mt-2 transition-colors focus-visible:outline-2 focus-visible:outline-neutral-900! focus-visible:outline-offset-2 disabled:opacity-50"
                   >
                     {isSubmitting ? (
                       <span className="flex items-center space-x-2">
@@ -866,7 +869,6 @@ const LoginClient = (props: LoginClientProps) => {
 
               {/* Social & SSO Buttons */}
               <div className="space-y-2.5">
-                {allowedMethods.has('line') && <LineSignIn />}
                 {googleAllowed && googleCapability.registration && !googleCapability.public_registration && (
                   <button type="button" onClick={() => handleGoogleSignIn('register')} disabled={isSubmitting || googleLoading}
                     className="w-full rounded-lg p-3 text-sm font-medium text-black underline underline-offset-4 disabled:opacity-50">

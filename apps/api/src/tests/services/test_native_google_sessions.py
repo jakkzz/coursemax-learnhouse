@@ -353,6 +353,68 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
                                    headers={'Origin': oauth.public_origin}) as client:
                 yield client
 
+    async def test_http_google_account_status_is_private_owned_and_read_only(self):
+        await self.link()
+        _, session = await self.login()
+        before = tuple(await self.counts())
+        async with self.http_flow() as client:
+            anonymous = await client.get('/auth/google/account')
+            self.assertEqual(anonymous.status_code, 401)
+            self.assertEqual(anonymous.headers['cache-control'], 'private, no-store')
+            client.cookies.set('LH_access', session.access_token)
+            response = await client.get('/auth/google/account?user_id=2')
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.json(), {'linked': True})
+            self.assertEqual(response.headers['cache-control'], 'private, no-store')
+            self.assertEqual(response.headers['vary'], 'Cookie, Authorization')
+            client.cookies.clear()
+            client.cookies.set('LH_access', create_access_token({'sub': 'fixture2@example.com', 'amr': 'password', 'sorg': 1}))
+            other = await client.get('/auth/google/account?user_id=1')
+            self.assertEqual(other.status_code, 200, other.text)
+            self.assertEqual(other.json(), {'linked': False})
+        self.assertEqual(tuple(await self.counts()), before)
+        self.assertEqual(self.google_requests, [])
+
+    async def test_http_google_account_retired_binding_is_not_connected(self):
+        from src.db.provider_identity import ProviderIdentity, ProviderIdentityEvent
+        identity_id = await self.link()
+        async with self.sessions.begin() as db:
+            row = await db.get(ProviderIdentity, identity_id)
+            row.retired_at = datetime.now(timezone.utc)
+            row.retirement_reason = 'synthetic_status_test'
+            db.add(row)
+            db.add(ProviderIdentityEvent(identity_id=identity_id, actor_user_id=1, kind='retired', reason='synthetic_status_test'))
+        before = tuple(await self.counts())
+        async with self.http_flow() as client:
+            client.cookies.set('LH_access', create_access_token({'sub': 'fixture1@example.com', 'amr': 'password', 'sorg': 1}))
+            response = await client.get('/auth/google/account')
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.json(), {'linked': False})
+        self.assertEqual(tuple(await self.counts()), before)
+
+    async def test_http_google_account_token_actor_cannot_read_a_colliding_user_id(self):
+        from types import SimpleNamespace
+        from src.routers import google_subject_auth as route
+        await self.link()
+        async with self.http_flow() as client:
+            with patch.object(route, 'get_current_user', new=AsyncMock(return_value=SimpleNamespace(id=1))):
+                response = await client.get('/auth/google/account')
+                self.assertEqual(response.status_code, 401)
+                self.assertNotIn('linked', response.json())
+        self.assertEqual(tuple(await self.counts()), (1, 1, 3))
+
+    async def test_http_google_account_status_does_not_require_enabled_admission(self):
+        from src.routers import google_subject_auth as route
+        await self.link()
+        _, session = await self.login()
+        async with self.http_flow() as client:
+            client.cookies.set('LH_access', session.access_token)
+            with patch.object(route, 'settings', side_effect=HTTPException(503, 'Disabled')):
+                response = await client.get('/auth/google/account')
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertEqual(response.json(), {'linked': True})
+        self.assertEqual(self.google_requests, [])
+
     async def start_http(self, client, intent, **extra):
         response = await client.post('/auth/google/start', json={'intent': intent, 'return_path': '/home', **extra})
         self.assertEqual(response.status_code, 200, response.text)

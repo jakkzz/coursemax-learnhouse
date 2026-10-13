@@ -3,7 +3,7 @@ import { useLHSession } from '@components/Contexts/LHSessionContext'
 import { updatePassword } from '@services/settings/password'
 import { Formik, Form } from 'formik'
 import React from 'react'
-import Link from 'next/link'
+import SignInMethods from './SignInMethods'
 import {
   AlertTriangle,
   Monitor,
@@ -479,19 +479,19 @@ function TwoFactorAuthSection() {
   )
 
   const sectionHeader = (
-    <div className="flex flex-col bg-gray-50 -space-y-1 px-5 py-3 mx-3 my-3 rounded-md">
-      <h1 className="font-bold text-xl text-gray-800 flex items-center gap-2">
+    <div className="space-y-1">
+      <h2 id="account-mfa-title" className="font-semibold text-lg text-neutral-900 flex items-center gap-2">
         <ShieldCheck size={18} className="text-gray-500" />
         {t('user.settings.security.mfa.title', {
           defaultValue: 'Two-factor authentication',
         })}
-      </h1>
-      <h2 className="text-gray-500 text-md ps-7">
+      </h2>
+      <p className="text-sm leading-relaxed text-neutral-600">
         {t('user.settings.security.mfa.subtitle', {
           defaultValue:
             'Ask for a one-time code from your authenticator app whenever you sign in.',
         })}
-      </h2>
+      </p>
     </div>
   )
 
@@ -1041,54 +1041,11 @@ function TwoFactorAuthSection() {
   }
 
   return (
-    <>
+    <section aria-labelledby="account-mfa-title" className="border-t border-neutral-200 pt-6">
       {sectionHeader}
-      <div className="mx-5 mb-6">{body}</div>
-    </>
-  )
-}
-
-function GoogleLinkSection() {
-  const { t } = useTranslation()
-  const [available, setAvailable] = React.useState(false)
-  React.useEffect(() => {
-    let active = true
-    fetch('/api/auth/google/capabilities', { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (active) setAvailable(data?.google === true) })
-      .catch(() => {})
-    return () => { active = false }
-  }, [])
-  if (!available) return null
-  return (
-    <section className="space-y-3">
-      <h2 className="text-lg font-semibold">{t('auth.google_link_title', { defaultValue: 'Link Google to your account' })}</h2>
-      <p className="text-sm leading-relaxed">{t('auth.google_link_description', { defaultValue: 'Linking adds Google as a sign-in method without changing your email, role or course access.' })}</p>
-      <Link href="/auth/link/google" className="inline-flex rounded-lg border px-4 py-3 text-sm font-medium">
-        {t('auth.google_link_continue', { defaultValue: 'Choose the Google account to link' })}
-      </Link>
+      <div className="mt-4">{body}</div>
     </section>
   )
-}
-
-function LineLinkSection() {
-  const { t } = useTranslation()
-  const [available, setAvailable] = React.useState(false)
-  React.useEffect(() => {
-    let active = true
-    fetch('/api/auth/line/capabilities', { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (active) setAvailable(data?.link === true) }).catch(() => {})
-    return () => { active = false }
-  }, [])
-  if (!available) return null
-  return <section className="space-y-3">
-    <h2 className="text-lg font-semibold">{t('auth.line_link_title')}</h2>
-    <p className="text-sm leading-relaxed">{t('auth.line_link_description')}</p>
-    <Link href="/auth/link/line" className="inline-flex rounded-lg border px-4 py-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2">
-      {t('auth.line_manage')}
-    </Link>
-  </section>
 }
 
 function AccountSecurity() {
@@ -1154,18 +1111,21 @@ function AccountSecurity() {
   return (
     <>
     <div className="bg-white rounded-xl nice-shadow">
-      <div className="flex flex-col gap-0">
+      <div className="space-y-6 p-4 sm:p-6 [&_button]:min-h-11">
+        <h1 className="text-xl font-semibold text-neutral-900">{t('account.security')}</h1>
+        <SignInMethods />
         {/* Current session / device */}
-        <div className="flex flex-col bg-gray-50 -space-y-1 px-5 py-3 mx-3 mt-3 rounded-md">
-          <h1 className="font-bold text-xl text-gray-800">
+        <section className="border-t border-neutral-200 pt-6" aria-labelledby="current-session-title">
+        <div className="space-y-1">
+          <h2 id="current-session-title" className="font-semibold text-lg text-neutral-900">
             {t('user.settings.security.current_session_title', { defaultValue: 'Current session' })}
-          </h1>
-          <h2 className="text-gray-500 text-md">
-            {t('user.settings.security.current_session_subtitle', { defaultValue: 'The device you are signed in from right now.' })}
           </h2>
+          <p className="text-sm leading-relaxed text-neutral-600">
+            {t('user.settings.security.current_session_subtitle', { defaultValue: 'The device you are signed in from right now.' })}
+          </p>
         </div>
-        <div className="mx-5 mt-3 mb-6">
-          <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+        <div className="mt-4">
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 p-4">
             <div className="flex items-center gap-3 min-w-0">
               <Monitor className="text-gray-400 shrink-0" size={20} />
               <div className="min-w-0">
@@ -1188,16 +1148,18 @@ function AccountSecurity() {
           </div>
         </div>
 
-        <div className="flex flex-col bg-gray-50 -space-y-1 px-5 py-3 mx-3 my-3 rounded-md">
-          <h1 className="font-bold text-xl text-gray-800">
+        </section>
+        <section className="border-t border-neutral-200 pt-6" aria-labelledby="password-title">
+        <div className="space-y-1">
+          <h2 id="password-title" className="font-semibold text-lg text-neutral-900">
             {t('user.settings.password.title')}
-          </h1>
-          <h2 className="text-gray-500 text-md">
-            {t('user.settings.password.subtitle')}
           </h2>
+          <p className="text-sm leading-relaxed text-neutral-600">
+            {t('user.settings.password.subtitle')}
+          </p>
         </div>
 
-        <div className="mx-5 mb-5">
+        <div className="mt-4">
           <Formik
             initialValues={{ old_password: '', new_password: '' }}
             validationSchema={validationSchema}
@@ -1213,7 +1175,7 @@ function AccountSecurity() {
             }}
           >
             {({ isSubmitting, handleChange, errors, touched }) => (
-              <Form className="w-full max-w-2xl mx-auto space-y-6">
+              <Form className="w-full max-w-2xl space-y-6">
                 <div>
                   <Label htmlFor="old_password">{t('user.settings.password.current_password')}</Label>
                   <Input
@@ -1244,7 +1206,7 @@ function AccountSecurity() {
                   )}
                 </div>
 
-                <div className="flex items-center space-x-2 text-amber-600 bg-amber-50 p-3 rounded-md">
+                <div className="flex items-center space-x-2 text-amber-900 bg-amber-50 p-3 rounded-md">
                   <AlertTriangle size={16} />
                   <span className="text-sm">{t('user.settings.password.logout_warning')}</span>
                 </div>
@@ -1263,9 +1225,8 @@ function AccountSecurity() {
           </Formik>
         </div>
 
+        </section>
         {/* Two-factor authentication (TOTP) */}
-        <GoogleLinkSection />
-        <LineLinkSection />
         <TwoFactorAuthSection />
       </div>
     </div>

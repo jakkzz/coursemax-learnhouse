@@ -104,6 +104,7 @@ function LayoutContent({ children, orgslug }: { children: ReactNode; orgslug: st
   // Pages that use a full-bleed layout (no footer/watermark)
   const noFooterPaths = ['copilot']
   const isFullBleedPage = noFooterPaths.some((p) => pathParts.includes(p))
+  const isAccountPage = pathParts.includes('account')
 
   return (
     <div
@@ -111,7 +112,7 @@ function LayoutContent({ children, orgslug }: { children: ReactNode; orgslug: st
       // font-family in Arabic, where Tajawal replaces the org's custom face
       // outright. An inline style beats any normal rule, so the override has to
       // target this element specifically.
-      className="lh-org-font-root flex flex-col min-h-screen"
+      className={`lh-org-font-root flex flex-col min-h-screen ${isAccountPage ? 'pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-0' : ''}`}
       style={{
         backgroundColor: primaryColor ? hexToRgba(primaryColor, 0.05) : 'transparent',
         ...(customFont ? { fontFamily: `'${customFont}', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif` } : {}),
@@ -126,7 +127,7 @@ function LayoutContent({ children, orgslug }: { children: ReactNode; orgslug: st
         {children}
       </div>
       {!isFullBleedPage && !chromeless && <OrgFooter />}
-      {!isFullBleedPage && !chromeless && <Watermark />}
+      {!isFullBleedPage && !chromeless && <Watermark inFlow={isAccountPage} />}
     </div>
   )
 }

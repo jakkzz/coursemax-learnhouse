@@ -62,21 +62,21 @@ export default function AccountDangerZone() {
   }
 
   return (
-    <div className="bg-white rounded-xl nice-shadow ring-1 ring-inset ring-red-100 overflow-hidden mt-6">
-      <div className="flex flex-col bg-red-50/60 -space-y-1 px-5 py-3 mx-3 mt-3 rounded-md">
-        <h1 className="font-bold text-xl text-red-700 flex items-center gap-2">
+    <div className="bg-white rounded-xl nice-shadow ring-1 ring-inset ring-red-100 overflow-hidden mt-6 p-4 sm:p-6">
+      <div className="space-y-1">
+        <h2 className="font-semibold text-lg text-red-700 flex items-center gap-2">
           <AlertTriangle size={18} />
           {t('account.delete.title', { defaultValue: 'Delete account' })}
-        </h1>
-        <h2 className="text-red-500/80 text-md ps-7">
+        </h2>
+        <p className="text-sm leading-relaxed text-red-700">
           {t('account.delete.zone_subtitle', {
             defaultValue: 'Permanently delete your account. This cannot be undone.',
           })}
-        </h2>
+        </p>
       </div>
 
-      <div className="mx-5 mt-3 mb-5 sm:flex sm:items-center sm:justify-between gap-4">
-        <p className="text-sm text-gray-500 max-w-xl">
+      <div className="mt-4 sm:flex sm:items-center sm:justify-between gap-4">
+        <p className="text-sm leading-relaxed text-gray-600 max-w-xl">
           {t('account.delete.zone_body', {
             defaultValue:
               'This removes your account and access. Any organization you are the sole admin of (and all of its courses and content) will be deleted too. Organizations with other admins are kept; you are simply removed from them.',
@@ -90,7 +90,7 @@ export default function AccountDangerZone() {
               setConfirmText('')
               setConfirmOpen(true)
             }}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg text-white bg-red-600 hover:bg-red-700 transition-colors"
+            className="inline-flex min-h-11 items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg text-white bg-red-600 hover:bg-red-700 transition-colors focus-visible:outline-2 focus-visible:outline-red-700! focus-visible:outline-offset-2"
           >
             <Trash2 size={15} />
             {t('account.delete.title', { defaultValue: 'Delete account' })}

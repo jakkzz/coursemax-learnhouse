@@ -129,6 +129,27 @@ async def capabilities(db: AsyncSession = Depends(get_db_session)):
             'public_registration': config.handoff.public_registration}
 
 
+@router.get('/account')
+async def account(request: Request, response: Response, db: AsyncSession = Depends(get_db_session)):
+    """Private, read-only connection status; never expose a provider subject."""
+    from sqlmodel import select
+    from src.db.provider_identity import ProviderIdentity
+
+    private_headers = {'Cache-Control': 'private, no-store', 'Vary': 'Cookie, Authorization'}
+    user = await get_current_user(request, db)
+    if not isinstance(user, PublicUser):
+        raise HTTPException(401, 'Sign in first', headers=private_headers)
+    response.headers.update(private_headers)
+    identity_id = (await db.exec(select(ProviderIdentity.id).where(
+        ProviderIdentity.user_id == user.id,
+        ProviderIdentity.provider == 'google',
+        ProviderIdentity.issuer == 'https://accounts.google.com',
+        ProviderIdentity.namespace == 'global',
+        ProviderIdentity.retired_at.is_(None),
+    ))).first()
+    return {'linked': identity_id is not None}
+
+
 @router.post('/start')
 async def start(request: Request, response: Response, body: StartBody, db: AsyncSession = Depends(get_db_session)):
     config = settings()

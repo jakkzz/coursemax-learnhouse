@@ -168,8 +168,6 @@ const nextConfig = {
       webpackMemoryOptimizations: true, webpackBuildWorker: true,
       turbopackGc: true,
       turbopackPluginRuntimeStrategy: 'workerThreads',
-      // Staging-only low-memory build; normal builds retain minification.
-      turbopackMinify: false,
     } : {}),
     optimizePackageImports: [
       '@phosphor-icons/react',

@@ -22,7 +22,7 @@ trap cleanup EXIT
 docker run -d --pull=never --name "$NAME" --memory 4096m --cpus 1 --read-only --ulimit core=0 --oom-score-adj 500 \
   --tmpfs /scratch:rw,exec,size=2048m --tmpfs /tmp:rw,size=64m \
   -v "$ROOT/apps/web:/source:ro" \
-  -v "$OUT/dependencies:/scratch/web/.build-deps:rw" \
+  -v "$OUT/dependencies:/scratch/web/node_modules/.build-deps:rw" \
   -v "$ROOT/deploy/staging/native_web_dependency_budget.py:/budget.py:ro" \
   -e NEXT_TELEMETRY_DISABLED=1 -e BUN_INSTALL_CACHE_DIR=/scratch/cache \
   -e NODE_OPTIONS=--max-old-space-size=2048 -e LEARNHOUSE_DISABLE_EE=1 -e LEARNHOUSE_BUILD_CPUS=1 -e LEARNHOUSE_BUILD_LOW_MEMORY=true \

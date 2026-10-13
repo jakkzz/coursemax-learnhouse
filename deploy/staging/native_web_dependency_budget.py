@@ -11,7 +11,9 @@ assert web.is_dir() and cache.is_dir()
 # are hardlinks. This is not host/Docker cache pruning.
 shutil.rmtree(cache)
 modules = web / 'node_modules'
-destination = web / '.build-deps'
+# Keep relocated packages inside node_modules so Tailwind/TypeScript and
+# framework content detection do not scan dependencies as application source.
+destination = modules / '.build-deps'
 assert destination.is_dir()
 packages = []
 for path in modules.iterdir():

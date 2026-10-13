@@ -1,7 +1,7 @@
 import json
 import logging
 from typing import Literal, List, Optional, Union
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, Query
 from pydantic import BaseModel, EmailStr
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.core.redis import get_redis_client as _get_redis_pool_client
@@ -327,6 +327,7 @@ async def api_create_user_without_org(
 async def api_get_user_by_id(
     *,
     request: Request,
+    response: Response,
     db_session: AsyncSession = Depends(get_db_session),
     current_user: PublicUser = Depends(get_authenticated_user),
     user_id: int,
@@ -339,6 +340,8 @@ async def api_get_user_by_id(
     receives native email for Account Settings; other callers remain redacted.
     Platform/internal metadata is always excluded.
     """
+    response.headers['Cache-Control'] = 'private, no-store'
+    response.headers['Vary'] = 'Cookie, Authorization'
     return await read_user_by_id(request, db_session, current_user, user_id)
 
 

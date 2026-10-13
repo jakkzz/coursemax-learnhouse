@@ -84,6 +84,8 @@ class TestGetUserById:
         assert response.status_code == 200
         body = response.json()
         assert body['email'] == admin_user.email
+        assert response.headers['cache-control'] == 'private, no-store'
+        assert response.headers['vary'] == 'Cookie, Authorization'
         for field in ('extra_metadata', 'is_superadmin', 'signup_method', 'password'):
             assert field not in body
 

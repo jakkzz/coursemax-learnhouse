@@ -1,8 +1,10 @@
 # Provider-proof foundation
 
 `provider_proof.py` verifies external proof without resolving accounts or issuing
-sessions. It is **not wired to login routes**. Existing Google login still uses
-`utils.py`; merely installing this module does not change that behavior.
+sessions. `google_subject_auth.py` now connects it through transactions, handoff,
+subject ownership and native session policy. Activation is deny-by-default; the old
+Google `/auth/oauth` bridge returns410 instead of using email lookup. Source wiring
+and tests do not establish deployment, browser acceptance or actual Google acceptance.
 
 - Google: signed RS256 ID token, fixed JWKS endpoint, issuer/audience/authorized
   party, expiry/issued-at, transaction nonce, subject and verified email.
@@ -35,8 +37,8 @@ transaction object to a browser. Callback intent can be an untrusted hint, but m
 match the original cryptographically bound intent. Link actor/session context must
 always come from verified native authentication, not request JSON.
 
-These primitives are not connected to existing native OAuth routes. Unit tests
-exercise an atomic in-memory store and the Redis command contract. The opt-in
+The Google subject-owned routes use these primitives rather than the retired native
+OAuth bridge. Unit tests exercise an atomic in-memory store and the Redis command contract. The opt-in
 integration suite also runs the real Lua script against disposable Redis, including
 32 simultaneous callbacks, expiry, malformed records and context/actor isolation.
 Native HTTP/cookie integration and provider-account acceptance are still required.
@@ -58,8 +60,8 @@ or enrollment grant, and no public registration switch. Existing signin/link int
 return internal proof/context only; signin must not fall back to creating a user.
 
 The frozen result is **not a browser response** and must not be serialized directly.
-Native ownership/account/session/MFA/org checks and atomic registration still need
-integration. No routes or credentials are enabled by this module. Public password
+Native ownership/account/session/MFA/org checks and atomic registration are integrated
+by `native_google.py` and the new router. No credentials are enabled by this module. Public password
 signup and LINE UI remain later work; existing bootstrap password login is unchanged.
 
 The cached-image Redis harness also runs the handoff matrix with real transaction
@@ -86,12 +88,14 @@ merges. Unknown LINE proof yields linking guidance, never account creation.
   create_all-first bootstrap. It imports no identities. Downgrade locks both tables
   and refuses to destroy any retained binding/event.
 
-**Not route-ready:** ownership resolution is not session authorization. Session
-issuance must lock/recheck the binding and active account, enforce native MFA/org
-policy, and use a stable account subject. Replacement must invalidate affected
-native sessions; retirement alone does not revoke existing JWTs. Native email-based
-OAuth fallback must be removed/guarded before provider activation. Both proofs and
-actor/session context must be server-verified, not request-body assertions.
+Ownership resolution is not session authorization. The native Google controller
+locks/rechecks the binding/account, enforces org/MFA policy and mints `lh:user:<id>`
+subjects with issuer/audience/UUID/binding claims. Provider REST/refresh/MFA validation
+rechecks active ownership and revocation; retirement denies old bound tokens. Password
+sessions retain their compatible email-subject format under the same native authority.
+Continuous collaboration/file lifecycle acceptance remains separate; replacement is
+not exposed as an ordinary linking endpoint. Proof and actor/session context must
+always be server-verified, not request-body assertions.
 
 Run isolated PostgreSQL tests from the repository root:
 
@@ -116,6 +120,45 @@ controls are integrated and tested. Apply exact-origin/CSRF and rate-limit guard
 reject ambiguous security cookies, authorize linking against a currently active,
 verified Google-bound account, and recheck lifecycle/ownership before issuing the
 native session. Do not infer these permissions from a valid OAuth transaction.
+
+## Native Google routes and activation
+
+Public capabilities and server-owned POST start/complete live under
+`/api/v1/auth/google`. Exact configured HTTPS Origin is required for mutations;
+ambiguous security cookies and excess attempts are rejected. Linking authenticates
+the initiating session and requires its existing password for non-Google sessions.
+Registration uses the handoff admission allowlist, a validated PostgreSQL email
+uniqueness index, a reviewed global learner role and one outer account/membership/
+binding transaction. There is no email merge, institution privilege or enrollment grant.
+
+Server-only configuration:
+
+- `LEARNHOUSE_GOOGLE_SUBJECT_LOGIN_ENABLED=true` (otherwise disabled)
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+- `LEARNHOUSE_GOOGLE_REGISTRATION_EMAILS`: JSON list of explicitly approved emails;
+  empty disables registration, not linked sign-in
+- `LEARNHOUSE_GOOGLE_ORG_ID`: reviewed target organization
+- `LEARNHOUSE_OAUTH_TRANSACTION_SECRET`: independently generated >=32 bytes
+- `LEARNHOUSE_OAUTH_DEPLOYMENT`: environment-specific transaction namespace
+- Native hosting SSL/domain and Redis configuration must be valid
+
+Keep secrets out of Git/builds. Frontend capabilities gate visible Google controls;
+the callback sends code/state to the native controller, never exchanges Google tokens.
+Cookie sharing requires explicit server `LEARNHOUSE_SESSION_COOKIE_TENANCY=multi`;
+absent/single is host-only and ignores browser tenancy hints. Staging must stay single.
+MFA challenges are single-use after successful factor verification. Provider logout
+requires a successful revocation write; failures do not pretend to end the session.
+Issuance/cutoff timestamps preserve fractional seconds so fresh login after logout works.
+
+`d84e13a6b902` adds lower(email) uniqueness without merging/deleting legacy rows;
+collisions or incompatible indexes stop for review. A schema-delta test is not a full
+native Alembic-chain acceptance. Do not activate registration before validating schema,
+org/role/admission policy, a full web build and actual desktop/mobile/provider flows.
+
+The isolated PostgreSQL harness runs40 cases, including21 ownership cases plus native
+account/session/MFA/refresh/logout and HTTP callback cases. Provider HTTP tests use
+actual ephemeral RSA/JWKS proofs with mocked Google URLs, not real Google accounts.
+Existing native auth/MFA regression coverage also passes88 cases.
 
 ## Offline tests
 

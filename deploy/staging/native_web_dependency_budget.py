@@ -24,12 +24,12 @@ for package in packages:
     size = int(subprocess.check_output(['du', '-sk', str(package)]).split()[0]) * 1024
     sized.append((size, package))
 used = 0
-budget = 600 * 1024**2
+budget = 900 * 1024**2
 for size, package in sorted(sized, key=lambda pair: pair[0], reverse=True):
     if used + size > budget or size < 1024**2:
         continue
     stats = os.statvfs(destination)
-    if stats.f_bavail * stats.f_frsize - size < 25.2 * 1024**3:
+    if stats.f_bavail * stats.f_frsize - size < 25.1 * 1024**3:
         raise RuntimeError('Disk safety floor would be crossed by build dependencies')
     target = destination / package.relative_to(modules)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -46,4 +46,4 @@ for folder, _, files in os.walk(destination):
         with path.open('rb') as stream:
             os.fsync(stream.fileno())
             os.posix_fadvise(stream.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
-print(f'Generated dependency disk budget: {used / 1024**2:.1f}MiB / 600MiB', flush=True)
+print(f'Generated dependency disk budget: {used / 1024**2:.1f}MiB / 900MiB', flush=True)

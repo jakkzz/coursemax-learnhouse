@@ -17,7 +17,7 @@ cleanup() {
     -B -c 'from pathlib import Path; import shutil; root=Path("/generated"); [shutil.rmtree(p) if p.is_dir() and not p.is_symlink() else p.unlink() for p in root.iterdir()]' >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
-# Large generated dependency packages use <=600MiB of disk, freeing memory for
+# Large generated dependency packages use <=900MiB of disk, freeing memory for
 # compilation. Only this new build directory is written; no cache is pruned.
 docker run -d --pull=never --name "$NAME" --memory 3328m --cpus 1 --read-only --ulimit core=0 --oom-score-adj 500 \
   --tmpfs /scratch:rw,exec,size=2048m --tmpfs /tmp:rw,size=64m \

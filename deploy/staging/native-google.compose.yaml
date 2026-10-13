@@ -1,0 +1,8 @@
+# Apply only with the validated native-Google image and private runtime files.
+# Preserve base + native-login + app-source overrides. Never apply to CourseMax.
+services:
+  app:
+    env_file: !override
+      - ${LEARNHOUSE_RUNTIME_DIR:?Set private runtime directory}/app.env
+      - ${LEARNHOUSE_RUNTIME_DIR:?Set private runtime directory}/google-oauth.env
+      - ${LEARNHOUSE_RUNTIME_DIR:?Set private runtime directory}/google-native.env

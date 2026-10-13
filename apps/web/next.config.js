@@ -138,6 +138,11 @@ const nextConfig = {
     ]
   },
   reactStrictMode: false,
+  // The isolated staging builder validates generated types AFTER bundling so
+  // Rust and TypeScript graphs do not coexist. Artifacts require both to pass.
+  typescript: {
+    ignoreBuildErrors: process.env.LEARNHOUSE_BUILD_SEPARATE_TYPES === 'true',
+  },
   turbopack: {
     ...(turbopackRoot ? { root: turbopackRoot } : {}),
     resolveAlias: {

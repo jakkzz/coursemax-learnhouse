@@ -26,18 +26,19 @@ docker run -d --pull=never --name "$NAME" --memory 4096m --cpus 1 --read-only --
   -v "$ROOT/deploy/staging/native_web_dependency_budget.py:/budget.py:ro" \
   -e NEXT_TELEMETRY_DISABLED=1 -e BUN_INSTALL_CACHE_DIR=/scratch/cache \
   -e NODE_OPTIONS=--max-old-space-size=2048 -e LEARNHOUSE_DISABLE_EE=1 -e LEARNHOUSE_BUILD_CPUS=1 -e LEARNHOUSE_BUILD_LOW_MEMORY=true \
-  -e LEARNHOUSE_BUILD_NO_TELEMETRY=true -e RAYON_NUM_THREADS=1 -e MALLOC_ARENA_MAX=2 \
+  -e LEARNHOUSE_BUILD_NO_TELEMETRY=true -e LEARNHOUSE_BUILD_SEPARATE_TYPES=true -e RAYON_NUM_THREADS=1 -e MALLOC_ARENA_MAX=2 \
   --entrypoint sh "$IMAGE" -c '
     mkdir -p /scratch/web
     cp -a /source/. /scratch/web/
     cd /scratch/web
     timeout 180 bun install --frozen-lockfile --ignore-scripts --network-concurrency 2 &&
     /app/api/.venv/bin/python -B /budget.py &&
-    timeout 480 bun run build && touch /scratch/build-success
+    timeout 480 bun run build &&
+    timeout 240 bun node_modules/typescript/bin/tsc --noEmit && touch /scratch/build-success
     echo BUILD_FINISHED
     sleep 600
   ' > "$OUT/container-id"
-for iteration in $(seq 1 150); do
+for iteration in $(seq 1 190); do
   if docker exec "$NAME" test -f /scratch/build-success >/dev/null 2>&1; then
     docker logs "$NAME" > "$OUT/build.log" 2>&1
     docker exec "$NAME" sh -c 'cd /scratch/web; tar czf /scratch/web-runtime.tar.gz -C .next/standalone .; tar czf /scratch/web-static.tar.gz -C .next static; tar czf /scratch/web-public.tar.gz public'

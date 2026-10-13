@@ -1,6 +1,9 @@
 const fs = require('fs')
 const path = require('path')
-const { withSentryConfig } = require("@sentry/nextjs/config");
+// Staging has no Sentry configuration; avoid build-time instrumentation overhead.
+const { withSentryConfig } = process.env.LEARNHOUSE_BUILD_NO_TELEMETRY === 'true'
+  ? { withSentryConfig: (config) => config }
+  : require("@sentry/nextjs/config");
 
 // Enterprise Edition modules are imported as `@ee/*`. They resolve to
 // apps/web/ee when it is present (a copied-in folder or local symlink) and to the
@@ -161,7 +164,10 @@ const nextConfig = {
   experimental: {
     // Bounded builds on the shared staging host; unset preserves upstream defaults.
     ...(process.env.LEARNHOUSE_BUILD_CPUS ? { cpus: Number(process.env.LEARNHOUSE_BUILD_CPUS) } : {}),
-    ...(process.env.LEARNHOUSE_BUILD_LOW_MEMORY === 'true' ? { webpackMemoryOptimizations: true, webpackBuildWorker: true } : {}),
+    ...(process.env.LEARNHOUSE_BUILD_LOW_MEMORY === 'true' ? {
+      webpackMemoryOptimizations: true, webpackBuildWorker: true,
+      turbopackGc: true, turbopackPluginRuntimeStrategy: 'workerThreads',
+    } : {}),
     optimizePackageImports: [
       '@phosphor-icons/react',
       'framer-motion',
@@ -223,7 +229,7 @@ if (process.env.NODE_ENV === 'development') {
   )
 }
 
-// Always wrap with Sentry; DSN is resolved at runtime, not build time
+// Normal builds retain Sentry; telemetry-free staging explicitly opts out.
 module.exports = withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,

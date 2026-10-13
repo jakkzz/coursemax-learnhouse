@@ -105,6 +105,32 @@ The server wrapper writes the private API URL only to its server runtime JSON;
 browser runtime config retains the public HTTPS URL. No JWT/OAuth secrets enter
 `NEXT_PUBLIC_*` values. Single tenancy keeps application cookies host-only.
 
+## Explicitly approved native-login-only access
+
+The default initializer remains gated. An owner may explicitly approve removing
+only the evaluator gate after reviewing exposure risks. This is **not** private-file
+or production acceptance: filesystem media may be anonymously retrievable, so keep
+all data synthetic. Native login, invite-only organization policy, signup blocking,
+noindex, HTTPS and suppressed callback access logs must remain in place.
+
+1. Record approval, capacity, actual app revision and protected rollback material.
+2. Generate `gateway.conf` with `native_gateway.py --domain <hostname>
+   --confirm-remove-evaluator-gate`; its output contains no credentials. It strips
+   stale Basic credentials and expires the obsolete preview cookie while preserving
+   native Bearer headers and response cookies.
+3. Use an isolated source release and Compose >=2.24.4. Validate base `compose.yaml`
+   plus `native-login.compose.yaml` with the private environment and `config --quiet`.
+4. Apply **only** `gateway`: `up -d --no-deps --force-recreate --pull never gateway`,
+   with both Compose files and the `public` profile. The override removes the
+   password-file mount. Do not recreate app/database/cache or apply API migrations.
+5. Verify anonymous page access without a Basic challenge, native login and protected
+   API denial, signup rejection and existing-service health. Then remove the active
+   `preview.htpasswd` and evaluator lines from private access instructions. Historical
+   protected backups are not silently rewritten; restoring one must not reactivate
+   retired evaluator credentials. Re-gating requires newly generated credentials.
+6. Record gateway provenance separately: a newer gateway release does not upgrade
+   the app's still-pinned image/overlays. Keep both Compose files for gateway restarts.
+
 ## Tests
 
 ```sh

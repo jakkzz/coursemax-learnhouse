@@ -45,6 +45,7 @@ class ProviderProof:
     subject: str = field(repr=False)
     verified_email: str | None = field(default=None, repr=False)
     profile: ProviderProfile | None = field(default=None, repr=False)
+    expires_at: int | None = field(default=None, repr=False, compare=False)
 
 
 def _opaque(value: object, maximum: int = 255) -> bool:
@@ -203,7 +204,7 @@ async def _verify_line(
     subject = _claims(claims, nonce)
     # LINE email, if supplied, is not proof of our Google verified-email policy.
     return ProviderProof("line", LINE_ISSUER, provider_namespace, subject,
-                         profile=extract_profile('line', claims))
+                         profile=extract_profile('line', claims), expires_at=claims['exp'])
 
 
 async def verify_line_oauth_token(

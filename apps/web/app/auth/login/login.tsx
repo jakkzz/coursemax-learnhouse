@@ -16,6 +16,7 @@ import { useLHSession } from '@components/Contexts/LHSessionContext'
 import { useTranslation } from 'react-i18next'
 import { resendVerificationEmail } from '@services/auth/auth'
 import AuthLayout from '@components/Auth/AuthLayout'
+import LineSignIn from '@components/Auth/LineSignIn'
 import TurnstileWidget, { useTurnstileRequired, verifyTurnstileToken, type TurnstileWidgetHandle } from '@components/Auth/TurnstileWidget'
 import { useLHAnalytics, AnalyticsEvent } from '@services/analytics'
 import { getAllowedAuthMethods } from '@services/auth/authMethods'
@@ -66,7 +67,7 @@ const LoginClient = (props: LoginClientProps) => {
   // Guarded by !isSubmitting so a FRESH login (which flips the session to
   // authenticated) doesn't race the onSubmit's own post-login navigation.
   useEffect(() => {
-    if (isAuthenticated && !isSubmitting) router.replace('/home')
+    if (isAuthenticated && !isSubmitting && !sessionStorage.getItem('lh_provider_mfa') && !sessionStorage.getItem('lh_google_mfa')) router.replace('/home')
   }, [isAuthenticated, isSubmitting, router])
 
   // Error state with type information
@@ -133,8 +134,9 @@ const LoginClient = (props: LoginClientProps) => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const token = params.get('mfa_token')
-    const googlePending = sessionStorage.getItem('lh_google_mfa')
+    const googlePending = sessionStorage.getItem('lh_provider_mfa') ?? sessionStorage.getItem('lh_google_mfa')
     if (googlePending) {
+      sessionStorage.removeItem('lh_provider_mfa')
       sessionStorage.removeItem('lh_google_mfa')
       try {
         const pending = JSON.parse(googlePending)
@@ -864,6 +866,7 @@ const LoginClient = (props: LoginClientProps) => {
 
               {/* Social & SSO Buttons */}
               <div className="space-y-2.5">
+                {allowedMethods.has('line') && <LineSignIn />}
                 {googleAllowed && googleCapability.registration && !googleCapability.public_registration && (
                   <button type="button" onClick={() => handleGoogleSignIn('register')} disabled={isSubmitting || googleLoading}
                     className="w-full rounded-lg p-3 text-sm font-medium text-black underline underline-offset-4 disabled:opacity-50">

@@ -18,7 +18,7 @@ const BACKEND_URL = (getConfig('NEXT_PUBLIC_LEARNHOUSE_BACKEND_URL') || 'http://
 // it returns tokens just like login/signup and its cookies must be mirrored.
 // `magic-link` covers /magic-link/verify, which mints a session (or an mfa_token)
 // from a passwordless login link.
-const TOKEN_RESPONSE_PATHS = ['login', 'refresh', 'oauth', 'signup', 'verify-email', 'magic-link', 'google/complete']
+const TOKEN_RESPONSE_PATHS = ['login', 'refresh', 'oauth', 'signup', 'verify-email', 'magic-link', 'google/complete', 'line/complete', 'line/liff/session']
 
 function shouldExtractTokens(path: string): boolean {
   return TOKEN_RESPONSE_PATHS.some(p => path.startsWith(p))
@@ -156,8 +156,8 @@ async function proxyRequest(
     if (value) headers[ipHeader] = value
   }
 
-  // Google mutations require the exact browser Origin at the native API.
-  if (pathSegments.startsWith('google/')) {
+  // Provider mutations require the exact browser Origin at the native API.
+  if (pathSegments.startsWith('google/') || pathSegments.startsWith('line/')) {
     const origin = request.headers.get('origin')
     if (origin) headers['Origin'] = origin
   }
@@ -280,7 +280,7 @@ async function proxyRequest(
   if (refreshToken?.value) {
     cookieParts.push(`${REFRESH_TOKEN_COOKIE}=${refreshToken.value}`)
   }
-  if (pathSegments.startsWith('google/')) {
+  if (pathSegments.startsWith('google/') || pathSegments.startsWith('line/')) {
     // Preserve the raw header so the API can reject duplicate security cookies
     // rather than Next.js selecting an arbitrary one before validation.
     const rawCookie = request.headers.get('cookie')
@@ -339,7 +339,7 @@ async function proxyRequest(
     response.headers.set('content-type', responseContentType)
   }
 
-  if (pathSegments.startsWith('google/')) {
+  if (pathSegments.startsWith('google/') || pathSegments.startsWith('line/')) {
     response.headers.set('cache-control', 'no-store')
     for (const cookie of backendResponse.headers.getSetCookie()) {
       if (cookie.startsWith('__Host-LH_oauth_binding=')) {

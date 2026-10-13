@@ -55,4 +55,4 @@ docker run --rm --pull=never --network none --read-only \
   -e LEARNHOUSE_DOMAIN=learn.example.com -e LEARNHOUSE_SSL=true -e LEARNHOUSE_DISABLE_EE=1 \
   -e RUN_IDENTITY_POSTGRES_TESTS=1 -e IDENTITY_TEST_PG_SOCKET=/scratch \
   -w /app/api --entrypoint /app/api/.venv/bin/python "$API_IMAGE" \
-  -B -m unittest src.tests.services.test_native_google_sessions -v
+  -B -m unittest src.tests.services.test_native_google_sessions src.tests.services.test_native_line_sessions -v

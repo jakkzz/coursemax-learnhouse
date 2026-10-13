@@ -1,0 +1,22 @@
+# Prepared LINE release. Parent retains native Google/profile/self-email fixes.
+# Requires separately validated web artifacts; no downloads/secrets/migrations.
+FROM coursemax-learnhouse:ec2002cd
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.source="https://github.com/jakkzz/coursemax-learnhouse" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}"
+COPY apps/api/src/router.py /app/api/src/router.py
+COPY apps/api/src/routers/mfa.py apps/api/src/routers/line_subject_auth.py /app/api/src/routers/
+COPY apps/api/src/security/auth.py apps/api/src/security/provider_session.py \
+     apps/api/src/security/session_context.py /app/api/src/security/
+COPY apps/api/src/services/auth/provider_proof.py \
+     apps/api/src/services/auth/session.py \
+     apps/api/src/services/auth/line_config.py \
+     apps/api/src/services/auth/line_handoff.py \
+     apps/api/src/services/auth/native_line.py /app/api/src/services/auth/
+COPY apps/api/src/services/orgs/auth_policy.py /app/api/src/services/orgs/auth_policy.py
+RUN rm -rf /app/web
+COPY web-runtime/ /app/web/
+COPY web-static/static/ /app/web/.next/static/
+COPY web-public/public/ /app/web/public/
+COPY apps/web/server-wrapper.js /app/web/server-wrapper.js
+COPY docker/nginx.conf /etc/nginx/http.d/default.conf

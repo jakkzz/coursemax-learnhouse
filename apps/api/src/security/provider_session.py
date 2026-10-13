@@ -6,6 +6,7 @@ Provider sessions fail closed if their owner/binding/org or revocation store cha
 from datetime import datetime, timezone
 import re
 import math
+import os
 
 from fastapi import HTTPException
 from sqlmodel import select
@@ -26,11 +27,12 @@ def issuer():
     return ('https://' if hosting.ssl else 'http://') + hosting.domain
 
 
-def claims(user, identity_id):
+def claims(user, identity_id, *, auth_time=None):
     if type(user.id) is not int or type(identity_id) is not int or not user.user_uuid:
         raise ValueError('invalid_session_identity')
     return {VERSION: 2, 'sub': f'lh:user:{user.id}', 'lh_uuid': user.user_uuid,
-            BINDING: identity_id, 'iss': issuer(), 'aud': AUDIENCE}
+            BINDING: identity_id, 'iss': issuer(), 'aud': AUDIENCE,
+            'lh_auth_time': datetime.now(timezone.utc).timestamp() if auth_time is None else auth_time}
 
 
 def validate_claims(payload):
@@ -40,13 +42,13 @@ def validate_claims(payload):
         and isinstance(payload.get('lh_uuid'), str) and bool(payload['lh_uuid'])
         and type(payload.get(BINDING)) is int and payload[BINDING] > 0
         and payload.get('iss') == issuer() and payload.get('aud') == AUDIENCE
-        and payload.get('amr') == 'google' and type(payload.get('sorg')) is int
+        and payload.get('amr') in ('google', 'line') and type(payload.get('sorg')) is int
         and type(payload.get('iat')) in (int, float)
     )
 
 
 def carried_claims(payload):
-    return {key: payload[key] for key in (VERSION, BINDING, 'lh_uuid', 'iss', 'aud') if key in payload}
+    return {key: payload[key] for key in (VERSION, BINDING, 'lh_uuid', 'iss', 'aud', 'lh_auth_time') if key in payload}
 
 
 async def resolve_provider_session(db, payload, *, check_revocation=True):
@@ -57,10 +59,21 @@ async def resolve_provider_session(db, payload, *, check_revocation=True):
     binding = (await db.exec(select(ProviderIdentity).where(ProviderIdentity.id == payload[BINDING]))).first()
     if (
         user is None or user.user_uuid != payload['lh_uuid'] or not user.email_verified
-        or binding is None or binding.user_id != ident or binding.provider != 'google'
+        or binding is None or binding.user_id != ident or binding.provider != payload.get('amr')
         or binding.retired_at is not None
     ):
         raise HTTPException(401, 'Provider session is no longer active')
+    if payload['amr'] == 'line':
+        if (os.getenv('LEARNHOUSE_LINE_SUBJECT_LOGIN_ENABLED', 'false').lower() != 'true'
+            or binding.namespace != os.getenv('LEARNHOUSE_LINE_PROVIDER_ID')
+            or binding.issuer != 'https://access.line.me'):
+            raise HTTPException(401, 'LINE sign-in is no longer available')
+        google = (await db.exec(select(ProviderIdentity.id).where(
+            ProviderIdentity.user_id == ident, ProviderIdentity.provider == 'google',
+            ProviderIdentity.retired_at.is_(None),
+        ))).first()
+        if google is None:
+            raise HTTPException(401, 'Google account recovery is required')
     now = datetime.now(timezone.utc)
     if user.locked_until:
         try:
@@ -83,7 +96,7 @@ async def resolve_provider_session(db, payload, *, check_revocation=True):
     if membership is None:
         raise HTTPException(403, 'Organization access removed')
     from src.services.orgs.auth_policy import enforce_login_auth_method
-    await enforce_login_auth_method(db, payload['sorg'], 'google')
+    await enforce_login_auth_method(db, payload['sorg'], payload['amr'])
     if check_revocation:
         # Do not use native fail-open revocation helpers for provider sessions.
         from src.core.redis import get_redis_client

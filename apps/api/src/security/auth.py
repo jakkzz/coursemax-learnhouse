@@ -127,7 +127,7 @@ def decode_jwt(token: str) -> Optional[dict]:
             )
             if not validate_claims(payload):
                 return None
-        elif payload.get("amr") == "google" or "aud" in payload:
+        elif payload.get("amr") in ("google", "line") or "aud" in payload:
             # Never admit old Google/email sessions alongside subject-owned login.
             return None
         return payload

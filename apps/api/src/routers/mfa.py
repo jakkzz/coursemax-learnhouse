@@ -439,7 +439,7 @@ async def api_login_mfa(
     if pending_payload and pending_payload.get("lhv") == 2:
         from src.security.provider_session import resolve_provider_session, claims
         user = await resolve_provider_session(db_session, pending_payload)
-        provider_claims = claims(user, pending_payload["lh_identity"])
+        provider_claims = claims(user, pending_payload["lh_identity"], auth_time=pending_payload.get('lh_auth_time'))
     else:
         user = (await db_session.execute(select(User).where(User.email == email))).scalars().first()
     if user is None:  # pragma: no cover - defensive: pending token only issued for a real user

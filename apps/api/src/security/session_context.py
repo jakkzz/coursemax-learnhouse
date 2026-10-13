@@ -59,6 +59,7 @@ LEGACY_GRACE_CLAIM = "lgc"  # unix seconds after which a method-less session sto
 AUTH_METHOD_PASSWORD = "password"
 AUTH_METHOD_MAGIC_LOGIN = "magic_login"
 AUTH_METHOD_GOOGLE = "google"
+AUTH_METHOD_LINE = "line"
 AUTH_METHOD_SSO = "sso"
 AUTH_METHOD_API_TOKEN = "api_token"
 
@@ -67,6 +68,7 @@ POLICY_AUTH_METHODS = (
     AUTH_METHOD_PASSWORD,
     AUTH_METHOD_MAGIC_LOGIN,
     AUTH_METHOD_GOOGLE,
+    AUTH_METHOD_LINE,
     AUTH_METHOD_SSO,
 )
 

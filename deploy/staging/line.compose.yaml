@@ -1,0 +1,9 @@
+# Prepared only: never apply before reviewed image, credentials and activation.
+# Preserve base + native-login + app-source + native-google + google-profile.
+# LINE fields share the existing protected google-oauth.env; no line.env needed.
+services:
+  app:
+    env_file: !override
+      - ${LEARNHOUSE_RUNTIME_DIR:?Set private runtime directory}/app.env
+      - ${LEARNHOUSE_RUNTIME_DIR:?Set private runtime directory}/google-oauth.env
+      - ${LEARNHOUSE_RUNTIME_DIR:?Set private runtime directory}/google-native.env

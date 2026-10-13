@@ -1071,6 +1071,26 @@ function GoogleLinkSection() {
   )
 }
 
+function LineLinkSection() {
+  const { t } = useTranslation()
+  const [available, setAvailable] = React.useState(false)
+  React.useEffect(() => {
+    let active = true
+    fetch('/api/auth/line/capabilities', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (active) setAvailable(data?.link === true) }).catch(() => {})
+    return () => { active = false }
+  }, [])
+  if (!available) return null
+  return <section className="space-y-3">
+    <h2 className="text-lg font-semibold">{t('auth.line_link_title')}</h2>
+    <p className="text-sm leading-relaxed">{t('auth.line_link_description')}</p>
+    <Link href="/auth/link/line" className="inline-flex rounded-lg border px-4 py-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2">
+      {t('auth.line_manage')}
+    </Link>
+  </section>
+}
+
 function AccountSecurity() {
   const session = useLHSession() as any
   const access_token = session?.data?.tokens?.access_token;
@@ -1245,6 +1265,7 @@ function AccountSecurity() {
 
         {/* Two-factor authentication (TOTP) */}
         <GoogleLinkSection />
+        <LineLinkSection />
         <TwoFactorAuthSection />
       </div>
     </div>

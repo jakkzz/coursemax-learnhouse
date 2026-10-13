@@ -91,6 +91,8 @@ v1_router.include_router(
 v1_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 from src.routers import google_subject_auth
 v1_router.include_router(google_subject_auth.router, prefix="/auth/google", tags=["auth"])
+from src.routers import line_subject_auth
+v1_router.include_router(line_subject_auth.router, prefix="/auth/line", tags=["auth"])
 # Two-factor: enrollment/management plus the /auth/login/mfa challenge.
 v1_router.include_router(mfa_router_module.router, prefix="/auth", tags=["auth"])
 v1_router.include_router(

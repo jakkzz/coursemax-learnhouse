@@ -385,9 +385,13 @@ export default async function proxy(req: NextRequest) {
     pathname.startsWith('/auth/sso/')
     || pathname.startsWith('/auth/callback/')
     || pathname === '/auth/link/google'
+    || pathname === '/auth/link/line'
+    || pathname === '/liff'
     || pathname.startsWith('/auth/token-exchange')
   ) {
     const response = NextResponse.rewrite(new URL(`${pathname}${search}`, req.url))
+    response.headers.set('Referrer-Policy', 'no-referrer')
+    response.headers.set('Cache-Control', 'private, no-store')
     setInstanceCookies(response, instance)
     return response
   }

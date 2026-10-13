@@ -113,9 +113,9 @@ async def issue_session_or_challenge(
     case mint a short-lived pending token instead and demand a code. Provenance
     (``amr`` / ``org_id``) is carried through both branches."""
     provider_claims = None
-    if amr == "google":
+    if amr in ("google", "line"):
         if provider_identity_id is None:
-            raise ValueError("Google sessions require subject ownership")
+            raise ValueError("Provider sessions require subject ownership")
         from src.security.provider_session import claims
         provider_claims = claims(user, provider_identity_id)
     if await is_mfa_active(db_session, user.id):

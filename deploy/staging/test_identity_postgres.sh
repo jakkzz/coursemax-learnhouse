@@ -49,11 +49,10 @@ docker run --rm --pull=never --network none --read-only \
   --user "$(id -u):$(id -g)" --cap-drop ALL --security-opt no-new-privileges \
   --memory 256m --cpus 0.5 --pids-limit 64 --tmpfs /tmp:rw,size=16m \
   -v "$SCRATCH:/scratch" \
-  -v "$ROOT/apps/api/src/db/provider_identity.py:/app/api/src/db/provider_identity.py:ro" \
-  -v "$ROOT/apps/api/src/services/auth/provider_proof.py:/app/api/src/services/auth/provider_proof.py:ro" \
-  -v "$ROOT/apps/api/src/services/auth/provider_identities.py:/app/api/src/services/auth/provider_identities.py:ro" \
-  -v "$ROOT/apps/api/src/tests/services/test_provider_identities_postgres.py:/app/api/src/tests/services/test_provider_identities_postgres.py:ro" \
-  -v "$ROOT/apps/api/migrations/versions/c71a02d9ef40_provider_identity_ownership.py:/app/api/migrations/versions/c71a02d9ef40_provider_identity_ownership.py:ro" \
+  -v "$ROOT/apps/api/src:/app/api/src:ro" \
+  -v "$ROOT/apps/api/migrations:/app/api/migrations:ro" \
+  -e TESTING=true -e LEARNHOUSE_AUTH_JWT_SECRET_KEY=synthetic-fixture-jwt-secret-32-chars \
+  -e LEARNHOUSE_DOMAIN=learn.example.com -e LEARNHOUSE_SSL=true -e LEARNHOUSE_DISABLE_EE=1 \
   -e RUN_IDENTITY_POSTGRES_TESTS=1 -e IDENTITY_TEST_PG_SOCKET=/scratch \
   -w /app/api --entrypoint /app/api/.venv/bin/python "$API_IMAGE" \
-  -B -m unittest src.tests.services.test_provider_identities_postgres -v
+  -B -m unittest src.tests.services.test_native_google_sessions -v

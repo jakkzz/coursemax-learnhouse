@@ -433,9 +433,15 @@ async def api_login_mfa(
     # session so the org auth-method / sharing policy sees the true method.
     pending_amr, pending_org_id = decode_mfa_pending_provenance(form.mfa_token)
 
-    user = (
-        await db_session.execute(select(User).where(User.email == email))
-    ).scalars().first()
+    from src.security.auth import decode_jwt
+    pending_payload = decode_jwt(form.mfa_token)
+    provider_claims = None
+    if pending_payload and pending_payload.get("lhv") == 2:
+        from src.security.provider_session import resolve_provider_session, claims
+        user = await resolve_provider_session(db_session, pending_payload)
+        provider_claims = claims(user, pending_payload["lh_identity"])
+    else:
+        user = (await db_session.execute(select(User).where(User.email == email))).scalars().first()
     if user is None:  # pragma: no cover - defensive: pending token only issued for a real user
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -444,10 +450,9 @@ async def api_login_mfa(
 
     mfa = await get_user_mfa(db_session, user.id)
     if mfa is None or mfa.confirmed_at is None:
-        # The factor was removed between password step and code step. Nothing
-        # left to verify, so fall through to a normal session rather than
-        # stranding the user at a challenge they can never satisfy.
-        result = mint_session_tokens(user.email, pending_amr, pending_org_id)
+        # Factor removal leaves no code to verify; session policy is still
+        # checked above, and provider challenges are still claimed once below.
+        pass
     else:
         accepted = False
         if form.is_backup_code:
@@ -472,7 +477,10 @@ async def api_login_mfa(
                 },
             )
 
-        result = mint_session_tokens(user.email, pending_amr, pending_org_id)
+    if provider_claims is not None:
+        from src.security.provider_session import consume_mfa_challenge
+        consume_mfa_challenge(pending_payload)
+    result = mint_session_tokens(user.email, pending_amr, pending_org_id, provider_claims=provider_claims)
 
     set_auth_cookies(response, result.access_token, result.refresh_token, request)
 

@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@components/Contexts/AuthContext'
 import { removeQueryParamsFromAddressBar } from '@services/utils/ts/scrubUrl'
-import { getLEARNHOUSE_TOP_DOMAIN_VAL, getDeploymentMode, isOnCustomDomain } from '@services/config/config'
+import { getDeploymentMode } from '@services/config/config'
 import { useLHSession } from '@components/Contexts/LHSessionContext'
 import { useTranslation } from 'react-i18next'
 import { resendVerificationEmail } from '@services/auth/auth'
@@ -46,7 +46,17 @@ const LoginClient = (props: LoginClientProps) => {
   )
   const passwordAllowed = allowedMethods.has('password')
   const magicLoginAllowed = allowedMethods.has('magic_login')
-  const googleAllowed = allowedMethods.has('google')
+  const [googleCapability, setGoogleCapability] = useState({ google: false, registration: false })
+  const [googleLoading, setGoogleLoading] = useState(false)
+  const googleAllowed = googleCapability.google && allowedMethods.has('google')
+  useEffect(() => {
+    let active = true
+    fetch('/api/auth/google/capabilities', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (active && data) setGoogleCapability({ google: data.google === true, registration: data.registration === true }) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
   const ssoAllowed = allowedMethods.has('sso')
   // SSO counts only once it is actually configured for the org (ssoEnabled).
   const hasAlternativeMethods = googleAllowed || magicLoginAllowed || (ssoAllowed && ssoEnabled)
@@ -123,6 +133,19 @@ const LoginClient = (props: LoginClientProps) => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const token = params.get('mfa_token')
+    const googlePending = sessionStorage.getItem('lh_google_mfa')
+    if (googlePending) {
+      sessionStorage.removeItem('lh_google_mfa')
+      try {
+        const pending = JSON.parse(googlePending)
+        if (typeof pending.token === 'string') setMfaToken(pending.token)
+        if (typeof pending.next === 'string' && pending.next.startsWith('/') && !pending.next.startsWith('//')) {
+          const url = new URL(window.location.href)
+          url.searchParams.set('next', pending.next)
+          window.history.replaceState(null, '', url)
+        }
+      } catch { /* A corrupt tab handoff restarts normal login. */ }
+    }
     if (token) {
       setMfaToken(token)
       removeQueryParamsFromAddressBar(['mfa_token'])
@@ -206,23 +229,28 @@ const LoginClient = (props: LoginClientProps) => {
     }
   }, [mfaCode, useBackupCode, mfaSubmitting, mfaToken]) // eslint-disable-line
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async (intent: 'signin' | 'register' = 'signin') => {
+    if (googleLoading) return
+    setGoogleLoading(true)
     track(AnalyticsEvent.LoginGoogleClicked)
-    // Store org context in cookies before OAuth redirect
-    if (props.org?.slug) {
-      const topDomain = getLEARNHOUSE_TOP_DOMAIN_VAL();
-      const isSecure = window.location.protocol === 'https:';
-      const secureAttr = isSecure ? '; secure' : '';
-      const baseAttributes = `; path=/; SameSite=Lax${secureAttr}`;
-      // Host-only on custom domains: a `.{platformTopDomain}` cookie can't be set
-      // from learn.acme.org (Domain not a suffix of host) → the browser drops it
-      // and the callback loses org context. Omit the Domain there.
-      const domainAttr = (topDomain === 'localhost' || isOnCustomDomain()) ? '' : `; domain=.${topDomain}`;
-      document.cookie = `LH_oauth_orgslug=${props.org.slug}${baseAttributes}${domainAttr}`;
-      document.cookie = `LH_oauth_org_id=${props.org.id}${baseAttributes}${domainAttr}`;
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const returnPath = params.get('next') ?? params.get('redirect') ?? '/home'
+      const response = await fetch('/api/auth/google/start', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ intent, return_path: returnPath }),
+      })
+      const data = await response.json()
+      if (!response.ok || typeof data.url !== 'string') throw new Error('start_failed')
+      const authorization = new URL(data.url)
+      if (authorization.origin !== 'https://accounts.google.com') throw new Error('start_failed')
+      sessionStorage.setItem('lh_google_intent', intent)
+      window.location.assign(authorization.toString())
+    } catch {
+      setError(t('auth.google_restart', { defaultValue: 'Google sign-in could not start. Please try again.' }))
+      setShowErrorModal(true)
+      setGoogleLoading(false)
     }
-    // Use absolute URL with current origin for custom domain support
-    signIn('google', { callbackUrl: buildCallbackUrl() });
   };
 
   // Check if SSO is enabled for this organization (requires enterprise plan)
@@ -826,13 +854,20 @@ const LoginClient = (props: LoginClientProps) => {
               <div className="space-y-2.5">
                 {googleAllowed && (
                 <button
-                  onClick={handleGoogleSignIn}
-                  disabled={isSubmitting}
+                  type="button"
+                  onClick={() => handleGoogleSignIn('signin')}
+                  disabled={isSubmitting || googleLoading}
                   className="flex justify-center items-center w-full bg-white hover:bg-neutral-50 text-black space-x-3 font-medium p-3 rounded-lg border border-neutral-200 transition-all text-sm disabled:opacity-50"
                 >
                   <img src="https://fonts.gstatic.com/s/i/productlogos/googleg/v6/24px.svg" alt="" className="w-4 h-4" />
-                  <span>{t('auth.sign_in_with_google')}</span>
+                  <span>{googleLoading ? t('common.loading') : t('auth.sign_in_with_google')}</span>
                 </button>
+                )}
+                {googleAllowed && googleCapability.registration && (
+                  <button type="button" onClick={() => handleGoogleSignIn('register')} disabled={isSubmitting || googleLoading}
+                    className="w-full rounded-lg p-3 text-sm font-medium text-black underline underline-offset-4 disabled:opacity-50">
+                    {t('auth.google_create_account', { defaultValue: 'Create an invited account with Google' })}
+                  </button>
                 )}
 
                 {ssoEnabled && (

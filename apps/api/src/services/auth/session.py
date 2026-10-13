@@ -14,6 +14,7 @@ verification endpoint, which decodes it explicitly.
 """
 
 from dataclasses import dataclass
+import secrets
 from datetime import timedelta
 from typing import Optional
 
@@ -42,13 +43,15 @@ class SessionIssueResult:
 
 
 def create_mfa_pending_token(
-    email: str, amr: Optional[str] = None, org_id: Optional[int] = None
+    email: str, amr: Optional[str] = None, org_id: Optional[int] = None,
+    *, provider_claims: Optional[dict] = None,
 ) -> str:
     """Mint the interim token. It carries the session's provenance (``amr`` /
     ``sorg``) so that when the second factor is completed at ``/auth/login/mfa``
     the real session is minted with the same method and org it was started for."""
     return create_access_token(
-        data={"sub": email, "purpose": MFA_PENDING_PURPOSE, **session_claims(amr, org_id)},
+        data={"sub": email, "purpose": MFA_PENDING_PURPOSE, **session_claims(amr, org_id), **(provider_claims or {}),
+              **({"jti": secrets.token_urlsafe(32)} if provider_claims else {})},
         expires_delta=MFA_PENDING_TTL,
     )
 
@@ -81,7 +84,8 @@ def decode_mfa_pending_provenance(token: str) -> tuple[Optional[str], Optional[i
 
 
 def mint_session_tokens(
-    email: str, amr: Optional[str] = None, org_id: Optional[int] = None
+    email: str, amr: Optional[str] = None, org_id: Optional[int] = None,
+    *, provider_claims: Optional[dict] = None,
 ) -> SessionIssueResult:
     """Mint a real session unconditionally. Only for callers that have already
     satisfied (or deliberately bypassed) the second factor.
@@ -90,7 +94,7 @@ def mint_session_tokens(
     the session was established for; both are stamped into the token so the
     per-org auth-method / session-sharing policy can evaluate the session later.
     """
-    claims = session_claims(amr, org_id)
+    claims = {**session_claims(amr, org_id), **(provider_claims or {})}
     return SessionIssueResult(
         mfa_required=False,
         access_token=create_access_token(data={"sub": email, "purpose": "session", **claims}),
@@ -103,13 +107,20 @@ async def issue_session_or_challenge(
     user: User,
     amr: Optional[str] = None,
     org_id: Optional[int] = None,
+    *, provider_identity_id: Optional[int] = None,
 ) -> SessionIssueResult:
     """Mint a session, unless the user has a confirmed second factor, in which
     case mint a short-lived pending token instead and demand a code. Provenance
     (``amr`` / ``org_id``) is carried through both branches."""
+    provider_claims = None
+    if amr == "google":
+        if provider_identity_id is None:
+            raise ValueError("Google sessions require subject ownership")
+        from src.security.provider_session import claims
+        provider_claims = claims(user, provider_identity_id)
     if await is_mfa_active(db_session, user.id):
         return SessionIssueResult(
             mfa_required=True,
-            mfa_token=create_mfa_pending_token(user.email, amr, org_id),
+            mfa_token=create_mfa_pending_token(user.email, amr, org_id, provider_claims=provider_claims),
         )
-    return mint_session_tokens(user.email, amr, org_id)
+    return mint_session_tokens(user.email, amr, org_id, provider_claims=provider_claims)

@@ -117,14 +117,19 @@ def decode_jwt(token: str) -> Optional[dict]:
         # SECURITY: Always require sub and exp claims, always verify expiration.
         # Dev mode no longer bypasses JWT expiration to prevent leaked tokens
         # from being valid forever if dev mode is accidentally left on.
-        decode_options = {"require": ["exp", "sub"]}
-
-        payload = jwt.decode(
-            token,
-            JWT_SECRET_KEY,
-            algorithms=[ALGORITHM],  # Explicit algorithm prevents confusion attacks
-            options=decode_options
-        )
+        decode_options = {"require": ["exp", "sub"], "verify_aud": False}
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[ALGORITHM], options=decode_options)
+        if "lhv" in payload:
+            from src.security.provider_session import AUDIENCE, issuer, validate_claims
+            payload = jwt.decode(
+                token, JWT_SECRET_KEY, algorithms=[ALGORITHM], issuer=issuer(), audience=AUDIENCE,
+                options={"require": ["exp", "sub", "iat", "iss", "aud", "lhv", "lh_identity", "lh_uuid", "amr", "sorg"]},
+            )
+            if not validate_claims(payload):
+                return None
+        elif payload.get("amr") == "google" or "aud" in payload:
+            # Never admit old Google/email sessions alongside subject-owned login.
+            return None
         return payload
     except PyJWTError:
         return None
@@ -194,7 +199,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     else:
         # SECURITY: Always set expiration (8 hours default)
         expire = now + JWT_ACCESS_TOKEN_EXPIRES
-    to_encode.update({"exp": expire, "iat": now})
+    to_encode.update({"exp": expire, "iat": now.timestamp()})
     # setdefault, not update: a caller that deliberately names its own type wins.
     to_encode.setdefault("type", "access")
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -252,7 +257,7 @@ def create_refresh_token(data: dict, expires_delta: timedelta | None = None):
         expire = now + JWT_REFRESH_TOKEN_EXPIRES
     to_encode.update({
         "exp": expire,
-        "iat": now,
+        "iat": now.timestamp(),
         "type": "refresh",
         "jti": _secrets.token_urlsafe(16),
     })
@@ -280,7 +285,7 @@ def revoke_user_sessions_before(user_id: int, cutoff: Optional[datetime] = None)
     call on every logout; the key is written with a TTL that matches the
     longest possible session so old keys garbage-collect themselves.
     """
-    ts = (cutoff or datetime.now(timezone.utc)).replace(microsecond=0)
+    ts = cutoff or datetime.now(timezone.utc)
     r = _get_revocation_redis_client()
     if r is None:
         return False
@@ -288,7 +293,7 @@ def revoke_user_sessions_before(user_id: int, cutoff: Optional[datetime] = None)
         r.setex(
             f"jwt_revoked_before:{user_id}",
             int(JWT_REFRESH_TOKEN_EXPIRES.total_seconds()),
-            int(ts.timestamp()),
+            ts.timestamp(),
         )
         return True
     except Exception:
@@ -319,10 +324,10 @@ def _is_token_revoked_for_user(user_id: int, token_iat: Optional[datetime]) -> b
     if raw is None:
         return False
     try:
-        cutoff_ts = int(raw)
+        cutoff_ts = float(raw)
     except (TypeError, ValueError):
         return False
-    return int(token_iat.timestamp()) < cutoff_ts
+    return token_iat.timestamp() < cutoff_ts
 
 
 def decode_refresh_token(token: str) -> Optional[dict]:
@@ -333,23 +338,15 @@ def decode_refresh_token(token: str) -> Optional[dict]:
     Dev mode does not affect refresh token validation.
     """
     try:
-        # SECURITY: Always verify expiration for refresh tokens
-        decode_options = {"require": ["exp", "sub"]}
-
-        payload = jwt.decode(
-            token,
-            JWT_SECRET_KEY,
-            algorithms=[ALGORITHM],
-            options=decode_options
-        )
-        if payload.get("type") != "refresh":
+        payload = decode_jwt(token)
+        if not payload or payload.get("type") != "refresh":
             return None
         return payload
     except PyJWTError:
         return None
 
 
-def _mark_refresh_jti_used(user_id: int, jti: str) -> bool:
+def _mark_refresh_jti_used(user_id: int, jti: str, *, strict: bool = False) -> bool:
     """
     Atomically record a refresh token jti as consumed. Returns True on the
     first call for a given jti and False for every subsequent replay.
@@ -359,9 +356,9 @@ def _mark_refresh_jti_used(user_id: int, jti: str) -> bool:
     """
     r = _get_revocation_redis_client()
     if r is None:
-        # Redis unavailable: fail open for usability (tokens still honour exp
-        # and password_changed_at). This is the same defense-in-depth posture
-        # as the logout blocklist.
+        if strict:
+            raise HTTPException(503, "Session validation temporarily unavailable")
+        # Legacy password-session behavior remains compatible.
         return True
     try:
         # NX + TTL = set-if-not-exists, auto-cleanup after the full refresh
@@ -374,6 +371,8 @@ def _mark_refresh_jti_used(user_id: int, jti: str) -> bool:
         )
         return bool(ok)
     except Exception:
+        if strict:
+            raise HTTPException(503, "Session validation temporarily unavailable") from None
         return True
 
 
@@ -642,7 +641,11 @@ async def get_current_user(
     token_data = TokenData(username=username)
 
     if username:
-        user = await security_get_user(request, db_session, email=token_data.username)  # type: ignore # treated as an email
+        if payload.get("lhv") == 2:
+            from src.security.provider_session import resolve_provider_session
+            user = await resolve_provider_session(db_session, payload)
+        else:
+            user = await security_get_user(request, db_session, email=token_data.username)  # legacy password sessions
         if user is None:
             raise credentials_exception
 

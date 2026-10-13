@@ -3,6 +3,7 @@ import { useLHSession } from '@components/Contexts/LHSessionContext'
 import { updatePassword } from '@services/settings/password'
 import { Formik, Form } from 'formik'
 import React from 'react'
+import Link from 'next/link'
 import {
   AlertTriangle,
   Monitor,
@@ -1047,6 +1048,29 @@ function TwoFactorAuthSection() {
   )
 }
 
+function GoogleLinkSection() {
+  const { t } = useTranslation()
+  const [available, setAvailable] = React.useState(false)
+  React.useEffect(() => {
+    let active = true
+    fetch('/api/auth/google/capabilities', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (active) setAvailable(data?.google === true) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
+  if (!available) return null
+  return (
+    <section className="space-y-3">
+      <h2 className="text-lg font-semibold">{t('auth.google_link_title', { defaultValue: 'Link Google to your account' })}</h2>
+      <p className="text-sm leading-relaxed">{t('auth.google_link_description', { defaultValue: 'Linking adds Google as a sign-in method without changing your email, role or course access.' })}</p>
+      <Link href="/auth/link/google" className="inline-flex rounded-lg border px-4 py-3 text-sm font-medium">
+        {t('auth.google_link_continue', { defaultValue: 'Choose the Google account to link' })}
+      </Link>
+    </section>
+  )
+}
+
 function AccountSecurity() {
   const session = useLHSession() as any
   const access_token = session?.data?.tokens?.access_token;
@@ -1220,6 +1244,7 @@ function AccountSecurity() {
         </div>
 
         {/* Two-factor authentication (TOTP) */}
+        <GoogleLinkSection />
         <TwoFactorAuthSection />
       </div>
     </div>

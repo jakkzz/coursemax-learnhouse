@@ -14,8 +14,8 @@ class ProviderIdentity(SQLModel, table=True):
     __table_args__ = (
         UniqueConstraint("provider", "issuer", "namespace", "subject", name="uq_provider_identity_subject"),
         CheckConstraint("(provider = 'google' AND issuer = 'https://accounts.google.com' AND namespace = 'global') OR (provider = 'line' AND issuer = 'https://access.line.me')", name="ck_provider_identity_issuer"),
-        CheckConstraint("length(btrim(namespace)) > 0 AND length(btrim(subject)) > 0", name="ck_provider_identity_nonempty"),
-        CheckConstraint("(retired_at IS NULL AND retirement_reason IS NULL) OR (retired_at IS NOT NULL AND retirement_reason IS NOT NULL AND length(btrim(retirement_reason)) > 0)", name="ck_provider_identity_retirement"),
+        CheckConstraint("length(trim(namespace)) > 0 AND length(trim(subject)) > 0", name="ck_provider_identity_nonempty"),
+        CheckConstraint("(retired_at IS NULL AND retirement_reason IS NULL) OR (retired_at IS NOT NULL AND retirement_reason IS NOT NULL AND length(trim(retirement_reason)) > 0)", name="ck_provider_identity_retirement"),
         Index("uq_provider_identity_active_user", "user_id", "provider", unique=True, postgresql_where=text("retired_at IS NULL")),
     )
     id: int | None = Field(default=None, primary_key=True)
@@ -32,7 +32,7 @@ class ProviderIdentity(SQLModel, table=True):
 class ProviderIdentityEvent(SQLModel, table=True):
     __table_args__ = (
         CheckConstraint("kind IN ('bound', 'retired')", name="ck_provider_identity_event_kind"),
-        CheckConstraint("length(btrim(reason)) > 0", name="ck_provider_identity_event_reason"),
+        CheckConstraint("length(trim(reason)) > 0", name="ck_provider_identity_event_reason"),
     )
     id: int | None = Field(default=None, primary_key=True)
     identity_id: int = Field(sa_column=Column(Integer, ForeignKey("provideridentity.id", ondelete="RESTRICT"), nullable=False))

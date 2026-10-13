@@ -30,15 +30,13 @@ export function getDomainFromRequest(request: NextRequest): { domain: string; to
 }
 
 export function getCookieDomain(request: NextRequest): string | undefined {
-  // Tenancy is the source of truth: in single mode cookies are always
-  // host-only on whatever Host the request arrived with, regardless of
-  // whether that's localhost or a self-hosted VPS hostname. In multi mode
-  // we use the configured top domain so subdomains share the session.
-  const tenancy = request.cookies.get('LH_tenancy')?.value || 'single'
-  if (tenancy === 'single') return undefined
-
+  // Cookie scope is server policy, never the browser's LH_tenancy hint.
+  // Shared sessions require explicit server opt-in; staging remains host-only.
+  if (process.env.LEARNHOUSE_SESSION_COOKIE_TENANCY !== 'multi') return undefined
+  const domain = process.env.NEXT_PUBLIC_LEARNHOUSE_DOMAIN
+  if (!domain) return undefined
+  const topDomain = stripPort(process.env.NEXT_PUBLIC_LEARNHOUSE_TOP_DOMAIN || domain)
   const host = request.headers.get('host')
-  const { domain, topDomain } = getDomainFromRequest(request)
 
   if (isLocalhost(host)) return undefined
   if (topDomain === 'localhost') return undefined

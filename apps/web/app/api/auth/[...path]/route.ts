@@ -18,7 +18,7 @@ const BACKEND_URL = (getConfig('NEXT_PUBLIC_LEARNHOUSE_BACKEND_URL') || 'http://
 // it returns tokens just like login/signup and its cookies must be mirrored.
 // `magic-link` covers /magic-link/verify, which mints a session (or an mfa_token)
 // from a passwordless login link.
-const TOKEN_RESPONSE_PATHS = ['login', 'refresh', 'oauth', 'signup', 'verify-email', 'magic-link']
+const TOKEN_RESPONSE_PATHS = ['login', 'refresh', 'oauth', 'signup', 'verify-email', 'magic-link', 'google/complete']
 
 function shouldExtractTokens(path: string): boolean {
   return TOKEN_RESPONSE_PATHS.some(p => path.startsWith(p))
@@ -156,6 +156,12 @@ async function proxyRequest(
     if (value) headers[ipHeader] = value
   }
 
+  // Google mutations require the exact browser Origin at the native API.
+  if (pathSegments.startsWith('google/')) {
+    const origin = request.headers.get('origin')
+    if (origin) headers['Origin'] = origin
+  }
+
   // Forward content-type
   const contentType = request.headers.get('content-type')
   if (contentType) {
@@ -203,8 +209,7 @@ async function proxyRequest(
     }
   }
 
-  // Handle logout locally: clear cookies and return 200
-  // Try backend invalidation but don't fail if it errors
+  // Do not report successful logout before the backend confirms revocation.
   if (pathSegments === 'logout' || pathSegments.endsWith('/logout')) {
     // POST only, same-origin when the browser says where it came from: a GET
     // (or cross-site POST) would let any page or <img> log users out.
@@ -256,11 +261,11 @@ async function proxyRequest(
         headers: logoutHeaders,
         signal: AbortSignal.timeout(3000),
       }).catch(() => null)
-      if (logoutRes && !logoutRes.ok) {
-        console.warn(`[auth] backend logout returned ${logoutRes.status}; server session may not be revoked`)
+      if (!logoutRes || (!logoutRes.ok && logoutRes.status !== 401)) {
+        return NextResponse.json({ error: 'Logout temporarily unavailable; please retry' }, { status: 503 })
       }
     } catch {
-      // Backend logout failed. That's fine, cookies are cleared below
+      return NextResponse.json({ error: 'Logout temporarily unavailable; please retry' }, { status: 503 })
     }
 
     const response = NextResponse.json({ ok: true })
@@ -275,7 +280,12 @@ async function proxyRequest(
   if (refreshToken?.value) {
     cookieParts.push(`${REFRESH_TOKEN_COOKIE}=${refreshToken.value}`)
   }
-  if (cookieParts.length > 0) {
+  if (pathSegments.startsWith('google/')) {
+    // Preserve the raw header so the API can reject duplicate security cookies
+    // rather than Next.js selecting an arbitrary one before validation.
+    const rawCookie = request.headers.get('cookie')
+    if (rawCookie) headers['Cookie'] = rawCookie
+  } else if (cookieParts.length > 0) {
     headers['Cookie'] = cookieParts.join('; ')
   }
 
@@ -327,6 +337,15 @@ async function proxyRequest(
   // Copy relevant headers
   if (responseContentType) {
     response.headers.set('content-type', responseContentType)
+  }
+
+  if (pathSegments.startsWith('google/')) {
+    response.headers.set('cache-control', 'no-store')
+    for (const cookie of backendResponse.headers.getSetCookie()) {
+      if (cookie.startsWith('__Host-LH_oauth_binding=')) {
+        response.headers.append('set-cookie', cookie)
+      }
+    }
   }
 
   // Extract and set auth cookies if this is a token-returning endpoint

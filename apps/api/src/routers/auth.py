@@ -348,7 +348,20 @@ async def refresh(
         _log_refresh_outcome("no_subject")
         raise credentials_exception
 
-    user = await security_get_user(request, db_session, email=email)
+    if payload.get("lhv") == 2:
+        from src.security.provider_session import resolve_provider_session
+        user = await resolve_provider_session(db_session, payload)
+        # Provider rotation must fail closed rather than use the legacy fail-open helper.
+        from src.core.redis import get_redis_client
+        try:
+            redis_client = get_redis_client()
+            if redis_client is None:
+                raise RuntimeError()
+            redis_client.ping()
+        except Exception:
+            raise HTTPException(503, "Session validation temporarily unavailable") from None
+    else:
+        user = await security_get_user(request, db_session, email=email)
     if user is None or user.id is None:
         _log_refresh_outcome("user_not_found", token_age_seconds=_token_age_seconds(payload))
         raise credentials_exception
@@ -393,7 +406,10 @@ async def refresh(
     jti = payload.get("jti")
     reused_pair = None
     if jti:
-        first_use = _mark_refresh_jti_used(user.id, jti)
+        if payload.get("lhv") == 2:
+            first_use = _mark_refresh_jti_used(user.id, jti, strict=True)
+        else:
+            first_use = _mark_refresh_jti_used(user.id, jti)
         if not first_use:
             # Poll briefly for the grace entry: a truly simultaneous request may
             # lose the NX race before the winner has written its cached pair.
@@ -427,6 +443,9 @@ async def refresh(
         # claim-less one that bypasses the org auth-method / sharing policy.
         # A session that records no method also picks up its grace deadline here.
         carried = carry_session_claims(payload)
+        if payload.get("lhv") == 2:
+            from src.security.provider_session import carried_claims
+            carried.update(carried_claims(payload))
         new_access_token = create_access_token(
             data={"sub": email, **carried},
             expires_delta=JWT_ACCESS_TOKEN_EXPIRES,
@@ -654,6 +673,9 @@ async def third_party_login(
     current_user: AnonymousUser = Depends(get_current_user),
     db_session: AsyncSession = Depends(get_db_session),
 ):
+    # The old Google/access-token/email bridge must never run alongside the new flow.
+    if body.provider == "google":
+        raise HTTPException(410, "Restart sign-in using the server-owned Google flow")
     import logging
     import redis as _redis
     _logger = logging.getLogger(__name__)
@@ -1112,18 +1134,20 @@ async def logout(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Best-effort resolve the user to revoke every session they have across
-    # devices (not just the one tied to this cookie).
-    if payload and payload.get("sub"):
+    if payload and payload.get("lhv") == 2:
+        # Signed stable claims identify the owner even after membership loss,
+        # lockout or identity retirement. Logout grants no account access.
+        user_record = await db_session.get(User, int(payload["sub"].removeprefix("lh:user:")))
+        if user_record is not None and user_record.user_uuid == payload["lh_uuid"]:
+            if not revoke_user_sessions_before(user_record.id):
+                raise HTTPException(503, "Logout temporarily unavailable; please retry")
+    elif payload and payload.get("sub"):
+        # Preserve legacy password-session compatibility.
         try:
-            user_record = await security_get_user(
-                request, db_session, email=payload["sub"]
-            )
+            user_record = await security_get_user(request, db_session, email=payload["sub"])
             if user_record is not None and user_record.id is not None:
                 revoke_user_sessions_before(user_record.id)
         except Exception:
-            # Never block logout on a revocation-store hiccup; cookies are
-            # still cleared below so the browser session ends.
             pass
 
     unset_auth_cookies(response, request)

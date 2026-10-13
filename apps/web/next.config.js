@@ -159,6 +159,9 @@ const nextConfig = {
     remotePatterns: [],
   },
   experimental: {
+    // Bounded builds on the shared staging host; unset preserves upstream defaults.
+    ...(process.env.LEARNHOUSE_BUILD_CPUS ? { cpus: Number(process.env.LEARNHOUSE_BUILD_CPUS) } : {}),
+    ...(process.env.LEARNHOUSE_BUILD_LOW_MEMORY === 'true' ? { webpackMemoryOptimizations: true, webpackBuildWorker: true } : {}),
     optimizePackageImports: [
       '@phosphor-icons/react',
       'framer-motion',

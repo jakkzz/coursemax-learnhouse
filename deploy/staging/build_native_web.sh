@@ -42,10 +42,10 @@ docker run -d --pull=never --name "$NAME" --memory 4096m --cpus 1 --read-only --
 for iteration in $(seq 1 190); do
   if docker exec "$NAME" test -f /scratch/build-success >/dev/null 2>&1; then
     docker logs "$NAME" > "$OUT/build.log" 2>&1
-    docker exec "$NAME" sh -c 'cd /scratch/web; tar czf /scratch/web-runtime.tar.gz -C .next/standalone .; tar czf /scratch/web-static.tar.gz -C .next static; tar czf /scratch/web-public.tar.gz public'
-    for file in web-runtime web-static web-public; do
-      docker cp "$NAME:/scratch/$file.tar.gz" "$OUT/$file.tar.gz" >/dev/null
-    done
+    # Stream out of tmpfs: docker cp cannot reliably archive tmpfs mount paths.
+    docker exec "$NAME" sh -c 'cd /scratch/web/.next/standalone; tar czf - .' > "$OUT/web-runtime.tar.gz"
+    docker exec "$NAME" sh -c 'cd /scratch/web/.next; tar czf - static' > "$OUT/web-static.tar.gz"
+    docker exec "$NAME" sh -c 'cd /scratch/web; tar czf - public' > "$OUT/web-public.tar.gz"
     (cd "$OUT"; sha256sum web-*.tar.gz > artifact.sha256)
     echo "Validated build artifacts: $OUT"
     exit 0

@@ -48,6 +48,24 @@ no arbitrary authored SVG/remote-media policy is introduced.
   migration/private-file acceptance are not inferred. Inline degraded finish review
   (no subagent exposed) ships this scoped incumbent extension only.
 
+## Staging activation
+
+Deployed source `c972fcb58fb9eea688336391af16651598d0d478`, image
+`coursemax-learnhouse:c972fcb5`
+(`sha256:686f0e5d9bd4a5e401154c7a727a00d33c6f54011b692289ba64dc8d8673577f`).
+All5136 desired baked file/link/mode signatures match the validated full build.
+Actual live admin1440/student390 password-login/security-status/action-route,
+local-icon, keyboard-focus, section-grid, mobile-footer, cookie and logout checks
+pass. Owned statuses match each actor's private API response, not a UI mock.
+Protected DB/content/runtime snapshots/checksums and5625764a rollback retained.
+Only staging app container changed; all other running IDs and identity/user/event
+counts preserved. Policy/schema/flags unchanged; supported source-menu URL alone
+advanced. API/web/collab health200; CourseMax frontend healthy. No pruning.
+Last measured25.18GiB free/4.07GiB available: recheck before future work.
+Owner visual acceptance still awaits refresh; no new real-provider/device/lifecycle
+acceptance is claimed. Provider lifecycle success previously confirmed by owner
+remains bounded by the LINE validation record.
+
 ## Recoverable staging recipe
 
 `Dockerfile.auth-ui` uses retained reviewed LINE parent5625764a, no pull/network,

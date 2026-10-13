@@ -171,7 +171,7 @@ const nextConfig = {
     ...(process.env.LEARNHOUSE_BUILD_CPUS ? { cpus: Number(process.env.LEARNHOUSE_BUILD_CPUS) } : {}),
     ...(process.env.LEARNHOUSE_BUILD_LOW_MEMORY === 'true' ? {
       webpackMemoryOptimizations: true, webpackBuildWorker: true,
-      turbopackGc: true,
+      turbopackGc: true, turbopackFileSystemCacheForBuild: false,
       turbopackPluginRuntimeStrategy: 'workerThreads',
     } : {}),
     optimizePackageImports: [

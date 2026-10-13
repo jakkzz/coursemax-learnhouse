@@ -384,6 +384,7 @@ export default async function proxy(req: NextRequest) {
   if (
     pathname.startsWith('/auth/sso/')
     || pathname.startsWith('/auth/callback/')
+    || pathname === '/auth/link/google'
     || pathname.startsWith('/auth/token-exchange')
   ) {
     const response = NextResponse.rewrite(new URL(`${pathname}${search}`, req.url))

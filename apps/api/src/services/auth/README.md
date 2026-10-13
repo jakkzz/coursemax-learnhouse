@@ -41,6 +41,32 @@ integration suite also runs the real Lua script against disposable Redis, includ
 32 simultaneous callbacks, expiry, malformed records and context/actor isolation.
 Native HTTP/cookie integration and provider-account acceptance are still required.
 
+## Google-first server handoff
+
+`google_handoff.py` joins browser-bound transaction consumption, fixed-endpoint Google
+code redemption and real ID-token proof verification. It consumes before exchanging,
+including cancellation, and never restores consumed state after provider/admission
+failure. PKCE, callback URI, nonce and client come from server-owned configuration
+and the consumed transaction. Each request is capped at 64 KiB/5 seconds; a single
+10-second budget covers redemption plus proof verification. Provider credentials and
+native headers/cookies never cross into unrelated requests or returned result fields.
+
+New staging registration requires an explicit, normalized verified-email allowlist;
+empty means deny. Personal Gmail and institutional addresses are both eligible when
+listed. This is admission only: no account lookup/merge by email, no `.ac.th` privilege
+or enrollment grant, and no public registration switch. Existing signin/link intents
+return internal proof/context only; signin must not fall back to creating a user.
+
+The frozen result is **not a browser response** and must not be serialized directly.
+Native ownership/account/session/MFA/org checks and atomic registration still need
+integration. No routes or credentials are enabled by this module. Public password
+signup and LINE UI remain later work; existing bootstrap password login is unchanged.
+
+The cached-image Redis harness also runs the handoff matrix with real transaction
+consumption, ephemeral RSA-signed ID tokens and mocked fixed Google endpoints, once
+with an atomic in-memory store and once with Redis. It does not contact Google or
+constitute native session/provider-account end-to-end acceptance.
+
 ## Persisted identity ownership
 
 `provider_identities.py` adds private subject ownership on native user IDs. It does

@@ -38,11 +38,14 @@ docker run --rm --pull=never --network none --read-only \
   -v "$SCRATCH:/scratch" \
   -v "$ROOT/apps/api/src/services/auth/provider_proof.py:/app/api/src/services/auth/provider_proof.py:ro" \
   -v "$ROOT/apps/api/src/services/auth/oauth_transactions.py:/app/api/src/services/auth/oauth_transactions.py:ro" \
+  -v "$ROOT/apps/api/src/services/auth/google_handoff.py:/app/api/src/services/auth/google_handoff.py:ro" \
   -v "$ROOT/apps/api/src/tests/services/test_provider_proof.py:/app/api/src/tests/services/test_provider_proof.py:ro" \
   -v "$ROOT/apps/api/src/tests/services/test_oauth_transactions.py:/app/api/src/tests/services/test_oauth_transactions.py:ro" \
   -v "$ROOT/apps/api/src/tests/services/test_oauth_transactions_redis.py:/app/api/src/tests/services/test_oauth_transactions_redis.py:ro" \
+  -v "$ROOT/apps/api/src/tests/services/test_google_handoff.py:/app/api/src/tests/services/test_google_handoff.py:ro" \
   -e RUN_OAUTH_REDIS_TESTS=1 -e OAUTH_TEST_REDIS_SOCKET=/scratch/redis.sock \
   -w /app/api --entrypoint /app/api/.venv/bin/python "$API_IMAGE" \
   -B -m unittest src.tests.services.test_provider_proof \
   src.tests.services.test_oauth_transactions \
-  src.tests.services.test_oauth_transactions_redis -v
+  src.tests.services.test_oauth_transactions_redis \
+  src.tests.services.test_google_handoff -v

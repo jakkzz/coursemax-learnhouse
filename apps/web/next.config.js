@@ -167,8 +167,9 @@ const nextConfig = {
     ...(process.env.LEARNHOUSE_BUILD_LOW_MEMORY === 'true' ? {
       webpackMemoryOptimizations: true, webpackBuildWorker: true,
       turbopackGc: true,
-      // Isolated Linux build only; any worker teardown abort fails the build.
-      turbopackPluginRuntimeStrategy: 'forceWorkerThreads',
+      turbopackPluginRuntimeStrategy: 'workerThreads',
+      // Staging-only low-memory build; normal builds retain minification.
+      turbopackMinify: false,
     } : {}),
     optimizePackageImports: [
       '@phosphor-icons/react',

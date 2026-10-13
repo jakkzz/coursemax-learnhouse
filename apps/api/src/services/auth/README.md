@@ -41,6 +41,44 @@ integration suite also runs the real Lua script against disposable Redis, includ
 32 simultaneous callbacks, expiry, malformed records and context/actor isolation.
 Native HTTP/cookie integration and provider-account acceptance are still required.
 
+## Persisted identity ownership
+
+`provider_identities.py` adds private subject ownership on native user IDs. It does
+not create accounts, search/update email, assign roles, issue sessions or implement
+merges. Unknown LINE proof yields linking guidance, never account creation.
+
+- A provider/issuer/namespace/subject is unique, including after retirement.
+- One active identity per provider per user; ordinary linking cannot replace it.
+- Linking LINE requires an active Google binding and verified native email.
+- Google replacement requires current and new verified proofs plus an expected
+  binding and reason. User-row locks, unique constraints and savepoints preserve
+  the losing account's access in races and roll back partial retirements.
+- Identity ownership is immutable; events are append-only. Foreign keys restrict
+  native user deletion while identity evidence exists. Lifecycle/merge APIs must
+  respect this boundary rather than bypass database guards.
+- Migration `c71a02d9ef40` installs the schema/guards and supports native
+  create_all-first bootstrap. It imports no identities. Downgrade locks both tables
+  and refuses to destroy any retained binding/event.
+
+**Not route-ready:** ownership resolution is not session authorization. Session
+issuance must lock/recheck the binding and active account, enforce native MFA/org
+policy, and use a stable account subject. Replacement must invalidate affected
+native sessions; retirement alone does not revoke existing JWTs. Native email-based
+OAuth fallback must be removed/guarded before provider activation. Both proofs and
+actor/session context must be server-verified, not request-body assertions.
+
+Run isolated PostgreSQL tests from the repository root:
+
+```sh
+bash deploy/staging/test_identity_postgres.sh
+```
+
+The harness uses cached pinned images, a private Unix socket, no network or live
+volumes, disposable native-user fixtures, and capacity gates. It checks migration
+and create_all bootstrap, competing ownership/replacement, audit retention and
+rollback even when the caller catches an error and commits its outer transaction.
+This is not a complete native migration-chain/HTTP/provider acceptance rehearsal.
+
 ## Before connecting a route
 
 Require a browser-bound, single-use transaction with server-owned nonce/PKCE and

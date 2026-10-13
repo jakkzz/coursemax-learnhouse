@@ -111,7 +111,15 @@ browser runtime config retains the public HTTPS URL. No JWT/OAuth secrets enter
 python3 -m unittest discover -s deploy/staging -p 'test_staging.py' -v
 node --test apps/web/tests/server-wrapper-runtime.test.mjs
 RUN_GATEWAY_DOCKER_TESTS=1 python3 -m unittest discover -s deploy/staging -p 'test_gateway.py' -v
+bash deploy/staging/test_oauth_redis.sh
+bash deploy/staging/test_identity_postgres.sh
 ```
+
+Run the store-backed authentication harnesses sequentially. Each enforces resource
+floors, uses cached pinned images with `--pull=never`, no TCP network/host ports or
+application volumes, and removes its disposable fixture. PostgreSQL data lives in
+tmpfs; the client uses a private Unix socket and synthetic native users. These tests
+cover primitives/ownership, not complete native migrations or live provider login.
 
 The optional gateway test uses an explicitly pinned **already cached** Nginx image,
 `--pull=never`, no network, no host ports, no named volumes and synthetic credentials.

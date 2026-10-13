@@ -46,14 +46,14 @@ const LoginClient = (props: LoginClientProps) => {
   )
   const passwordAllowed = allowedMethods.has('password')
   const magicLoginAllowed = allowedMethods.has('magic_login')
-  const [googleCapability, setGoogleCapability] = useState({ google: false, registration: false })
+  const [googleCapability, setGoogleCapability] = useState({ google: false, registration: false, public_registration: false })
   const [googleLoading, setGoogleLoading] = useState(false)
   const googleAllowed = googleCapability.google && allowedMethods.has('google')
   useEffect(() => {
     let active = true
     fetch('/api/auth/google/capabilities', { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null)
-      .then(data => { if (active && data) setGoogleCapability({ google: data.google === true, registration: data.registration === true }) })
+      .then(data => { if (active && data) setGoogleCapability({ google: data.google === true, registration: data.registration === true, public_registration: data.public_registration === true }) })
       .catch(() => {})
     return () => { active = false }
   }, [])
@@ -753,9 +753,9 @@ const LoginClient = (props: LoginClientProps) => {
             ) : (
               <>
             {/* Header */}
-            <h1 className="text-[28px] md:text-[32px] font-black text-black tracking-tight leading-tight">{t('auth.welcome_back')}</h1>
-            <p className="mt-2 text-black/45 text-[15px] font-medium">
-              {passwordAllowed
+            <h1 className="text-[28px] md:text-[32px] font-black text-black tracking-tight leading-tight">{googleCapability.public_registration ? t('auth.google_welcome') : t('auth.welcome_back')}</h1>
+            <p className="mt-2 text-black/70 text-[15px] font-medium">
+              {googleCapability.public_registration ? t('auth.google_create_or_signin') : passwordAllowed
                 ? t('auth.enter_credentials')
                 : t('auth.choose_sign_in_method', {
                     defaultValue: 'Choose how you’d like to sign in.',
@@ -763,6 +763,18 @@ const LoginClient = (props: LoginClientProps) => {
             </p>
 
             <div className="mt-8">
+              {googleAllowed && (
+                <div className="mb-6">
+                  <button type="button"
+                    onClick={() => handleGoogleSignIn(googleCapability.public_registration ? 'register' : 'signin')}
+                    disabled={isSubmitting || googleLoading}
+                    className="flex justify-center items-center w-full bg-black hover:bg-neutral-800 text-white space-x-3 font-semibold p-3 rounded-lg border border-black transition-all text-base disabled:opacity-50">
+                    <img src="https://fonts.gstatic.com/s/i/productlogos/googleg/v6/24px.svg" alt="" className="w-5 h-5" />
+                    <span>{googleLoading ? t('common.loading') : googleCapability.public_registration ? t('auth.google_continue') : t('auth.sign_in_with_google')}</span>
+                  </button>
+                  {passwordAllowed && <p className="mt-5 text-center text-sm text-black/70">{t('auth.google_password_alternative')}</p>}
+                </div>
+              )}
               {passwordAllowed && (
               <FormLayout onSubmit={formik.handleSubmit}>
                 <FormField name="email">
@@ -839,7 +851,7 @@ const LoginClient = (props: LoginClientProps) => {
               )}
 
               {/* Divider: only earns its place between two sets of options. */}
-              {passwordAllowed && hasAlternativeMethods && (
+              {passwordAllowed && (ssoEnabled || magicLoginAllowed) && (
                 <div className="relative my-6">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-neutral-200" />
@@ -852,18 +864,7 @@ const LoginClient = (props: LoginClientProps) => {
 
               {/* Social & SSO Buttons */}
               <div className="space-y-2.5">
-                {googleAllowed && (
-                <button
-                  type="button"
-                  onClick={() => handleGoogleSignIn('signin')}
-                  disabled={isSubmitting || googleLoading}
-                  className="flex justify-center items-center w-full bg-white hover:bg-neutral-50 text-black space-x-3 font-medium p-3 rounded-lg border border-neutral-200 transition-all text-sm disabled:opacity-50"
-                >
-                  <img src="https://fonts.gstatic.com/s/i/productlogos/googleg/v6/24px.svg" alt="" className="w-4 h-4" />
-                  <span>{googleLoading ? t('common.loading') : t('auth.sign_in_with_google')}</span>
-                </button>
-                )}
-                {googleAllowed && googleCapability.registration && (
+                {googleAllowed && googleCapability.registration && !googleCapability.public_registration && (
                   <button type="button" onClick={() => handleGoogleSignIn('register')} disabled={isSubmitting || googleLoading}
                     className="w-full rounded-lg p-3 text-sm font-medium text-black underline underline-offset-4 disabled:opacity-50">
                     {t('auth.google_create_account', { defaultValue: 'Sign up with Google' })}

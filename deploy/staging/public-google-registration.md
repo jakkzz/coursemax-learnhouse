@@ -15,9 +15,13 @@ It creates the reviewed native learner role (4), not staff/admin rights or cours
 rosters. Existing email collisions require explicit authenticated linking and never
 merge accounts. Password signup remains blocked; password sign-in remains available.
 
-Login offers **Sign in with Google** and **Sign up with Google**. Existing Google
-identities choose sign-in; new identities choose sign-up. This change does not add
-an implicit sign-in-to-registration fallback. LINE remains disabled.
+Public mode offers one primary **Continue with Google** action above password
+recovery. Its explicit public-register transaction becomes a verified `continue`
+handoff: a permanently bound Google subject signs in; an unbound subject creates a
+learner, unless its email conflicts with an existing account (explicit linking only).
+Retired/reserved subjects never create replacement accounts. Signin-only transactions
+still never register accounts. Restricted mode preserves separate signup/signin.
+LINE remains disabled.
 
 Validation uses disposable PostgreSQL and real ephemeral RSA/JWKS with mocked
 provider endpoints. Actual provider consent/signup acceptance requires a real

@@ -53,7 +53,7 @@ export default function GoogleCallbackPage() {
     <AuthLayout org={null}>
       <div className="m-auto w-full max-w-md space-y-4 p-6 text-center" role={error ? 'alert' : 'status'}>
         {error ? <AlertTriangle className="mx-auto" size={24} /> : <Loader2 className="mx-auto animate-spin" size={24} />}
-        <h1 className="text-xl font-semibold">{t('auth.sign_in_with_google')}</h1>
+        <h1 className="text-xl font-semibold">{t('auth.google_continue')}</h1>
         <p className="text-sm leading-relaxed">{error ?? t('auth.google_completing', { defaultValue: 'Completing secure sign-in…' })}</p>
         {error && <Link className="inline-block rounded-lg border px-4 py-3 text-sm font-medium" href="/login">{t('auth.google_back_to_login', { defaultValue: 'Back to sign in' })}</Link>}
       </div>

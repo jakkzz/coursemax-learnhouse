@@ -32,7 +32,19 @@ async def complete_native_google(db, verified, *, org_id):
     proof = verified.proof
     if proof.provider != 'google' or not proof.verified_email:
         raise HTTPException(401, 'Invalid Google proof')
-    if verified.intent == 'link':
+    intent = verified.intent
+    if intent == 'continue':
+        # Only the public-register handoff can produce this intent. Resolve
+        # permanent subject ownership, never email, to select the native path.
+        try:
+            await resolve_identity_owner(db, proof)
+        except IdentityConflict as error:
+            if str(error) != 'google_registration_required':
+                raise HTTPException(409, 'Google identity is unavailable') from error
+            intent = 'register'
+        else:
+            intent = 'signin'
+    if intent == 'link':
         if verified.actor is None:
             raise HTTPException(401, 'Sign in before linking Google')
         user = (await db.exec(select(User).where(User.id == verified.actor.user_id).with_for_update())).first()
@@ -45,7 +57,7 @@ async def complete_native_google(db, verified, *, org_id):
             raise HTTPException(403, 'Organization access required')
         binding = await link_existing_identity(db, actor_user_id=user.id, proof=proof)
         # Explicit linking never mutates the native email, password, role or name.
-    elif verified.intent == 'signin':
+    elif intent == 'signin':
         try:
             owner = await resolve_identity_owner(db, proof)
         except IdentityConflict as error:
@@ -57,7 +69,7 @@ async def complete_native_google(db, verified, *, org_id):
         ).with_for_update())).first()
         if user is None or binding is None:
             raise HTTPException(409, 'Google identity changed. Restart sign-in.')
-    elif verified.intent == 'register':
+    elif intent == 'register':
         # Handoff admission verifies email and public/allowlist policy first.
         # Existing identities must choose signin, not create duplicates.
         try:

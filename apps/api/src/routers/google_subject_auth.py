@@ -123,8 +123,9 @@ async def capabilities(db: AsyncSession = Depends(get_db_session)):
         config = settings()
         await enforce_login_auth_method(db, config.org_id, 'google')
     except HTTPException:
-        return {'google': False, 'registration': False}
-    return {'google': True, 'registration': config.handoff.registration_enabled}
+        return {'google': False, 'registration': False, 'public_registration': False}
+    return {'google': True, 'registration': config.handoff.registration_enabled,
+            'public_registration': config.handoff.public_registration}
 
 
 @router.post('/start')

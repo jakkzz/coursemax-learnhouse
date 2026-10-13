@@ -378,15 +378,31 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
         from sqlmodel import select
         async with self.http_flow(allow_registration=False, public_registration=True) as client:
             self.assertEqual((await client.get('/auth/google/capabilities')).json(),
-                             {'google': True, 'registration': True})
+                             {'google': True, 'registration': True, 'public_registration': True})
             body = await self.start_http(client, 'register')
             response = await client.post('/auth/google/complete', json=body)
             self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual((await client.get('/profile')).json()['id'], 4)
+            # The same primary public action signs in the already-bound subject
+            # without duplicating users, bindings, memberships or audit events.
+            body = await self.start_http(client, 'register')
+            returning = await client.post('/auth/google/complete', json=body)
+            self.assertEqual(returning.status_code, 200, returning.text)
             self.assertEqual((await client.get('/profile')).json()['id'], 4)
         async with self.sessions() as db:
             membership = (await db.exec(select(UserOrganization).where(UserOrganization.user_id == 4))).one()
             self.assertEqual(membership.role_id, 4)
         self.assertEqual(tuple(await self.counts()), (1, 1, 4))
+
+    async def test_http_public_continue_never_merges_existing_email(self):
+        from dataclasses import replace
+        self.google = replace(self.google, verified_email='fixture1@example.com')
+        async with self.http_flow(allow_registration=False, public_registration=True) as client:
+            body = await self.start_http(client, 'register')
+            response = await client.post('/auth/google/complete', json=body)
+            self.assertEqual(response.status_code, 409)
+            self.assertIn('already uses this email', response.text)
+        self.assertEqual(tuple(await self.counts()), (0, 0, 3))
 
     async def test_http_cancel_consumes_state_and_unknown_signin_never_registers(self):
         async with self.http_flow() as client:

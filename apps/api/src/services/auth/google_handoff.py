@@ -190,7 +190,9 @@ async def complete_google_handoff(
 
     return VerifiedGoogleHandoff(
         proof=proof,
-        intent=consumed.intent,
+        # Public registration explicitly means create-or-sign-in by Google
+        # subject. Signin-only transactions still never create accounts.
+        intent='continue' if consumed.intent == 'register' and config.public_registration else consumed.intent,
         return_path=consumed.return_path,
         actor=consumed.actor,
     )

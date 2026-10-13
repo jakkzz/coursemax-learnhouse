@@ -163,6 +163,7 @@ class GoogleHandoffTests(unittest.IsolatedAsyncioTestCase):
             self.claim_changes = {'email': email}
             result = await self.finish(config=config)
             self.assertEqual(result.proof.verified_email, email)
+            self.assertEqual(result.intent, 'continue')
             self.assertFalse(hasattr(result, 'role'))
         for changes in ({'email_verified': False}, {'email': None}):
             await self.start('register')

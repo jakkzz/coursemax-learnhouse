@@ -19,7 +19,7 @@ cleanup() {
 trap cleanup EXIT
 # Large generated dependency packages use <=900MiB of disk, freeing memory for
 # compilation. Only this new build directory is written; no cache is pruned.
-docker run -d --pull=never --name "$NAME" --memory 4096m --cpus 1 --read-only --ulimit core=0 --oom-score-adj 500 \
+docker run -d --pull=never --name "$NAME" --memory 4352m --cpus 1 --read-only --ulimit core=0 --oom-score-adj 500 \
   --tmpfs /scratch:rw,exec,size=2048m --tmpfs /tmp:rw,size=64m \
   -v "$ROOT/apps/web:/source:ro" \
   -v "$OUT/dependencies:/scratch/web/node_modules/.build-deps:rw" \

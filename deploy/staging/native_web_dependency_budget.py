@@ -32,7 +32,7 @@ for size, package in sorted(sized, key=lambda pair: pair[0], reverse=True):
         continue
     stats = os.statvfs(destination)
     if stats.f_bavail * stats.f_frsize - size < 25.1 * 1024**3:
-        raise RuntimeError('Disk safety floor would be crossed by build dependencies')
+        continue  # Keep this package in tmpfs rather than cross the disk floor.
     target = destination / package.relative_to(modules)
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(package, target, symlinks=True)

@@ -1,0 +1,18 @@
+# Existing native release includes the validated API dependencies, wrapper,
+# private-file gateway policy and unchanged public assets. Retain its rollback.
+ARG NATIVE_IMAGE=coursemax-learnhouse:0ef5ae2c
+FROM ${NATIVE_IMAGE}
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.source="https://github.com/jakkzz/coursemax-learnhouse" \
+      org.opencontainers.image.revision=$SOURCE_REVISION
+COPY apps/api/src/services/auth/google_handoff.py /app/api/src/services/auth/google_handoff.py
+COPY apps/api/src/services/auth/native_google.py /app/api/src/services/auth/native_google.py
+COPY apps/api/src/routers/google_subject_auth.py /app/api/src/routers/google_subject_auth.py
+# BuildKit bind mounts avoid duplicate compressed/extracted artifact layers on
+# the shared host. Bundle AND generated-route type checks must pass beforehand.
+# public/ and server-wrapper.js are unchanged from the pinned parent release.
+RUN --mount=type=bind,source=web-runtime.tar.gz,target=/tmp/runtime.tar.gz \
+    --mount=type=bind,source=web-static.tar.gz,target=/tmp/static.tar.gz \
+    rm -rf /app/web/.next /app/web/node_modules && \
+    tar xzf /tmp/runtime.tar.gz -C /app/web && \
+    tar xzf /tmp/static.tar.gz -C /app/web/.next

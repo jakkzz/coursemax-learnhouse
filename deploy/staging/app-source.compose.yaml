@@ -1,0 +1,7 @@
+# Explicit derived-image app release. Does not load staged Google credentials.
+services:
+  app:
+    image: ${LEARNHOUSE_APP_IMAGE:?Set a validated immutable derived-image tag or digest}
+    # Overlays are baked into this image. Keep only the existing content volume.
+    volumes: !override
+      - content:/app/api/content

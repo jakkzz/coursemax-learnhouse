@@ -153,6 +153,23 @@ It removes only its uniquely named temporary container. This validates the auth
 contract, not the candidate production image or the complete LearnHouse workflow.
 Re-run equivalent probes against the actual candidate before public exposure.
 
+## Small derived API-image release
+
+`Dockerfile` adds the validated auth modules, private ownership model/migration and
+existing web-wrapper/Nginx fixes to the exact upstream image, without downloading
+packages or rebuilding the frontend. It does **not** wire Google login or load
+`runtime/google-oauth.env`. `app-source.compose.yaml` selects an explicitly recorded
+image and removes obsolete overlay mounts (the content volume is retained).
+
+Build only from a clean, isolated source archive. Record image ID/source revision,
+retain the working image and matching Compose/overlay release, and back up synthetic
+stores before restart. Run auth/ownership tests and verify baked-file hashes. Apply
+only app with `--no-deps --pull never`, then reload gateway after app health passes.
+Keep the native-login gateway override. Bootstrap will create the additive private
+identity tables using native create_all; verify their guards and empty state. This
+is not proof of a full Alembic-chain upgrade or Google login acceptance. Rollback to
+the retained app image/overlays does not require deleting the additive tables.
+
 ## Backup and rollback boundaries
 
 Back up database and content together with a protected secret/config recovery copy.

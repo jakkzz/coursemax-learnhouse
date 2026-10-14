@@ -1,6 +1,6 @@
 # Academic classes and roster-first student identity
 
-Implementation checkpoint, 2026-10-14. **Source implementation, not an activated release.** The live staging image remains `coursemax-learnhouse:8be3f82e`. No real courses, student rosters, historical evidence or accounts were migrated by this work.
+**Deployed to staging, 2026-10-14:** source `4c512c94`, image `coursemax-learnhouse:4c512c94`, at `/classes`. Only the staging app was replaced. All six new tables remain empty; no real courses, student rosters, historical evidence or accounts were migrated. Account profiles, provider ownership, security policy and account4's audited superadmin grant are preserved. CourseMax remains unchanged.
 
 ## Task flow
 
@@ -29,8 +29,9 @@ Implementation checkpoint, 2026-10-14. **Source implementation, not an activated
 
 ## Validation and limits
 
-- Isolated PostgreSQL/auth/service suite; full bounded production bundle and generated-route TypeScript checks.
+- 107 isolated PostgreSQL/auth/service tests; full bounded production bundle and generated-route TypeScript checks.
 - Eight compiled synthetic teacher/student EN/TH flows at 1440 and 390 pixels: setup → preview confirmation → applied roster, search, verified manual addition, history-preserving withdrawal, own student details/classes and reload; no page errors/overflow or peer-student details. A stale owned test server was detected and stopped; accepted flows use the final compiled bundle.
 - Scoped School color/status polish retained; Classes attribution is in-flow rather than covering roster actions.
 - Finish review is inline, not independent. Real registrar/provider acceptance, actual institution approval, administrative dispute resolution, private-course learning access, academic timetable/attendance/grading parity and real migration remain separate gates.
-- Before activation: freeze migration DDL, protect current DB/content/runtime and rollback image, verify baked source/artifacts, install additive schema without stamping/backfill, switch app only, verify native identity/security policy and account4 grant remain intact. Do not claim deployment based on this checkpoint.
+- Activation completed with frozen SQL tested on isolated PostgreSQL, protected DB/content/runtime backups and saved/checksummed `8be3f82e` parent. Verified 5,192 baked web entries and nine API files. Installed six additive tables atomically without stamping/backfill; native identity/security checks and unchanged account4 grant pass. Four live EN/TH1440/390 class/School flows and two native auth flows pass; anonymous401/private-no-store/foreign-origin403 guards pass. The initial inherited post-start private-activity assertion failed; a complete rerun and explicit guards subsequently passed.
+- Rollback preserves the new schema and data, never restores an old DB or reverts account4's grant. If academic history is created after this empty release, the parent-code rollback requires a guarded-image review before use.

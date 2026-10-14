@@ -1,0 +1,15 @@
+# Exact retained School parent; additive class/roster authority, no data backfill.
+FROM coursemax-learnhouse:8be3f82e
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.source="https://github.com/jakkzz/coursemax-learnhouse" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}"
+COPY apps/api/src/db/academic_classes.py /app/api/src/db/academic_classes.py
+COPY apps/api/src/routers/academic_classes.py /app/api/src/routers/academic_classes.py
+COPY apps/api/src/services/academic_projection.py /app/api/src/services/academic_projection.py
+COPY apps/api/src/services/academic_rosters.py /app/api/src/services/academic_rosters.py
+COPY apps/api/src/routers/school_identity.py /app/api/src/routers/school_identity.py
+COPY apps/api/src/services/auth/native_google.py /app/api/src/services/auth/native_google.py
+COPY apps/api/src/services/courses/courses.py /app/api/src/services/courses/courses.py
+COPY apps/api/src/router.py /app/api/src/router.py
+COPY apps/api/migrations/versions/f25c930d8e22_academic_class_rosters.py /app/api/migrations/versions/f25c930d8e22_academic_class_rosters.py
+ADD web-delta.tar.gz /app/web/

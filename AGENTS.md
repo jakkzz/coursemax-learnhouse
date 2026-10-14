@@ -6,6 +6,14 @@ framework instructions for affected apps. When this checkout is under the privat
 handoff workspace, also read `../AGENTS.md`, `../STATUS.md`, `../PLAN.md` and the
 referenced scope/identity documents; current decisions supersede historical notes.
 
+## Current deployed extraction
+
+Live source/image `fe1877c9`; read `docs/extensions/deployment.md` for actual scope.
+Owned feature code is extracted; 43 historical original-file patches remain, with
+only the router registration changed further. No schema/data migration. Current
+upstream default `dev` is still our original `45cf5d4f` baseline: isolated pull
+reported zero incoming commits/conflicts, NOT future upgrade compatibility.
+
 ## Mandatory boundary
 
 - Put our backend logic/tests in `apps/api/src/route66_ext/`, frontend logic/copy/

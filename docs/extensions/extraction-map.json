@@ -63,6 +63,9 @@
     ],
     "src.routers.users": [
       "_invalidate_session_cache"
+    ],
+    "config.config": [
+      "get_learnhouse_config"
     ]
   },
   "moved": {
@@ -135,7 +138,10 @@
     "apps/web/components/Objects/Classes/AttendanceWorkspace.tsx": "apps/web/extensions/route66/components/Objects/Classes/AttendanceWorkspace.tsx",
     "apps/web/components/Objects/Classes/ClassesWorkspace.tsx": "apps/web/extensions/route66/components/Objects/Classes/ClassesWorkspace.tsx",
     "apps/web/components/Objects/Classes/attendance-copy.ts": "apps/web/extensions/route66/components/Objects/Classes/attendance-copy.ts",
-    "apps/web/services/auth/line.ts": "apps/web/extensions/route66/services/auth/line.ts"
+    "apps/web/services/auth/line.ts": "apps/web/extensions/route66/services/auth/line.ts",
+    "apps/web/tests/classes-preview.test.mjs": "apps/web/extensions/route66/tests/classes-preview.test.mjs",
+    "apps/web/tests/org-user-role-control.test.mjs": "apps/web/extensions/route66/tests/org-user-role-control.test.mjs",
+    "apps/web/tests/server-wrapper-runtime.test.mjs": "apps/web/extensions/route66/tests/server-wrapper-runtime.test.mjs"
   },
   "web_owned_copies": {
     "apps/web/app/auth/callback/line/page.tsx": "apps/web/extensions/route66/app/auth/callback/line/page.tsx",
@@ -163,5 +169,13 @@
     "apps/web/components/Objects/Classes/ClassesWorkspace.tsx": "apps/web/extensions/route66/components/Objects/Classes/ClassesWorkspace.tsx",
     "apps/web/components/Objects/Classes/attendance-copy.ts": "apps/web/extensions/route66/components/Objects/Classes/attendance-copy.ts",
     "apps/web/services/auth/line.ts": "apps/web/extensions/route66/services/auth/line.ts"
-  }
+  },
+  "extraction_revision": "fe1877c9d704be24e54b25fb0c29307bd772a2dc",
+  "new_integration_files": [
+    "apps/api/src/route66_ext/bootstrap.py",
+    "apps/api/src/route66_ext/adapters/_exports.py",
+    "apps/api/src/route66_ext/tests/services/test_extension_boundary.py",
+    "apps/web/extensions/route66/adapters/ui.ts",
+    "apps/web/extensions/route66/adapters/server.ts"
+  ]
 }

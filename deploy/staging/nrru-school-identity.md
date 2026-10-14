@@ -1,6 +1,6 @@
 # NRRU own-directory association — implementation checkpoint
 
-**Prepared, not deployed.** Existing synthetic preview remains live at f308348a.
+**Deployed to `learn.route66.click`: source/image `8be3f82e`.** Existing synthetic preview remains available. App-only release; CourseMax and other service containers unchanged. Exact f308348a parent is retained/saved for code-only rollback.
 
 ## Approved flow
 
@@ -25,6 +25,8 @@ Owner confirmed student search requires registrar login. **Do not implement stud
 
 81 isolated PostgreSQL/native auth tests pass, including new Google evidence, migration/model compatibility, own scoped search/confirmation, multiple matches, foreign/replayed candidate rejection, unique-record conflict, correction blocking, unchanged native roles, conditional staff/student menu, staff-only own timetable gate and empty assigned courses. 15 bounded directory/timetable parser tests and 31 provider-proof cases pass. Generated-route TypeScript passes after fixing ownership-safe type-harness copying and using the existing react-hot-toast dependency.
 
-Production bundle has **not passed**: initial Turbopack and diagnostic webpack builds timed out; reviewed Turbopack build was SIGKILLed. Diagnostic engine changes were reverted. No valid new web artifact, compiled bilingual desktop/mobile browser acceptance, finish-review verdict, new app image, schema activation or staging switch. Do not deploy from `BUILD_FINISHED` or type-only evidence.
+Earlier attempts timed out/SIGKILLed. A complete bounded production bundle and generated-route TypeScript now pass. Compiled checks caught and fixed semester-label association and saved-Thai hydration, including native locale restoration after mount without overwriting preferences. Eight compiled mocked EN/TH teacher/student flows at1440/390 pass; four live EN/TH own-school/fresh-evidence/classes/reload flows and two live native provider/password regressions pass, with zero page errors/overflow. Scoped finish review is disclosed as inline, not independent. Real fresh Google/own-name confirmation remains human acceptance, not a manufactured test result.
 
-When validated: use exact retained f308348a parent and `Dockerfile.school-identity`, clean complete web extraction/manifest verification and app-only release with protected pre-release snapshots. Apply reviewed additive migration f14b820c7d11 without manufacturing historical Google evidence or Alembic stamping. Retain tables/history on code rollback. The separate owner-confirmed platform-superadmin grant is an audited live administrative operation, not baked into source, signup or rollback.
+Released with `Dockerfile.school-identity` from exact f308348a parent and complete baked-tree/API byte/link/mode verification. Protected pre-release database/content/runtime backups and checksummed saved parent image retained. Reviewed additive f14b820c7d11 schema applied atomically without historical backfill or Alembic stamping; both new tables remain empty until actual user actions. Native profiles/provider ownership, policy and audited account4 superadmin grant preserved. App is healthy; only app container replaced. No real student/academic migration or class-roster importer activated. Code rollback must retain new tables/history and the owner grant, never restore an old database snapshot.
+
+Owner entry: sign in again with the existing NRRU Google identity, open `/account/school-identity`, search and explicitly confirm your own directory name. Confirmed staff then receive **School** in the profile dropdown and their read-only timetable; numeric institutional student hints receive the pending roster-match state. LearnHouse course assignment still requires a separately implemented explicit class/course/section authority.

@@ -1,0 +1,1112 @@
+{
+  "upstream_baseline": "45cf5d4f78cf537064070dc8e315a64990d14966",
+  "snapshot": "cfad1e042e45318051c547df044525a9ed3f7069",
+  "policy_version": 1,
+  "owned_prefixes": [
+    "apps/api/src/route66_ext/",
+    "apps/web/extensions/route66/",
+    "apps/web/public/route66/",
+    "docs/extensions/",
+    "scripts/extensions/",
+    "deploy/staging/"
+  ],
+  "owned_files": [
+    "AGENTS.md"
+  ],
+  "preserved_untracked_files": [
+    ".github/workflows/native-google-web.yaml"
+  ],
+  "preserved_untracked_prefixes": [
+    ".impeccable/"
+  ],
+  "exceptions": {},
+  "legacy_inventory": [
+    {
+      "status": "A",
+      "path": "DESIGN.md",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "PRODUCT.md",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/migrations/versions/c71a02d9ef40_provider_identity_ownership.py",
+      "target": "retain-version-id/path-wrapper; owned implementation under src.route66_ext.migrations",
+      "rationale": "Extension-owned historical revision; never renumber, stamp or drop evidence during extraction."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/migrations/versions/d84e13a6b902_native_google_email_uniqueness.py",
+      "target": "retain-version-id/path-wrapper; owned implementation under src.route66_ext.migrations",
+      "rationale": "Extension-owned historical revision; never renumber, stamp or drop evidence during extraction."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/migrations/versions/e92d7f04ab16_optional_provider_profile_import.py",
+      "target": "retain-version-id/path-wrapper; owned implementation under src.route66_ext.migrations",
+      "rationale": "Extension-owned historical revision; never renumber, stamp or drop evidence during extraction."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/migrations/versions/f14b820c7d11_school_directory_identity.py",
+      "target": "retain-version-id/path-wrapper; owned implementation under src.route66_ext.migrations",
+      "rationale": "Extension-owned historical revision; never renumber, stamp or drop evidence during extraction."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/migrations/versions/f25c930d8e22_academic_class_rosters.py",
+      "target": "retain-version-id/path-wrapper; owned implementation under src.route66_ext.migrations",
+      "rationale": "Extension-owned historical revision; never renumber, stamp or drop evidence during extraction."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/migrations/versions/f36da41e9f33_class_attendance.py",
+      "target": "retain-version-id/path-wrapper; owned implementation under src.route66_ext.migrations",
+      "rationale": "Extension-owned historical revision; never renumber, stamp or drop evidence during extraction."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/db/academic_classes.py",
+      "target": "src.route66_ext.db.academic_classes",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/db/class_attendance.py",
+      "target": "src.route66_ext.db.class_attendance",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/db/provider_identity.py",
+      "target": "src.route66_ext.db.provider_identity",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/db/provider_profile_import.py",
+      "target": "src.route66_ext.db.provider_profile_import",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/db/school_identity.py",
+      "target": "src.route66_ext.db.school_identity",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/db/users.py",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Unique lower-email index and private self DTO: schema/privacy exception; DTO can move, native index requires migration/metadata contract."
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/router.py",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Consolidate five registrations to one explicit extension registration; no feature logic in native router."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/routers/academic_classes.py",
+      "target": "src.route66_ext.routers.academic_classes",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/routers/auth.py",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Stable provider refresh/logout and retired unsafe Google flow: retained security seam, not removable by moving modules."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/routers/class_attendance.py",
+      "target": "src.route66_ext.routers.class_attendance",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/routers/google_subject_auth.py",
+      "target": "src.route66_ext.routers.google_subject_auth",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/routers/line_subject_auth.py",
+      "target": "src.route66_ext.routers.line_subject_auth",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/routers/mfa.py",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Provider-owned pending claims and single-use challenge: retained security seam."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/routers/school_identity.py",
+      "target": "src.route66_ext.routers.school_identity",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/routers/users.py",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Owner-only self response and no-store: prefer extension self endpoint plus frontend adapter before restoring native response."
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/security/auth.py",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Strict stable-subject validation/resolution, precision and fail-closed refresh: retained security seam."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/security/provider_session.py",
+      "target": "src.route66_ext.security.provider_session",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/security/session_context.py",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "LINE method/policy contract: compatibility seam."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/services/academic_projection.py",
+      "target": "src.route66_ext.services.academic_projection",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/services/academic_rosters.py",
+      "target": "src.route66_ext.services.academic_rosters",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/services/attendance_policy.py",
+      "target": "src.route66_ext.services.attendance_policy",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/services/auth/README.md",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/services/auth/google_handoff.py",
+      "target": "src.route66_ext.services.auth.google_handoff",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/services/auth/line_config.py",
+      "target": "src.route66_ext.services.auth.line_config",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/services/auth/line_handoff.py",
+      "target": "src.route66_ext.services.auth.line_handoff",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/services/auth/native_google.py",
+      "target": "src.route66_ext.services.auth.native_google",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/services/auth/native_line.py",
+      "target": "src.route66_ext.services.auth.native_line",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/services/auth/oauth_transactions.py",
+      "target": "src.route66_ext.services.auth.oauth_transactions",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/services/auth/profile_import.py",
+      "target": "src.route66_ext.services.auth.profile_import",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/services/auth/provider_identities.py",
+      "target": "src.route66_ext.services.auth.provider_identities",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/services/auth/provider_profile.py",
+      "target": "src.route66_ext.services.auth.provider_profile",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/services/auth/provider_proof.py",
+      "target": "src.route66_ext.services.auth.provider_proof",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/services/auth/session.py",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Provider claims in native session/MFA issuance: compatibility seam."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/services/class_attendance.py",
+      "target": "src.route66_ext.services.class_attendance",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/services/courses/courses.py",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Retention veto before filesystem deletion, serialized with class writer: lifecycle seam."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/services/nrru_directory.py",
+      "target": "src.route66_ext.services.nrru_directory",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/services/nrru_timetable.py",
+      "target": "src.route66_ext.services.nrru_timetable",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/services/orgs/auth_policy.py",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "LINE policy label: small native method compatibility seam."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/services/users/provider_avatar.py",
+      "target": "src.route66_ext.services.users.provider_avatar",
+      "rationale": "Own backend module; namespace move rehearsed statically, adapter/runtime work not accepted."
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/services/users/users.py",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Manual-profile locks/import cancellation and self DTO: lifecycle/privacy seam."
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/tests/routers/test_users_router.py",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Native self/public privacy regression: retain a native contract test, not feature logic."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/tests/services/test_academic_rosters.py",
+      "target": "apps/api/src/route66_ext/tests/",
+      "rationale": "Own tests; relocate imports/patch targets, retain native contract coverage."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/tests/services/test_attendance_policy.py",
+      "target": "apps/api/src/route66_ext/tests/",
+      "rationale": "Own tests; relocate imports/patch targets, retain native contract coverage."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/tests/services/test_class_attendance.py",
+      "target": "apps/api/src/route66_ext/tests/",
+      "rationale": "Own tests; relocate imports/patch targets, retain native contract coverage."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/tests/services/test_google_handoff.py",
+      "target": "apps/api/src/route66_ext/tests/",
+      "rationale": "Own tests; relocate imports/patch targets, retain native contract coverage."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/tests/services/test_native_google_sessions.py",
+      "target": "apps/api/src/route66_ext/tests/",
+      "rationale": "Own tests; relocate imports/patch targets, retain native contract coverage."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/tests/services/test_native_line_sessions.py",
+      "target": "apps/api/src/route66_ext/tests/",
+      "rationale": "Own tests; relocate imports/patch targets, retain native contract coverage."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/tests/services/test_nrru_directory.py",
+      "target": "apps/api/src/route66_ext/tests/",
+      "rationale": "Own tests; relocate imports/patch targets, retain native contract coverage."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/tests/services/test_nrru_timetable.py",
+      "target": "apps/api/src/route66_ext/tests/",
+      "rationale": "Own tests; relocate imports/patch targets, retain native contract coverage."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/tests/services/test_oauth_transactions.py",
+      "target": "apps/api/src/route66_ext/tests/",
+      "rationale": "Own tests; relocate imports/patch targets, retain native contract coverage."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/tests/services/test_oauth_transactions_redis.py",
+      "target": "apps/api/src/route66_ext/tests/",
+      "rationale": "Own tests; relocate imports/patch targets, retain native contract coverage."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/tests/services/test_provider_identities_postgres.py",
+      "target": "apps/api/src/route66_ext/tests/",
+      "rationale": "Own tests; relocate imports/patch targets, retain native contract coverage."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/tests/services/test_provider_profile.py",
+      "target": "apps/api/src/route66_ext/tests/",
+      "rationale": "Own tests; relocate imports/patch targets, retain native contract coverage."
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/tests/services/test_provider_proof.py",
+      "target": "apps/api/src/route66_ext/tests/",
+      "rationale": "Own tests; relocate imports/patch targets, retain native contract coverage."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/app/api/auth/[...path]/route.ts",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/app/api/auth/google/authorize/route.ts",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/app/api/auth/google/state/route.ts",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/app/api/auth/google/token/route.ts",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/app/auth/callback/google/page.tsx",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/app/auth/callback/line/page.tsx",
+      "target": "existing URL thin wrapper -> apps/web/extensions/route66/",
+      "rationale": "Framework-discovered extension route; exact wrapper registration required, not unrestricted app-path ownership."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/app/auth/link/google/page.tsx",
+      "target": "existing URL thin wrapper -> apps/web/extensions/route66/",
+      "rationale": "Framework-discovered extension route; exact wrapper registration required, not unrestricted app-path ownership."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/app/auth/link/line/page.tsx",
+      "target": "existing URL thin wrapper -> apps/web/extensions/route66/",
+      "rationale": "Framework-discovered extension route; exact wrapper registration required, not unrestricted app-path ownership."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/app/auth/login/login.tsx",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/app/liff/page.tsx",
+      "target": "existing URL thin wrapper -> apps/web/extensions/route66/",
+      "rationale": "Framework-discovered extension route; exact wrapper registration required, not unrestricted app-path ownership."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/app/orgs/[orgslug]/(withmenu)/account/[subpage]/page.tsx",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/app/orgs/[orgslug]/(withmenu)/attendance/check-in/page.tsx",
+      "target": "existing URL thin wrapper -> apps/web/extensions/route66/",
+      "rationale": "Framework-discovered extension route; exact wrapper registration required, not unrestricted app-path ownership."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/app/orgs/[orgslug]/(withmenu)/attendance/page.tsx",
+      "target": "existing URL thin wrapper -> apps/web/extensions/route66/",
+      "rationale": "Framework-discovered extension route; exact wrapper registration required, not unrestricted app-path ownership."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/app/orgs/[orgslug]/(withmenu)/attendance/receipts/[receiptId]/page.tsx",
+      "target": "existing URL thin wrapper -> apps/web/extensions/route66/",
+      "rationale": "Framework-discovered extension route; exact wrapper registration required, not unrestricted app-path ownership."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/app/orgs/[orgslug]/(withmenu)/classes/page.tsx",
+      "target": "existing URL thin wrapper -> apps/web/extensions/route66/",
+      "rationale": "Framework-discovered extension route; exact wrapper registration required, not unrestricted app-path ownership."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/app/orgs/[orgslug]/(withmenu)/layout.tsx",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/app/orgs/[orgslug]/dash/classes-preview/page.tsx",
+      "target": "existing URL thin wrapper -> apps/web/extensions/route66/",
+      "rationale": "Framework-discovered extension route; exact wrapper registration required, not unrestricted app-path ownership."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/components/Auth/LineSignIn.tsx",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/components/Auth/ProviderButton.tsx",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/components/Contexts/AuthContext.tsx",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/components/Contexts/I18nContext.tsx",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/components/Dashboard/Menus/DashLeftMenu.tsx",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/components/Dashboard/Menus/DashMobileMenu.tsx",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/components/Dashboard/Pages/ClassesPreview/ClassesPreview.tsx",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/components/Dashboard/Pages/ClassesPreview/copy.ts",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/components/Dashboard/Pages/ClassesPreview/model.ts",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/components/Dashboard/Pages/ClassesPreview/preview.module.css",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/components/Dashboard/Pages/Users/OrgUsers/OrgUsers.tsx",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/components/Dashboard/Pages/Users/Security/shared.tsx",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/components/Objects/Account/AccountActionsMobile.tsx",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/components/Objects/Account/AccountClient.tsx",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/components/Objects/Account/AccountSidebar.tsx",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/components/Objects/Account/subpages/AccountDangerZone.tsx",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/components/Objects/Account/subpages/AccountSecurity.tsx",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/components/Objects/Account/subpages/SchoolIdentity.tsx",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/components/Objects/Account/subpages/SchoolTimetable.tsx",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/components/Objects/Account/subpages/SignInMethods.tsx",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/components/Objects/Account/subpages/StudentRegistrarDetails.tsx",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/components/Objects/Account/subpages/school-identity.module.css",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/components/Objects/Classes/AttendanceCheckin.tsx",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/components/Objects/Classes/AttendanceWorkspace.tsx",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/components/Objects/Classes/ClassesWorkspace.tsx",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/components/Objects/Classes/attendance-copy.ts",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/components/Objects/Watermark.tsx",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/components/Security/HeaderProfileBox.tsx",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/lib/i18n.ts",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/locales/en.json",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/locales/th.json",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/next.config.js",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Build/runtime compatibility patch: isolate staging wrapper/config where supported; preserve separate type/build acceptance."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/proxy.ts",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Routing/cookie isolation safety seam; preserve until supported native contract proven."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/public/provider-google.svg",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/public/provider-line.svg",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/server-wrapper.js",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Build/runtime compatibility patch: isolate staging wrapper/config where supported; preserve separate type/build acceptance."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/services/auth/authMethods.ts",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Frontend composition/compatibility patch: extract owned logic and retain only reviewed integration delegate."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/services/auth/cookies.ts",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Routing/cookie isolation safety seam; preserve until supported native contract proven."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/services/auth/line.ts",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/tests/classes-preview.test.mjs",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/tests/org-user-role-control.test.mjs",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "A",
+      "path": "apps/web/tests/server-wrapper-runtime.test.mjs",
+      "target": "apps/web/extensions/route66/ or public/route66/ (framework test wrappers reviewed separately)",
+      "rationale": "Own frontend module/asset/test; native contexts consumed through web adapters."
+    },
+    {
+      "status": "M",
+      "path": "apps/web/tsconfig.json",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Build/runtime compatibility patch: isolate staging wrapper/config where supported; preserve separate type/build acceptance."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/Dockerfile",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/Dockerfile.academic-classes",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/Dockerfile.account-email",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/Dockerfile.attendance",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/Dockerfile.auth-ui",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/Dockerfile.auth-ui.dockerignore",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/Dockerfile.classes-preview",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/Dockerfile.classes-preview.dockerignore",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/Dockerfile.google-learner-role",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/Dockerfile.google-profile",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/Dockerfile.line",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/Dockerfile.line.dockerignore",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/Dockerfile.native-google",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/Dockerfile.native-google.dockerignore",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/Dockerfile.public-google",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/Dockerfile.public-google.dockerignore",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/Dockerfile.role-control",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/Dockerfile.school-identity",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/Dockerfile.school-identity.dockerignore",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/README.md",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/academic-classes.md",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/account-email-validation.md",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/app-source.compose.yaml",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/attendance-schema.sql",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/attendance.md",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/auth-ui-polish.md",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/build_native_web.sh",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/classes-preview.md",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/compose.yaml",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/create_web_overlay.py",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/google-profile-import.md",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/google-profile-validation.md",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/google-profile.compose.yaml",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/google-profile.env.example",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/init_runtime.py",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/line-login.md",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/line-validation.md",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/line.compose.yaml",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/line.env.example",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/native-google.compose.yaml",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/native-login.compose.yaml",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/native_gateway.py",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/native_web_dependency_budget.py",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/nrru-school-identity.md",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/preflight.py",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/public-google-registration.md",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/public-google-validation.md",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/role-control-fix.md",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/roster-first-student-identity.md",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/test_attendance_postgres.sh",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/test_gateway.py",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/test_identity_postgres.sh",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/test_native_web_types.sh",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/test_oauth_redis.sh",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/test_provider_profile.sh",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/test_staging.py",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "A",
+      "path": "deploy/staging/test_web_overlay.py",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    },
+    {
+      "status": "M",
+      "path": "docker/nginx.conf",
+      "target": "reviewed-core-hook-or-upstream-fix",
+      "rationale": "Suppress callback URL access logs; deployment/privacy patch, not a feature module."
+    },
+    {
+      "status": "A",
+      "path": "docs/attendance-port.md",
+      "target": "own docs/deploy/scripts surface",
+      "rationale": "Operational/documentation code; preserve existing retained release evidence."
+    }
+  ],
+  "note": "Existing patches recorded, not blanket permission to expand them. Gate is advisory; policy/approval references require human review. Do not auto-refresh snapshot or whitelist failed paths."
+}

@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import AsyncMock
 import httpx
-from src.services.nrru_directory import teacher_hint, parse_candidates, search_directory, DirectoryUnavailable, URL, MAX_BYTES
+from src.services.nrru_directory import teacher_hint, student_hint, parse_candidates, search_directory, DirectoryUnavailable, URL, MAX_BYTES
 
 def fixture(*records):
     rows = ''.join(f'<tr><td><a href="teach_time.asp?officerid={id}&amp;f_cmd=2&amp;officercode={id}">{th}</a></td><td>{en}</td></tr>' for id,th,en in records)
@@ -12,6 +12,12 @@ class DirectoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(teacher_hint('jakkrit.s@nrru.ac.th','nrru.ac.th'),'jakkrit')
         for email,hd in [('6900000001@nrru.ac.th','nrru.ac.th'),('jakkrit.s@nrru.ac.th',None),('jakkrit.s@gmail.com','nrru.ac.th'),('jakkrit.s@nrru.ac.th.evil','nrru.ac.th'),("jack'.s@nrru.ac.th",'nrru.ac.th')]:
             self.assertIsNone(teacher_hint(email,hd))
+    def test_student_school_menu_hint_needs_verified_institutional_evidence(self):
+        self.assertEqual(student_hint('6900000001@nrru.ac.th','nrru.ac.th'),'6900000001')
+        self.assertEqual(student_hint('690000001@nrru.ac.th','nrru.ac.th'),'690000001')
+        for email,domain in [('6900000001@nrru.ac.th',None),('6900000001@gmail.com','nrru.ac.th'),('jakkrit.s@nrru.ac.th','nrru.ac.th'),('69@nrru.ac.th','nrru.ac.th')]:
+            self.assertIsNone(student_hint(email,domain))
+
     def test_multiple_names_and_only_known_source_fields(self):
         items=parse_candidates(fixture(('12','อาจารย์ตัวอย่าง ก','Demo Teacher A'),('13','อาจารย์ตัวอย่าง ข','Demo Teacher B')))
         self.assertEqual([x['officer_id'] for x in items],['12','13'])

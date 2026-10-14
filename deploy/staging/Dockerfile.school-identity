@@ -7,6 +7,7 @@ COPY apps/api/src/db/school_identity.py /app/api/src/db/school_identity.py
 COPY apps/api/src/services/auth/provider_proof.py /app/api/src/services/auth/provider_proof.py
 COPY apps/api/src/services/auth/native_google.py /app/api/src/services/auth/native_google.py
 COPY apps/api/src/services/nrru_directory.py /app/api/src/services/nrru_directory.py
+COPY apps/api/src/services/nrru_timetable.py /app/api/src/services/nrru_timetable.py
 COPY apps/api/src/routers/school_identity.py /app/api/src/routers/school_identity.py
 COPY apps/api/src/router.py /app/api/src/router.py
 COPY apps/api/migrations/versions/f14b820c7d11_school_directory_identity.py /app/api/migrations/versions/f14b820c7d11_school_directory_identity.py

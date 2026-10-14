@@ -151,6 +151,28 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
         async with self.sessions() as db:
             self.assertIsNone((await db.exec(select(SchoolGoogleEvidence))).first().hosted_domain)
 
+    async def test_school_menu_student_hint_does_not_claim_registrar_data_or_grant_access(self):
+        from types import SimpleNamespace
+        from fastapi import FastAPI
+        from src.routers import school_identity as route
+        await self.link()
+        _, result = await self.login(replace(self.google, verified_email='6900000001@nrru.ac.th', hosted_domain='nrru.ac.th'))
+        app=FastAPI();app.include_router(route.router,prefix='/school-identity')
+        async def dbdep():
+            async with self.sessions() as db:yield db
+        app.dependency_overrides[route.get_db_session]=dbdep
+        with patch.object(route,'settings',return_value=SimpleNamespace(org_id=1)):
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='https://learn.example.com',cookies={'LH_access':result.access_token}) as c:
+                r=await c.get('/school-identity/me');self.assertEqual(r.status_code,200)
+                self.assertTrue(r.json()['school_menu']);self.assertEqual(r.json()['school_kind'],'student')
+                self.assertEqual(r.json()['student_number_hint'],'6900000001')
+                self.assertEqual(r.json()['registrar_details_status'],'not_connected')
+                self.assertIsNone(r.json()['directory_identity'])
+                self.assertEqual((await c.get('/school-identity/timetable')).status_code,403)
+        async with self.sessions() as db:
+            self.assertEqual((await db.get(UserOrganization,1)).role_id,4)
+            self.assertFalse((await db.get(User,1)).is_superadmin)
+
     async def test_school_directory_confirmation_is_own_scoped_and_not_assignment(self):
         from types import SimpleNamespace
         from fastapi import FastAPI
@@ -176,9 +198,11 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
             async with self.sessions() as db: yield db
         app.dependency_overrides[route.get_db_session]=dbdep
         candidates=[dict(officer_id='12',officer_code='12',name_th='อาจารย์ตัวอย่าง ก',name_en='Demo Teacher A'),dict(officer_id='13',officer_code='13',name_th='อาจารย์ตัวอย่าง ข',name_en='Demo Teacher B')]
-        with patch.object(route,'settings',return_value=config),patch.object(route,'resources',resources),patch.object(route,'throttle',new=AsyncMock()),patch.object(route,'search_directory',new=AsyncMock(return_value=candidates)):
+        with patch.object(route,'settings',return_value=config),patch.object(route,'resources',resources),patch.object(route,'throttle',new=AsyncMock()),patch.object(route,'search_directory',new=AsyncMock(return_value=candidates)),patch('src.services.nrru_timetable.teacher_timetable',new=AsyncMock(return_value={'academic_year':2569,'semester':1,'classes':[]})):
             async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='https://learn.example.com',cookies={'LH_access':result.access_token},headers={'Origin':'https://learn.example.com'}) as c:
                 me=await c.get('/school-identity/me');self.assertEqual(me.status_code,200);self.assertTrue(me.json()['eligible']);self.assertEqual(me.json()['courses'],[])
+                self.assertFalse(me.json()['school_menu'])
+                self.assertEqual((await c.get('/school-identity/timetable')).status_code,403)
                 found=await c.post('/school-identity/search');self.assertEqual(found.status_code,200);self.assertEqual(len(found.json()['candidates']),2)
                 body=dict(search_id=found.json()['search_id'],officer_id='999',confirm_own_name=True)
                 self.assertEqual((await c.post('/school-identity/confirm',json=body)).status_code,409)
@@ -195,6 +219,9 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
                     self.assertIsNone((await other.get('/school-identity/me')).json()['directory_identity'])
                 self.assertEqual((await c.post('/school-identity/confirm',json=body)).status_code,409)
                 me=await c.get('/school-identity/me');self.assertEqual(me.json()['directory_identity']['officer_id'],'12');self.assertEqual(me.json()['courses'],[])
+                self.assertTrue(me.json()['school_menu']);self.assertEqual(me.json()['school_kind'],'staff')
+                timetable=await c.get('/school-identity/timetable');self.assertEqual(timetable.status_code,200)
+                self.assertEqual(timetable.json()['academic_year'],2569);self.assertIn('private',timetable.headers['cache-control'])
                 self.assertIn('private',me.headers['cache-control'])
                 again=(await c.post('/school-identity/search')).json()
                 self.assertEqual((await c.post('/school-identity/confirm',json={**body,'search_id':again['search_id'],'officer_id':'13'})).status_code,409)

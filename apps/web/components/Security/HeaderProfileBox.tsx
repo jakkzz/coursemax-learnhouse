@@ -1,8 +1,8 @@
 'use client'
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 
 import Link from 'next/link'
-import { Crown, Shield, User, Users, SignOut, CaretDown, Globe, Check, ShoppingBag, House, Buildings, Plus, CreditCard } from '@phosphor-icons/react'
+import { Crown, Shield, User, Users, SignOut, CaretDown, Globe, Check, ShoppingBag, House, Buildings, Plus, CreditCard, GraduationCap } from '@phosphor-icons/react'
 import UserAvatar from '@components/Objects/UserAvatar'
 import useAdminStatus from '@components/Hooks/useAdminStatus'
 import { useLHSession } from '@components/Contexts/LHSessionContext'
@@ -50,6 +50,28 @@ export const HeaderProfileBox = ({ primaryColor = '' }: { primaryColor?: string 
   const { t, i18n } = useTranslation()
   const { track } = useLHAnalytics()
   const colors = getMenuColorClasses(primaryColor)
+  const [showSchool, setShowSchool] = useState(false)
+  const [schoolVersion, setSchoolVersion] = useState(0)
+  useEffect(() => {
+    const refresh = () => setSchoolVersion(value => value + 1)
+    window.addEventListener('lh-school-identity-changed', refresh)
+    return () => window.removeEventListener('lh-school-identity-changed', refresh)
+  }, [])
+  const schoolUser = session?.status === 'authenticated' ? session?.data?.user?.user_uuid : null
+  useEffect(() => {
+    setShowSchool(false)
+    if (!schoolUser) return
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10000)
+    // Native own-only evidence, never an email-domain/name guess in the browser.
+    fetch('/api/v1/school-identity/me', { credentials: 'include', cache: 'no-store', signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) return
+        const data = await response.json()
+        if (!controller.signal.aborted) setShowSchool(data.school_menu === true)
+      }).catch(() => {}).finally(() => clearTimeout(timeout))
+    return () => { clearTimeout(timeout); controller.abort() }
+  }, [schoolUser, org?.id, schoolVersion])
 
   // The user's organizations (deduped) from the session roles, used by the
   // "My Organizations" submenu. Only relevant in multi-org (SaaS) mode, where
@@ -248,6 +270,12 @@ export const HeaderProfileBox = ({ primaryColor = '' }: { primaryColor?: string 
                     <span>{t('user.user_settings')}</span>
                   </Link>
                 </DropdownMenuItem>
+                {showSchool && <DropdownMenuItem asChild>
+                  <Link href={getUriWithOrg(org?.slug, '/account/school-identity')} className="flex min-h-11 items-center gap-2">
+                    <GraduationCap size={16} weight="fill" />
+                    <span>{t('account.school')}</span>
+                  </Link>
+                </DropdownMenuItem>}
                 <DropdownMenuItem asChild>
                   <Link href={getUriWithOrg(org?.slug, '/account/purchases')} className="flex items-center space-x-2">
                     <ShoppingBag size={16} weight="fill" />

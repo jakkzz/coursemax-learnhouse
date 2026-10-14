@@ -1,7 +1,7 @@
 """Own-only NRRU directory association. No role, roster or course writers."""
 import json
 import secrets
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
@@ -14,7 +14,7 @@ from src.db.user_organizations import UserOrganization
 from src.db.users import PublicUser
 from src.security.auth import get_current_user
 from src.routers.google_subject_auth import settings, boundary, resources, throttle
-from src.services.nrru_directory import teacher_hint, search_directory, DirectoryUnavailable
+from src.services.nrru_directory import teacher_hint, student_hint, search_directory, DirectoryUnavailable
 
 router = APIRouter()
 _CONSUME = "if redis.call('GET',KEYS[1]) == ARGV[1] then redis.call('DEL',KEYS[1]); return 1 end; return 0"
@@ -55,11 +55,42 @@ async def own_identity(request:Request, response:Response, db:AsyncSession=Depen
     identity = await db.get(NrruTeacherIdentity, user.id)
     # Changed/retired Google evidence never preserves teacher eligibility.
     identity = identity if hint and identity and identity.identity_id == evidence.identity_id else None
+    student_number = student_hint(evidence.email, evidence.hosted_domain) if evidence else None
     return {'eligible': bool(hint), 'search_hint': hint,
+        'school_menu': bool(identity or student_number),
+        'school_kind': 'staff' if identity else 'student' if student_number else None,
+        'student_number_hint': student_number,
+        'registrar_details_status': 'not_connected',
         'needs_google_signin': evidence is None,
         'directory_identity': candidate(identity) if identity else None,
         'confirmation_kind': 'self_confirmed_directory' if identity else None,
         'courses': []}
+
+@router.get('/timetable')
+async def own_timetable(request:Request, response:Response,
+    academic_year:int | None=Query(default=None), semester:int | None=Query(default=None),
+    db:AsyncSession=Depends(get_db_session)):
+    private(response)
+    user, config, evidence = await context(request, db)
+    identity = await db.get(NrruTeacherIdentity, user.id)
+    if not eligible(evidence) or identity is None or identity.identity_id != evidence.identity_id:
+        raise HTTPException(403, 'Confirm your own staff directory record first')
+    from src.services.nrru_timetable import teacher_timetable
+    from datetime import datetime, timezone
+    async with resources(config) as (redis, _):
+        await throttle(redis, request, config, 'school-timetable-' + str(user.id))
+        key='lh:school-timetable:'+config.deployment+':'+str(user.id)+':'+identity.officer_id+':'+str(academic_year)+':'+str(semester)
+        cached=await redis.get(key)
+        if cached:return json.loads(cached)
+        try:
+            data=await teacher_timetable(identity.officer_id,identity.officer_code,academic_year,semester)
+        except ValueError as error:
+            if isinstance(error,DirectoryUnavailable):
+                raise HTTPException(503, 'NRRU timetable is unavailable. Try again later.') from None
+            raise HTTPException(400, 'Choose a supported year and semester') from None
+        data['fetched_at']=datetime.now(timezone.utc).isoformat()
+        await redis.set(key,json.dumps(data),ex=300)
+        return data
 
 @router.post('/search')
 async def search(request:Request, response:Response, db:AsyncSession=Depends(get_db_session)):

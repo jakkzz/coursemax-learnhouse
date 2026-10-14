@@ -9,6 +9,7 @@
 !apps/api/src/services/auth/provider_proof.py
 !apps/api/src/services/auth/native_google.py
 !apps/api/src/services/nrru_directory.py
+!apps/api/src/services/nrru_timetable.py
 !apps/api/src/routers/
 !apps/api/src/routers/school_identity.py
 !apps/api/src/router.py

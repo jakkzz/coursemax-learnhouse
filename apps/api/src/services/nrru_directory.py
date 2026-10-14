@@ -10,6 +10,13 @@ MAX_BYTES = 512 * 1024
 class DirectoryUnavailable(ValueError):
     pass
 
+def student_hint(email, hosted_domain):
+    """Institutional-account hint only; never enrollment or registrar verification."""
+    if hosted_domain != 'nrru.ac.th' or not isinstance(email, str):
+        return None
+    match = re.fullmatch(r'([0-9]{9,10})@nrru\.ac\.th', email.lower())
+    return match[1] if match else None
+
 def teacher_hint(email, hosted_domain):
     if hosted_domain != 'nrru.ac.th' or not isinstance(email, str):
         return None

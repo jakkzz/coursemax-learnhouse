@@ -50,10 +50,9 @@ from src.security.features_utils.plan_check import require_plan, require_plan_fo
 
 v1_router = APIRouter(prefix="/api/v1")
 
-from src.routers import school_identity, academic_classes, class_attendance
-v1_router.include_router(school_identity.router, prefix='/school-identity', tags=['school-identity'])
-v1_router.include_router(academic_classes.router, prefix='/academic-classes', tags=['academic-classes'])
-v1_router.include_router(class_attendance.router, prefix='/attendance', tags=['attendance'])
+# One reviewed extension integration seam; feature logic stays extension-owned.
+from src.route66_ext.bootstrap import build_router
+v1_router.include_router(build_router())
 
 # Helper dependency to reject API token access (still admits AnonymousUser;
 # use on routers that contain at least one deliberately-public endpoint).
@@ -94,10 +93,6 @@ v1_router.include_router(
     ],
 )
 v1_router.include_router(auth.router, prefix="/auth", tags=["auth"])
-from src.routers import google_subject_auth
-v1_router.include_router(google_subject_auth.router, prefix="/auth/google", tags=["auth"])
-from src.routers import line_subject_auth
-v1_router.include_router(line_subject_auth.router, prefix="/auth/line", tags=["auth"])
 # Two-factor: enrollment/management plus the /auth/login/mfa challenge.
 v1_router.include_router(mfa_router_module.router, prefix="/auth", tags=["auth"])
 v1_router.include_router(

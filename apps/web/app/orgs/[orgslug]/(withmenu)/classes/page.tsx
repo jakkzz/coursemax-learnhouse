@@ -1,9 +1,2 @@
-import { getServerSession } from '@/lib/auth/server'
-import { redirect } from 'next/navigation'
-import GeneralWrapperStyled from '@components/Objects/StyledElements/Wrappers/GeneralWrapper'
-import ClassesWorkspace from '@components/Objects/Classes/ClassesWorkspace'
-
-export default async function ClassesPage() {
- if (!await getServerSession()) redirect('/login?next=/classes')
- return <GeneralWrapperStyled><ClassesWorkspace /></GeneralWrapperStyled>
-}
+// Compatibility/route delegate; no feature logic here.
+export { default } from '@/extensions/route66/app/orgs/[orgslug]/(withmenu)/classes/page'

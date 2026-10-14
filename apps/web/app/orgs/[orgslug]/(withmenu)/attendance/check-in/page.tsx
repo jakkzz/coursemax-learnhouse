@@ -1,6 +1,2 @@
-import GeneralWrapperStyled from '@components/Objects/StyledElements/Wrappers/GeneralWrapper'
-import AttendanceCheckin from '@components/Objects/Classes/AttendanceCheckin'
-
-export default function AttendanceCheckinPage() {
- return <GeneralWrapperStyled><AttendanceCheckin/></GeneralWrapperStyled>
-}
+// Compatibility/route delegate; no feature logic here.
+export { default } from '@/extensions/route66/app/orgs/[orgslug]/(withmenu)/attendance/check-in/page'

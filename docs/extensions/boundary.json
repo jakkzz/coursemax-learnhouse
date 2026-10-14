@@ -19,7 +19,815 @@
   "preserved_untracked_prefixes": [
     ".impeccable/"
   ],
-  "exceptions": {},
+  "exceptions": {
+    "apps/api/src/db/academic_classes.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "6a39b385ae7108f503fbd7178ab0ddaa09b34bac979dc4f70f396b5225c72e18"
+    },
+    "apps/api/src/db/class_attendance.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "57a1a916d5d5a1df54e21206aca6dd2c8d0bf62243bae7c1f6fdde899608899b"
+    },
+    "apps/api/src/db/provider_identity.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "9cb899ff8c70195dec8620dfe7bdec6dab25066ab40fbdb77411f0cc401d4093"
+    },
+    "apps/api/src/db/provider_profile_import.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "d5e4231be0c6de3cd32a8b1ae2c987707ac359c086c3364610f9909557f00172"
+    },
+    "apps/api/src/db/school_identity.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "fb8a290df9a19d10e1988c43115bfe3a4dd01f165a91eb6130255adedb8f9ab1"
+    },
+    "apps/api/src/routers/academic_classes.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "74bc30d15d8b87cdd07ea3c98bd79c10ca51909466dca5df7bcbf3c731f8aff2"
+    },
+    "apps/api/src/routers/class_attendance.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "5973fe556dd03e52f72314694289446734ee4272dd3f7015e2fb0b2b4e943d9f"
+    },
+    "apps/api/src/routers/google_subject_auth.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "ca7d252b5ea658fe432e4eb7d86811051f5f885a600d7d200919ba7c8590d2c6"
+    },
+    "apps/api/src/routers/line_subject_auth.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "b6a69be3febba9c0997b49aa22e4a1e0ba28d5661b8f4134e1795f4a95790ad3"
+    },
+    "apps/api/src/routers/school_identity.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "881b5a65a990f738a93871ad9d8f4ecafaf1ad97fecbf15d735adeaacc518adc"
+    },
+    "apps/api/src/security/provider_session.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "a1f1aae1d6377718b4685155dd5d64e9b5db38d76533c61cb48e1952d67e9325"
+    },
+    "apps/api/src/services/academic_projection.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "15ac025c62128a9f1e82c346ff3f110cb20d6d7519957a776a38ace3aa480067"
+    },
+    "apps/api/src/services/academic_rosters.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "b0bb8fe08a6b138e205c29929c1428fe23afc02e95c17586abcfb780c257c8d2"
+    },
+    "apps/api/src/services/attendance_policy.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "0c648897cb7992853e8d1054d4920479c1497b85b503f459fdd0e45f15e46976"
+    },
+    "apps/api/src/services/auth/google_handoff.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "9b6bbe5346ce9ba0df2fde64d0a8f71de363a4c5c98008bc2811648cf37c3221"
+    },
+    "apps/api/src/services/auth/line_config.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "ef219f3048bb7ab4354ed5ff9e6f50f5d5c34158d1945e05af8233304ce7febb"
+    },
+    "apps/api/src/services/auth/line_handoff.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "92e4332604981df4d2fb7202ccad919b9391f6f033dfab53d5c1a58884c89985"
+    },
+    "apps/api/src/services/auth/native_google.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "57f3c876a8d283185e3752858d0713b46f24ef0d89df9f86ea0c6dfd6b82078e"
+    },
+    "apps/api/src/services/auth/native_line.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "c877350734eabd9c74f08a3d93730633ba1768182aa604374cca1e4addd9f0e0"
+    },
+    "apps/api/src/services/auth/oauth_transactions.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "c4e443246a23154c97072409f50b704293177862f8e9619d820d8f3c6b381a16"
+    },
+    "apps/api/src/services/auth/profile_import.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "7c8edcfba92095081f9e9576b9d4d2377a0a637fa78ca21b87328b2202d8d569"
+    },
+    "apps/api/src/services/auth/provider_identities.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "7d0a5a500e1c2abb93b1d306205f3ee4340f488ee08cc721e0540fb52dc0159d"
+    },
+    "apps/api/src/services/auth/provider_profile.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "7b9a2ed912296d5f627fb1a2b97a8d9dc0fa03cd743776618d5ed892e570d297"
+    },
+    "apps/api/src/services/auth/provider_proof.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "bb4073b4678407f2b7b6e150ca132d0551bfec7746cb924a10f35e1bf33b49fe"
+    },
+    "apps/api/src/services/class_attendance.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "0139367902378083336eb168a29ce592b93fc56c7900df6f08e16e3c79e5a0fb"
+    },
+    "apps/api/src/services/nrru_directory.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "c98579aafe869dc10090cd811ea2bd7ab6a431e522252e9b967ad053d5a81c4d"
+    },
+    "apps/api/src/services/nrru_timetable.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "a23133e592cf9ce142b5dc2be07289e0f2748e02b367124bde847e31469513fc"
+    },
+    "apps/api/src/services/users/provider_avatar.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "cfe55ad4a6d5ff07d2b545bf84eb0d50e13079bb5fb347efda96a7885efb5943"
+    },
+    "apps/api/src/tests/services/test_academic_rosters.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "b12f7ca7cfed22ae6a22926fa34c899f4f924b7ba9bc6168c8687e94f3f4a283"
+    },
+    "apps/api/src/tests/services/test_attendance_policy.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "b44e99278deedf102d14a363847c49350c26c1ea28d9816c0a1aaa19ff26ccee"
+    },
+    "apps/api/src/tests/services/test_class_attendance.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "479e5a5f6f04a788f2631952fd51e612d3d9dc58344395ef1c6a9d3b6049c834"
+    },
+    "apps/api/src/tests/services/test_google_handoff.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "30b2c7e7a86017fbafeb897247484ec9b1eba404b60d4f52175134f5af544943"
+    },
+    "apps/api/src/tests/services/test_native_google_sessions.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "c87b8cd1faaceaf62ade6ec54238b7e64e203beb3174fa0c576e05468fa4c875"
+    },
+    "apps/api/src/tests/services/test_native_line_sessions.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "31ce8894880e81f999ca2782e9b3a7aee6c77b6e1550889bc966d49b36a66011"
+    },
+    "apps/api/src/tests/services/test_nrru_directory.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "42ce8e4ffd9239a3049ba2fb6bd3f996ec37c4a5ca77747866d5b9c16a6eb886"
+    },
+    "apps/api/src/tests/services/test_nrru_timetable.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "e229dd7da3b0570852d4e577d02a7e5920e9b0e158d082708804666945bbd1cf"
+    },
+    "apps/api/src/tests/services/test_oauth_transactions.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "c4657004bed21acac9247f0d0b5185eca9430a722f7c4939db842979684b0146"
+    },
+    "apps/api/src/tests/services/test_oauth_transactions_redis.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "66ec4d2b02b60e124acbf01d2af33aad96ceb397d8582e882327544e15e2cf77"
+    },
+    "apps/api/src/tests/services/test_provider_identities_postgres.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "06095a5d7187d441f918377b3bfdb87d202bef7ea437738215910bfd48537c61"
+    },
+    "apps/api/src/tests/services/test_provider_profile.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "c2f05ac854886adc0dd0385cc39976bbf5dec906f2b97089b610b3421cb05c4d"
+    },
+    "apps/api/src/tests/services/test_provider_proof.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "d9048ffdf4cbe12dd6d5c1fdffbe9fe3951f6033400b979001723f8a7523f016"
+    },
+    "apps/api/migrations/versions/c71a02d9ef40_provider_identity_ownership.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "c9964707615cabd0afc3ed8139d164569185d7018d1f7f57e2ed101352b4b00f"
+    },
+    "apps/api/migrations/versions/d84e13a6b902_native_google_email_uniqueness.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "3eb3003bfe6f1d813d9902f0d22a139818337df7fb50e8c0bd7a2b32d11f64b6"
+    },
+    "apps/api/migrations/versions/e92d7f04ab16_optional_provider_profile_import.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "824009ed09cc931f4df8c249f9c968f9969bbeb8d3847932dda1ebbd9ce235ff"
+    },
+    "apps/api/migrations/versions/f14b820c7d11_school_directory_identity.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "2b3f93197547ff53033b62f4662cd50a510516605b6ad7b97db475d587550cce"
+    },
+    "apps/api/migrations/versions/f25c930d8e22_academic_class_rosters.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "9fdbd6c4b46876b195039bf9e3cb240543137ebe9ad1dec77857787d920ab77f"
+    },
+    "apps/api/migrations/versions/f36da41e9f33_class_attendance.py": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "2de624a23f21f4be6de37617dac2ac296a004fd5873309f0b36de2df9bd3e818"
+    },
+    "apps/web/app/auth/callback/line/page.tsx": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "a07b0eea6774cda94c56405a07a6918d073435aab2db397ea959d0a63d9cfe40"
+    },
+    "apps/web/app/auth/link/google/page.tsx": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "58a5644e4369cd0a956502297bd509765035bc5b0b09ccd8a5232ac1d5421bba"
+    },
+    "apps/web/app/auth/link/line/page.tsx": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "b4a702e17d69f67be15e63e278918f45734c6994e9d1759e8080ecf5c42cd714"
+    },
+    "apps/web/app/liff/page.tsx": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "74ecb49df76475bc9853527f440072beb27986ebeaf8a50c6546e7339e5107ca"
+    },
+    "apps/web/app/orgs/[orgslug]/(withmenu)/attendance/check-in/page.tsx": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "47d8b3f745bf143d3fbdafeff938aee3673162c82e5ecde1a2b69d142746777e"
+    },
+    "apps/web/app/orgs/[orgslug]/(withmenu)/attendance/page.tsx": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "5589de9f69c87e700c3dc16ff0a264290c2ae60e151393e57f9f41a71a6a80bf"
+    },
+    "apps/web/app/orgs/[orgslug]/(withmenu)/attendance/receipts/[receiptId]/page.tsx": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "6b8716562a4cb6fd7e8019fa3b1f0733c05a4945f4d631da93b33bd525e46ca8"
+    },
+    "apps/web/app/orgs/[orgslug]/(withmenu)/classes/page.tsx": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "7b009496c569a1a1ac309bdfdf4660ec5d0b6ad1f6a0c30b64c9f0c459b36892"
+    },
+    "apps/web/app/orgs/[orgslug]/dash/classes-preview/page.tsx": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "dcf69078412903218b7af4adb9e55c3b1afd94b83a2dcb54f5c6ce8345feffd8"
+    },
+    "apps/web/components/Auth/LineSignIn.tsx": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "77aae2b3a5d4d7dcccf3cd1f822d01abcad8bb0472d4522f60dbc3b0f0fdee6d"
+    },
+    "apps/web/components/Auth/ProviderButton.tsx": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "a7fbe6a35ac7d437fbcedd9f7d6e67635d48025bceefcd21d485cf0e4fee6231"
+    },
+    "apps/web/components/Dashboard/Pages/ClassesPreview/ClassesPreview.tsx": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "d0a2f7e00ee3ba5c12a98a721e64716394bff4546f8a9664f8153c155512655c"
+    },
+    "apps/web/components/Dashboard/Pages/ClassesPreview/copy.ts": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "07647b16df4501ab602a6be214a9b7034e203e86b0f9d4f6c6d17a76a15ae3f8"
+    },
+    "apps/web/components/Dashboard/Pages/ClassesPreview/model.ts": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "97ab1431f1cd1f79d7c24cb6e5e6f1ad77bc3fe0606fd098b487a157824cbde1"
+    },
+    "apps/web/components/Objects/Account/subpages/SchoolIdentity.tsx": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "1da18909cc11d63188d7e1f5ddb9ac31d98cdfedc08781941bb0e497147b11a7"
+    },
+    "apps/web/components/Objects/Account/subpages/SchoolTimetable.tsx": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "06c71691bc0ea86401f9ddfeb5f18e3f8886753c0cceec1696c19812009153a9"
+    },
+    "apps/web/components/Objects/Account/subpages/SignInMethods.tsx": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "5d9e2ce4f3c7f70580921d70c8eb0d06e84d0e8fc65bb08c7ee5f3ea713d5003"
+    },
+    "apps/web/components/Objects/Account/subpages/StudentRegistrarDetails.tsx": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "4319a441d9afe49da495623f0591179a12a8fe8603187444f3ebecf29b62173b"
+    },
+    "apps/web/components/Objects/Classes/AttendanceCheckin.tsx": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "d817b7b577f52adc3ea2fd0fc4d5944d5bebb5046411b40213f1656ad0464d5f"
+    },
+    "apps/web/components/Objects/Classes/AttendanceWorkspace.tsx": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "f1cb710c604108555dec70b6f8fede03b1e8881e420ea43e07855cc2eea38ad3"
+    },
+    "apps/web/components/Objects/Classes/ClassesWorkspace.tsx": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "bf17d6656a94e7184b8f2bbec4587021f2354a35fec76b92a21cbcb0e576e317"
+    },
+    "apps/web/components/Objects/Classes/attendance-copy.ts": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "01f5fceda4115cd63e9138a310ef5aa9521f07b1602817242b104f2051749379"
+    },
+    "apps/web/services/auth/line.ts": {
+      "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
+      "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",
+      "tests": [
+        "native auth/PostgreSQL/metadata guards",
+        "extension/static boundary",
+        "compiled EN/TH task flows and full web bundle/types"
+      ],
+      "replacement_plan": "Keep stable public/import discovery compatibility; remove only after all native callers/discovery are migrated and regression accepted.",
+      "sha256": "8c12989098946f8525cce5218cd0de1442ccea05c5350ac26d120a3f958d0554"
+    },
+    "apps/api/src/router.py": {
+      "reason": "Replace five preexisting extension mounts with one explicit bootstrap; preserve native auth/lifecycle code.",
+      "approval_reference": "Owner approved isolated-pattern migration/rebuild/redeploy and resumed work after bounded cleanup.",
+      "tests": [
+        "PostgreSQL native Google/LINE/MFA/refresh and class/attendance HTTP regressions",
+        "unique route scope and metadata registration"
+      ],
+      "replacement_plan": "Retain one explicit reviewed router registration until upstream offers a tested supported loader.",
+      "sha256": "0020729f9411ec3bff9daf2ef86056a9fd5e2681b2bc93c0e75f00bfc83ca9d1"
+    },
+    "apps/web/tests/classes-preview.test.mjs": {
+      "reason": "Move our added tests into owned namespace; retain test-command compatibility loader.",
+      "approval_reference": "Owner approved isolated extension extraction/rebuild/deploy and resumed after cleanup.",
+      "tests": [
+        "Bun frontend extension tests"
+      ],
+      "replacement_plan": "Remove old command alias only after all validation scripts consume owned test paths.",
+      "sha256": "511faa4a5a4e083e9b33e3f9353ebb7eaa917a437798830240938260c5bb9793"
+    },
+    "apps/web/tests/org-user-role-control.test.mjs": {
+      "reason": "Move our added tests into owned namespace; retain test-command compatibility loader.",
+      "approval_reference": "Owner approved isolated extension extraction/rebuild/deploy and resumed after cleanup.",
+      "tests": [
+        "Bun frontend extension tests"
+      ],
+      "replacement_plan": "Remove old command alias only after all validation scripts consume owned test paths.",
+      "sha256": "5aa23994cbb4dd40c722b45b446e9cab9fc91bbf107b4c76b98b1817bed70951"
+    },
+    "apps/web/tests/server-wrapper-runtime.test.mjs": {
+      "reason": "Move our added tests into owned namespace; retain test-command compatibility loader.",
+      "approval_reference": "Owner approved isolated extension extraction/rebuild/deploy and resumed after cleanup.",
+      "tests": [
+        "Bun frontend extension tests"
+      ],
+      "replacement_plan": "Remove old command alias only after all validation scripts consume owned test paths.",
+      "sha256": "a74ca6fe174105cdd52b651d0883f3e0d5e5a4046f5c3a031f943f34d11b4dfe"
+    }
+  },
   "legacy_inventory": [
     {
       "status": "A",

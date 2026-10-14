@@ -1,6 +1,2 @@
-import { Suspense } from 'react'
-import ClassesPreview from '@components/Dashboard/Pages/ClassesPreview/ClassesPreview'
-
-export default function ClassesPreviewPage() {
-  return <Suspense><ClassesPreview /></Suspense>
-}
+// Compatibility/route delegate; no feature logic here.
+export { default } from '@/extensions/route66/app/orgs/[orgslug]/dash/classes-preview/page'

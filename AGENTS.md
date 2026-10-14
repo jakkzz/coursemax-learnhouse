@@ -9,8 +9,9 @@ referenced scope/identity documents; current decisions supersede historical note
 ## Mandatory boundary
 
 - Put our backend logic/tests in `apps/api/src/route66_ext/`, frontend logic/copy/
-  tests in `apps/web/extensions/route66/`. This namespace is the target contract;
-  historical code has NOT yet been moved there. Do not imitate its scattered layout.
+  tests in `apps/web/extensions/route66/`. Feature code has been extracted there;
+  old feature paths are compatibility delegates, not places to add logic. Read
+  `docs/extensions/extraction.md` and the exact extraction map before refactoring.
 - Avoid original LearnHouse edits. Native integration uses typed adapters and minimal
   explicit hooks; request approval BEFORE a new core-hook edit and record exact file,
   invariant, alternatives, tests and replacement/update plan. Route/model/migration

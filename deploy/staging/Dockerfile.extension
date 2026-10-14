@@ -1,0 +1,9 @@
+# Retained attendance release. Namespace extraction only: no schema/data change.
+FROM coursemax-learnhouse:a9a1c84b
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.source="https://github.com/jakkzz/coursemax-learnhouse" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}"
+# Complete tracked API source includes moved implementations AND discovery shims.
+COPY apps/api/src/ /app/api/src/
+COPY apps/api/migrations/versions/ /app/api/migrations/versions/
+ADD web-delta.tar.gz /app/web/

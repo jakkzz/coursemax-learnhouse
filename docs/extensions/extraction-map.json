@@ -1,0 +1,167 @@
+{
+  "source": "76d31480",
+  "backend_modules_and_tests_migrations": 47,
+  "native_adapters": {
+    "src.core.events.database": [
+      "engine",
+      "get_db_session"
+    ],
+    "src.db.courses.courses": [
+      "Course"
+    ],
+    "src.db.users": [
+      "PublicUser",
+      "User",
+      "UserRead"
+    ],
+    "src.db.user_organizations": [
+      "UserOrganization"
+    ],
+    "src.security.auth": [
+      "decode_jwt",
+      "extract_jwt_from_request",
+      "get_current_user"
+    ],
+    "src.services.orgs.auth_policy": [
+      "enforce_login_auth_method"
+    ],
+    "src.services.security.rate_limiting": [
+      "get_client_ip"
+    ],
+    "src.routers.auth": [
+      "get_token_expiry_ms",
+      "set_auth_cookies"
+    ],
+    "src.services.users.users": [
+      "security_verify_password"
+    ],
+    "src.db.user_audit_events": [
+      "UserAuditEvent"
+    ],
+    "src.core.redis": [
+      "get_redis_client"
+    ],
+    "src.db.organizations": [
+      "Organization"
+    ],
+    "src.db.roles": [
+      "Role",
+      "RoleTypeEnum"
+    ],
+    "src.services.auth.session": [
+      "issue_session_or_challenge"
+    ],
+    "src.security.features_utils.usage": [
+      "check_limits_with_usage"
+    ],
+    "src.security.file_validation": [
+      "validate_upload"
+    ],
+    "src.services.utils.upload_content": [
+      "_safe_content_path",
+      "upload_content"
+    ],
+    "src.routers.users": [
+      "_invalidate_session_cache"
+    ]
+  },
+  "moved": {
+    "apps/api/src/db/academic_classes.py": "apps/api/src/route66_ext/db/academic_classes.py",
+    "apps/api/src/db/class_attendance.py": "apps/api/src/route66_ext/db/class_attendance.py",
+    "apps/api/src/db/provider_identity.py": "apps/api/src/route66_ext/db/provider_identity.py",
+    "apps/api/src/db/provider_profile_import.py": "apps/api/src/route66_ext/db/provider_profile_import.py",
+    "apps/api/src/db/school_identity.py": "apps/api/src/route66_ext/db/school_identity.py",
+    "apps/api/src/routers/academic_classes.py": "apps/api/src/route66_ext/routers/academic_classes.py",
+    "apps/api/src/routers/class_attendance.py": "apps/api/src/route66_ext/routers/class_attendance.py",
+    "apps/api/src/routers/google_subject_auth.py": "apps/api/src/route66_ext/routers/google_subject_auth.py",
+    "apps/api/src/routers/line_subject_auth.py": "apps/api/src/route66_ext/routers/line_subject_auth.py",
+    "apps/api/src/routers/school_identity.py": "apps/api/src/route66_ext/routers/school_identity.py",
+    "apps/api/src/security/provider_session.py": "apps/api/src/route66_ext/security/provider_session.py",
+    "apps/api/src/services/academic_projection.py": "apps/api/src/route66_ext/services/academic_projection.py",
+    "apps/api/src/services/academic_rosters.py": "apps/api/src/route66_ext/services/academic_rosters.py",
+    "apps/api/src/services/attendance_policy.py": "apps/api/src/route66_ext/services/attendance_policy.py",
+    "apps/api/src/services/auth/google_handoff.py": "apps/api/src/route66_ext/services/auth/google_handoff.py",
+    "apps/api/src/services/auth/line_config.py": "apps/api/src/route66_ext/services/auth/line_config.py",
+    "apps/api/src/services/auth/line_handoff.py": "apps/api/src/route66_ext/services/auth/line_handoff.py",
+    "apps/api/src/services/auth/native_google.py": "apps/api/src/route66_ext/services/auth/native_google.py",
+    "apps/api/src/services/auth/native_line.py": "apps/api/src/route66_ext/services/auth/native_line.py",
+    "apps/api/src/services/auth/oauth_transactions.py": "apps/api/src/route66_ext/services/auth/oauth_transactions.py",
+    "apps/api/src/services/auth/profile_import.py": "apps/api/src/route66_ext/services/auth/profile_import.py",
+    "apps/api/src/services/auth/provider_identities.py": "apps/api/src/route66_ext/services/auth/provider_identities.py",
+    "apps/api/src/services/auth/provider_profile.py": "apps/api/src/route66_ext/services/auth/provider_profile.py",
+    "apps/api/src/services/auth/provider_proof.py": "apps/api/src/route66_ext/services/auth/provider_proof.py",
+    "apps/api/src/services/class_attendance.py": "apps/api/src/route66_ext/services/class_attendance.py",
+    "apps/api/src/services/nrru_directory.py": "apps/api/src/route66_ext/services/nrru_directory.py",
+    "apps/api/src/services/nrru_timetable.py": "apps/api/src/route66_ext/services/nrru_timetable.py",
+    "apps/api/src/services/users/provider_avatar.py": "apps/api/src/route66_ext/services/users/provider_avatar.py",
+    "apps/api/src/tests/services/test_academic_rosters.py": "apps/api/src/route66_ext/tests/services/test_academic_rosters.py",
+    "apps/api/src/tests/services/test_attendance_policy.py": "apps/api/src/route66_ext/tests/services/test_attendance_policy.py",
+    "apps/api/src/tests/services/test_class_attendance.py": "apps/api/src/route66_ext/tests/services/test_class_attendance.py",
+    "apps/api/src/tests/services/test_google_handoff.py": "apps/api/src/route66_ext/tests/services/test_google_handoff.py",
+    "apps/api/src/tests/services/test_native_google_sessions.py": "apps/api/src/route66_ext/tests/services/test_native_google_sessions.py",
+    "apps/api/src/tests/services/test_native_line_sessions.py": "apps/api/src/route66_ext/tests/services/test_native_line_sessions.py",
+    "apps/api/src/tests/services/test_nrru_directory.py": "apps/api/src/route66_ext/tests/services/test_nrru_directory.py",
+    "apps/api/src/tests/services/test_nrru_timetable.py": "apps/api/src/route66_ext/tests/services/test_nrru_timetable.py",
+    "apps/api/src/tests/services/test_oauth_transactions.py": "apps/api/src/route66_ext/tests/services/test_oauth_transactions.py",
+    "apps/api/src/tests/services/test_oauth_transactions_redis.py": "apps/api/src/route66_ext/tests/services/test_oauth_transactions_redis.py",
+    "apps/api/src/tests/services/test_provider_identities_postgres.py": "apps/api/src/route66_ext/tests/services/test_provider_identities_postgres.py",
+    "apps/api/src/tests/services/test_provider_profile.py": "apps/api/src/route66_ext/tests/services/test_provider_profile.py",
+    "apps/api/src/tests/services/test_provider_proof.py": "apps/api/src/route66_ext/tests/services/test_provider_proof.py",
+    "apps/api/migrations/versions/c71a02d9ef40_provider_identity_ownership.py": "apps/api/src/route66_ext/migrations/c71a02d9ef40_provider_identity_ownership.py",
+    "apps/api/migrations/versions/d84e13a6b902_native_google_email_uniqueness.py": "apps/api/src/route66_ext/migrations/d84e13a6b902_native_google_email_uniqueness.py",
+    "apps/api/migrations/versions/e92d7f04ab16_optional_provider_profile_import.py": "apps/api/src/route66_ext/migrations/e92d7f04ab16_optional_provider_profile_import.py",
+    "apps/api/migrations/versions/f14b820c7d11_school_directory_identity.py": "apps/api/src/route66_ext/migrations/f14b820c7d11_school_directory_identity.py",
+    "apps/api/migrations/versions/f25c930d8e22_academic_class_rosters.py": "apps/api/src/route66_ext/migrations/f25c930d8e22_academic_class_rosters.py",
+    "apps/api/migrations/versions/f36da41e9f33_class_attendance.py": "apps/api/src/route66_ext/migrations/f36da41e9f33_class_attendance.py",
+    "apps/web/app/auth/callback/line/page.tsx": "apps/web/extensions/route66/app/auth/callback/line/page.tsx",
+    "apps/web/app/auth/link/google/page.tsx": "apps/web/extensions/route66/app/auth/link/google/page.tsx",
+    "apps/web/app/auth/link/line/page.tsx": "apps/web/extensions/route66/app/auth/link/line/page.tsx",
+    "apps/web/app/liff/page.tsx": "apps/web/extensions/route66/app/liff/page.tsx",
+    "apps/web/app/orgs/[orgslug]/(withmenu)/attendance/check-in/page.tsx": "apps/web/extensions/route66/app/orgs/[orgslug]/(withmenu)/attendance/check-in/page.tsx",
+    "apps/web/app/orgs/[orgslug]/(withmenu)/attendance/page.tsx": "apps/web/extensions/route66/app/orgs/[orgslug]/(withmenu)/attendance/page.tsx",
+    "apps/web/app/orgs/[orgslug]/(withmenu)/attendance/receipts/[receiptId]/page.tsx": "apps/web/extensions/route66/app/orgs/[orgslug]/(withmenu)/attendance/receipts/[receiptId]/page.tsx",
+    "apps/web/app/orgs/[orgslug]/(withmenu)/classes/page.tsx": "apps/web/extensions/route66/app/orgs/[orgslug]/(withmenu)/classes/page.tsx",
+    "apps/web/app/orgs/[orgslug]/dash/classes-preview/page.tsx": "apps/web/extensions/route66/app/orgs/[orgslug]/dash/classes-preview/page.tsx",
+    "apps/web/components/Auth/LineSignIn.tsx": "apps/web/extensions/route66/components/Auth/LineSignIn.tsx",
+    "apps/web/components/Auth/ProviderButton.tsx": "apps/web/extensions/route66/components/Auth/ProviderButton.tsx",
+    "apps/web/components/Dashboard/Pages/ClassesPreview/ClassesPreview.tsx": "apps/web/extensions/route66/components/Dashboard/Pages/ClassesPreview/ClassesPreview.tsx",
+    "apps/web/components/Dashboard/Pages/ClassesPreview/copy.ts": "apps/web/extensions/route66/components/Dashboard/Pages/ClassesPreview/copy.ts",
+    "apps/web/components/Dashboard/Pages/ClassesPreview/model.ts": "apps/web/extensions/route66/components/Dashboard/Pages/ClassesPreview/model.ts",
+    "apps/web/components/Objects/Account/subpages/SchoolIdentity.tsx": "apps/web/extensions/route66/components/Objects/Account/subpages/SchoolIdentity.tsx",
+    "apps/web/components/Objects/Account/subpages/SchoolTimetable.tsx": "apps/web/extensions/route66/components/Objects/Account/subpages/SchoolTimetable.tsx",
+    "apps/web/components/Objects/Account/subpages/SignInMethods.tsx": "apps/web/extensions/route66/components/Objects/Account/subpages/SignInMethods.tsx",
+    "apps/web/components/Objects/Account/subpages/StudentRegistrarDetails.tsx": "apps/web/extensions/route66/components/Objects/Account/subpages/StudentRegistrarDetails.tsx",
+    "apps/web/components/Objects/Classes/AttendanceCheckin.tsx": "apps/web/extensions/route66/components/Objects/Classes/AttendanceCheckin.tsx",
+    "apps/web/components/Objects/Classes/AttendanceWorkspace.tsx": "apps/web/extensions/route66/components/Objects/Classes/AttendanceWorkspace.tsx",
+    "apps/web/components/Objects/Classes/ClassesWorkspace.tsx": "apps/web/extensions/route66/components/Objects/Classes/ClassesWorkspace.tsx",
+    "apps/web/components/Objects/Classes/attendance-copy.ts": "apps/web/extensions/route66/components/Objects/Classes/attendance-copy.ts",
+    "apps/web/services/auth/line.ts": "apps/web/extensions/route66/services/auth/line.ts"
+  },
+  "web_owned_copies": {
+    "apps/web/app/auth/callback/line/page.tsx": "apps/web/extensions/route66/app/auth/callback/line/page.tsx",
+    "apps/web/app/auth/link/google/page.tsx": "apps/web/extensions/route66/app/auth/link/google/page.tsx",
+    "apps/web/app/auth/link/line/page.tsx": "apps/web/extensions/route66/app/auth/link/line/page.tsx",
+    "apps/web/app/liff/page.tsx": "apps/web/extensions/route66/app/liff/page.tsx",
+    "apps/web/app/orgs/[orgslug]/(withmenu)/attendance/check-in/page.tsx": "apps/web/extensions/route66/app/orgs/[orgslug]/(withmenu)/attendance/check-in/page.tsx",
+    "apps/web/app/orgs/[orgslug]/(withmenu)/attendance/page.tsx": "apps/web/extensions/route66/app/orgs/[orgslug]/(withmenu)/attendance/page.tsx",
+    "apps/web/app/orgs/[orgslug]/(withmenu)/attendance/receipts/[receiptId]/page.tsx": "apps/web/extensions/route66/app/orgs/[orgslug]/(withmenu)/attendance/receipts/[receiptId]/page.tsx",
+    "apps/web/app/orgs/[orgslug]/(withmenu)/classes/page.tsx": "apps/web/extensions/route66/app/orgs/[orgslug]/(withmenu)/classes/page.tsx",
+    "apps/web/app/orgs/[orgslug]/dash/classes-preview/page.tsx": "apps/web/extensions/route66/app/orgs/[orgslug]/dash/classes-preview/page.tsx",
+    "apps/web/components/Auth/LineSignIn.tsx": "apps/web/extensions/route66/components/Auth/LineSignIn.tsx",
+    "apps/web/components/Auth/ProviderButton.tsx": "apps/web/extensions/route66/components/Auth/ProviderButton.tsx",
+    "apps/web/components/Dashboard/Pages/ClassesPreview/ClassesPreview.tsx": "apps/web/extensions/route66/components/Dashboard/Pages/ClassesPreview/ClassesPreview.tsx",
+    "apps/web/components/Dashboard/Pages/ClassesPreview/copy.ts": "apps/web/extensions/route66/components/Dashboard/Pages/ClassesPreview/copy.ts",
+    "apps/web/components/Dashboard/Pages/ClassesPreview/model.ts": "apps/web/extensions/route66/components/Dashboard/Pages/ClassesPreview/model.ts",
+    "apps/web/components/Dashboard/Pages/ClassesPreview/preview.module.css": "apps/web/extensions/route66/components/Dashboard/Pages/ClassesPreview/preview.module.css",
+    "apps/web/components/Objects/Account/subpages/SchoolIdentity.tsx": "apps/web/extensions/route66/components/Objects/Account/subpages/SchoolIdentity.tsx",
+    "apps/web/components/Objects/Account/subpages/SchoolTimetable.tsx": "apps/web/extensions/route66/components/Objects/Account/subpages/SchoolTimetable.tsx",
+    "apps/web/components/Objects/Account/subpages/SignInMethods.tsx": "apps/web/extensions/route66/components/Objects/Account/subpages/SignInMethods.tsx",
+    "apps/web/components/Objects/Account/subpages/StudentRegistrarDetails.tsx": "apps/web/extensions/route66/components/Objects/Account/subpages/StudentRegistrarDetails.tsx",
+    "apps/web/components/Objects/Account/subpages/school-identity.module.css": "apps/web/extensions/route66/components/Objects/Account/subpages/school-identity.module.css",
+    "apps/web/components/Objects/Classes/AttendanceCheckin.tsx": "apps/web/extensions/route66/components/Objects/Classes/AttendanceCheckin.tsx",
+    "apps/web/components/Objects/Classes/AttendanceWorkspace.tsx": "apps/web/extensions/route66/components/Objects/Classes/AttendanceWorkspace.tsx",
+    "apps/web/components/Objects/Classes/ClassesWorkspace.tsx": "apps/web/extensions/route66/components/Objects/Classes/ClassesWorkspace.tsx",
+    "apps/web/components/Objects/Classes/attendance-copy.ts": "apps/web/extensions/route66/components/Objects/Classes/attendance-copy.ts",
+    "apps/web/services/auth/line.ts": "apps/web/extensions/route66/services/auth/line.ts"
+  }
+}

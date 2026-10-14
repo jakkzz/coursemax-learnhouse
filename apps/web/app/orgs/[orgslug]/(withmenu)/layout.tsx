@@ -127,7 +127,7 @@ function LayoutContent({ children, orgslug }: { children: ReactNode; orgslug: st
         {children}
       </div>
       {!isFullBleedPage && !chromeless && <OrgFooter />}
-      {!isFullBleedPage && !chromeless && <Watermark inFlow={isAccountPage || pathParts.includes('classes')} />}
+      {!isFullBleedPage && !chromeless && <Watermark inFlow={isAccountPage || pathParts.includes('classes') || pathParts.includes('attendance')} />}
     </div>
   )
 }

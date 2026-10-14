@@ -1,0 +1,13 @@
+# Retained native-auth/class parent, additive attendance API + validated web delta.
+FROM coursemax-learnhouse:d43256b0
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.source="https://github.com/jakkzz/coursemax-learnhouse" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}"
+COPY apps/api/src/db/class_attendance.py /app/api/src/db/class_attendance.py
+COPY apps/api/src/services/attendance_policy.py /app/api/src/services/attendance_policy.py
+COPY apps/api/src/services/class_attendance.py /app/api/src/services/class_attendance.py
+COPY apps/api/src/routers/class_attendance.py /app/api/src/routers/class_attendance.py
+COPY apps/api/src/routers/academic_classes.py /app/api/src/routers/academic_classes.py
+COPY apps/api/src/router.py /app/api/src/router.py
+COPY apps/api/migrations/versions/f36da41e9f33_class_attendance.py /app/api/migrations/versions/f36da41e9f33_class_attendance.py
+ADD web-delta.tar.gz /app/web/

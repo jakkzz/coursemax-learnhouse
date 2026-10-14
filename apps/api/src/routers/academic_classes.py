@@ -138,7 +138,9 @@ async def create(body:ClassSetup,request:Request,response:Response,db:AsyncSessi
 async def correct(class_id:int,body:Correction,request:Request,response:Response,db:AsyncSession=Depends(get_db_session)):
     private(response);user,config,_=await context(request,db);boundary(request,config);await service.serialize(db);cls=await staff_class(db,user,config.org_id,class_id)
     entries=(await db.exec(select(AcademicRosterEntry).where(AcademicRosterEntry.class_id==class_id))).all()
-    if body.course_id!=cls.course_id or cls.version!=body.expected_version or cls.last_synced_at or entries:
+    from src.db.class_attendance import AttendanceSession
+    attendance=(await db.exec(select(AttendanceSession.id).where(AttendanceSession.class_id==class_id).limit(1))).first()
+    if body.course_id!=cls.course_id or cls.version!=body.expected_version or cls.last_synced_at or entries or attendance:
         raise HTTPException(409,'Only an unused class setup can be corrected. Preserve existing roster/history; ask an administrator to review.')
     binding=await db.get(CourseRegistryBinding,cls.course_id)
     if not binding or binding.registry_course_id!=body.registry_course_id:raise HTTPException(409,'Use the administrator-approved official course mapping')

@@ -19,6 +19,8 @@ from src.db.roles import Role
 from src.db.user_organizations import UserOrganization
 from src.db.users import User
 from src.db.provider_profile_import import ProviderProfileImport
+from src.db.school_identity import SchoolGoogleEvidence, NrruTeacherIdentity
+from src.db.user_audit_events import UserAuditEvent
 from src.services.auth.google_handoff import VerifiedGoogleHandoff
 from src.services.auth.native_google import complete_native_google
 from src.services.auth.oauth_transactions import LinkActor
@@ -80,7 +82,7 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
     async def asyncSetUp(self):
         await super().asyncSetUp()
         async with self.engine.begin() as conn:
-            for table in (Organization.__table__, Role.__table__, UserOrganization.__table__, ProviderProfileImport.__table__):
+            for table in (Organization.__table__, Role.__table__, UserOrganization.__table__, ProviderProfileImport.__table__, SchoolGoogleEvidence.__table__, NrruTeacherIdentity.__table__, UserAuditEvent.__table__):
                 await conn.run_sync(table.create)
         async with self.sessions.begin() as db:
             db.add(Organization(id=1, name='Fixture', slug='default', email='fixture@example.com', org_uuid='org_fixture'))
@@ -112,6 +114,97 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
         async with self.sessions.begin() as db:
             user, result = await complete_native_google(db, verified, org_id=1)
             return user.id, result
+
+    async def test_school_migration_matches_models_and_refuses_destructive_downgrade(self):
+        import importlib.util
+        from pathlib import Path
+        from alembic.migration import MigrationContext
+        from alembic.operations import Operations
+        import sqlalchemy as sa
+        spec=importlib.util.spec_from_file_location('school_migration',Path('migrations/versions/f14b820c7d11_school_directory_identity.py'))
+        migration=importlib.util.module_from_spec(spec);spec.loader.exec_module(migration)
+        def apply(conn):
+            with Operations.context(MigrationContext.configure(conn)):migration.upgrade()
+            for model in (SchoolGoogleEvidence,NrruTeacherIdentity):
+                self.assertEqual({c['name'] for c in sa.inspect(conn).get_columns(model.__tablename__)},set(model.__table__.columns.keys()))
+            with Operations.context(MigrationContext.configure(conn)):
+                with self.assertRaises(RuntimeError):migration.downgrade()
+        async with self.engine.begin() as conn:
+            await conn.run_sync(NrruTeacherIdentity.__table__.drop)
+            await conn.run_sync(SchoolGoogleEvidence.__table__.drop)
+            await conn.run_sync(apply)
+
+    async def test_school_evidence_never_grants_roles_or_merges_email(self):
+        await self.link()
+        async with self.sessions() as db:
+            before = (await db.get(User, 1)).model_dump()
+        proof = replace(self.google, verified_email='demo.t@nrru.ac.th', hosted_domain='nrru.ac.th')
+        await self.login(proof)
+        async with self.sessions() as db:
+            from sqlmodel import select
+            saved = (await db.exec(select(SchoolGoogleEvidence))).first()
+            self.assertEqual(saved.email, 'demo.t@nrru.ac.th')
+            self.assertEqual(saved.hosted_domain, 'nrru.ac.th')
+            self.assertEqual((await db.get(User, 1)).model_dump(), before)
+            self.assertEqual((await db.get(UserOrganization, 1)).role_id, 4)
+        await self.login(replace(proof, hosted_domain=None))
+        async with self.sessions() as db:
+            self.assertIsNone((await db.exec(select(SchoolGoogleEvidence))).first().hosted_domain)
+
+    async def test_school_directory_confirmation_is_own_scoped_and_not_assignment(self):
+        from types import SimpleNamespace
+        from fastapi import FastAPI
+        from src.routers import school_identity as route
+        await self.link()
+        _, result = await self.login(replace(self.google, verified_email='demo.t@nrru.ac.th', hosted_domain='nrru.ac.th'))
+        second_proof = replace(self.google, subject='second-school-subject', verified_email='demo.b@nrru.ac.th', hosted_domain='nrru.ac.th')
+        await self.link(user=2, proof=second_proof)
+        _, second_result = await self.login(second_proof)
+        class Store:
+            def __init__(self): self.data={}
+            async def set(self,k,v,ex=None): self.data[k]=v.encode()
+            async def get(self,k): return self.data.get(k)
+            async def eval(self,s,n,k,raw):
+                if self.data.get(k)!=raw:return 0
+                self.data.pop(k);return 1
+        store=Store()
+        @asynccontextmanager
+        async def resources(c): yield store,None
+        config=SimpleNamespace(deployment='fixture',org_id=1,handoff=SimpleNamespace(client=SimpleNamespace(public_origin='https://learn.example.com')))
+        app=FastAPI();app.include_router(route.router,prefix='/school-identity')
+        async def dbdep():
+            async with self.sessions() as db: yield db
+        app.dependency_overrides[route.get_db_session]=dbdep
+        candidates=[dict(officer_id='12',officer_code='12',name_th='อาจารย์ตัวอย่าง ก',name_en='Demo Teacher A'),dict(officer_id='13',officer_code='13',name_th='อาจารย์ตัวอย่าง ข',name_en='Demo Teacher B')]
+        with patch.object(route,'settings',return_value=config),patch.object(route,'resources',resources),patch.object(route,'throttle',new=AsyncMock()),patch.object(route,'search_directory',new=AsyncMock(return_value=candidates)):
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='https://learn.example.com',cookies={'LH_access':result.access_token},headers={'Origin':'https://learn.example.com'}) as c:
+                me=await c.get('/school-identity/me');self.assertEqual(me.status_code,200);self.assertTrue(me.json()['eligible']);self.assertEqual(me.json()['courses'],[])
+                found=await c.post('/school-identity/search');self.assertEqual(found.status_code,200);self.assertEqual(len(found.json()['candidates']),2)
+                body=dict(search_id=found.json()['search_id'],officer_id='999',confirm_own_name=True)
+                self.assertEqual((await c.post('/school-identity/confirm',json=body)).status_code,409)
+                body['officer_id']='12';body['confirm_own_name']=False
+                self.assertEqual((await c.post('/school-identity/confirm',json=body)).status_code,403)
+                body['confirm_own_name']=True
+                self.assertEqual((await c.post('/school-identity/confirm',json=body,headers={'Origin':'https://evil.example'})).status_code,403)
+                async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='https://learn.example.com',cookies={'LH_access':second_result.access_token},headers={'Origin':'https://learn.example.com'}) as other:
+                    self.assertEqual((await other.post('/school-identity/confirm',json=body)).status_code,409)
+                    other_search=(await other.post('/school-identity/search')).json()
+                self.assertEqual((await c.post('/school-identity/confirm',json=body)).status_code,200)
+                async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='https://learn.example.com',cookies={'LH_access':second_result.access_token},headers={'Origin':'https://learn.example.com'}) as other:
+                    self.assertEqual((await other.post('/school-identity/confirm',json={**body,'search_id':other_search['search_id']})).status_code,409)
+                    self.assertIsNone((await other.get('/school-identity/me')).json()['directory_identity'])
+                self.assertEqual((await c.post('/school-identity/confirm',json=body)).status_code,409)
+                me=await c.get('/school-identity/me');self.assertEqual(me.json()['directory_identity']['officer_id'],'12');self.assertEqual(me.json()['courses'],[])
+                self.assertIn('private',me.headers['cache-control'])
+                again=(await c.post('/school-identity/search')).json()
+                self.assertEqual((await c.post('/school-identity/confirm',json={**body,'search_id':again['search_id'],'officer_id':'13'})).status_code,409)
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='https://learn.example.com') as anonymous:
+                self.assertEqual((await anonymous.get('/school-identity/me')).status_code,401)
+        async with self.sessions() as db:
+            self.assertFalse((await db.get(User,1)).is_superadmin)
+            self.assertEqual((await db.get(UserOrganization,1)).role_id,4)
+            from sqlmodel import select
+            self.assertEqual(len((await db.exec(select(UserAuditEvent).where(UserAuditEvent.event_type=='nrru_directory_self_confirmed'))).all()),1)
 
     async def test_google_sessions_resolve_native_user_without_email_subject(self):
         await self.link()
@@ -474,10 +567,11 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
         self.assertEqual(tuple(await self.counts()), (1, 1, 4))
 
     async def test_create_all_first_bootstrap_and_empty_downgrade(self):
-        # Parent case predates this FK-dependent optional table. Remove only its
-        # empty disposable fixture before testing the historical migration.
+        # Remove only empty FK-dependent disposable fixtures before testing
+        # the historical provider migration; never drop production evidence.
         async with self.engine.begin() as conn:
-            await conn.run_sync(ProviderProfileImport.__table__.drop)
+            for table in (NrruTeacherIdentity.__table__, SchoolGoogleEvidence.__table__, ProviderProfileImport.__table__):
+                await conn.run_sync(table.drop)
         await super().test_create_all_first_bootstrap_and_empty_downgrade()
 
     async def _profile_fixture(self):

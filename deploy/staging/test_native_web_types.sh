@@ -13,7 +13,7 @@ docker run --rm --pull never --read-only --memory 3584m --oom-score-adj 500 --cp
   -e NODE_OPTIONS=--max-old-space-size=2048 -e LEARNHOUSE_DISABLE_EE=1 \
   -e LEARNHOUSE_BUILD_NO_TELEMETRY=true -e LEARNHOUSE_BUILD_CPUS=1 \
   --entrypoint sh "$IMAGE" -c '
-    mkdir -p /scratch/web; cp -a /source/. /scratch/web/; cd /scratch/web
+    mkdir -p /scratch/web; tar -cf - -C /source . | tar -xf - --no-same-owner -C /scratch/web; cd /scratch/web
     timeout 180 bun install --frozen-lockfile --ignore-scripts --network-concurrency 2 &&
     rm -rf /scratch/cache &&
     timeout 90 node node_modules/next/dist/bin/next typegen &&

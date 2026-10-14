@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next'
 import AccountGeneral from '@components/Objects/Account/subpages/AccountGeneral'
 import AccountProfile from '@components/Objects/Account/subpages/AccountProfile'
 import AccountSecurity from '@components/Objects/Account/subpages/AccountSecurity'
+import SchoolIdentity from '@components/Objects/Account/subpages/SchoolIdentity'
 import AccountPurchases from '@components/Objects/Account/subpages/AccountPurchases'
 import { useLHAnalytics, AnalyticsEvent } from '@services/analytics'
 
@@ -26,6 +27,7 @@ const getSubpageTitle = (subpage: string, t: (_key: string) => string): string =
     'general': t('account.general'),
     'profile': t('account.profile'),
     'security': t('account.security'),
+    'school-identity': t('account.school_identity'),
     'purchases': t('account.purchases'),
   }
   return titles[subpage] || t('account.title')
@@ -55,6 +57,8 @@ const AccountClient = ({ orgslug, org_id, subpage }: AccountClientProps) => {
         return <AccountProfile />
       case 'security':
         return <AccountSecurity />
+      case 'school-identity':
+        return <SchoolIdentity />
       case 'purchases':
         return <AccountPurchases orgId={org_id} orgslug={orgslug} />
       default:

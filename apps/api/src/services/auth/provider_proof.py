@@ -46,6 +46,7 @@ class ProviderProof:
     verified_email: str | None = field(default=None, repr=False)
     profile: ProviderProfile | None = field(default=None, repr=False)
     expires_at: int | None = field(default=None, repr=False, compare=False)
+    hosted_domain: str | None = field(default=None, repr=False, compare=False)
 
 
 def _opaque(value: object, maximum: int = 255) -> bool:
@@ -183,7 +184,8 @@ async def verify_google_id_token(
     except ValidationError:
         raise ProviderProofError("invalid_provider_token") from None
     return ProviderProof("google", GOOGLE_ISSUERS[0], "global", subject, email,
-                         extract_profile('google', claims))
+                         extract_profile('google', claims),
+                         hosted_domain=claims.get('hd') if _opaque(claims.get('hd')) else None)
 
 
 async def _verify_line(

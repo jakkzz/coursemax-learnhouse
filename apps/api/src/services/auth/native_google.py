@@ -124,6 +124,18 @@ async def complete_native_google(db, verified, *, org_id):
     ))).first()
     if membership is None:
         raise HTTPException(403, 'You are not a member of this organization')
+    # Capture only server-verified Google evidence, never mutable profile email.
+    # No backfill, domain-derived role, account merge or course assignment.
+    from src.db.school_identity import SchoolGoogleEvidence
+    evidence = await db.get(SchoolGoogleEvidence, binding.id)
+    if evidence is None:
+        evidence = SchoolGoogleEvidence(identity_id=binding.id, user_id=user.id,
+            email=proof.verified_email.lower(), hosted_domain=proof.hosted_domain)
+    else:
+        evidence.email = proof.verified_email.lower()
+        evidence.hosted_domain = proof.hosted_domain
+        evidence.observed_at = datetime.now(timezone.utc)
+    db.add(evidence)
     # Resolve the same stable subject through the native request guard before
     # minting; lifetime checks/MFA remain part of the one native session authority.
     from src.security.provider_session import claims, resolve_provider_session

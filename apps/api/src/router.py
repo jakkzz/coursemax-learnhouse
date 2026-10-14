@@ -50,6 +50,9 @@ from src.security.features_utils.plan_check import require_plan, require_plan_fo
 
 v1_router = APIRouter(prefix="/api/v1")
 
+from src.routers import school_identity
+v1_router.include_router(school_identity.router, prefix='/school-identity', tags=['school-identity'])
+
 # Helper dependency to reject API token access (still admits AnonymousUser;
 # use on routers that contain at least one deliberately-public endpoint).
 async def get_non_api_token_user(user = Depends(get_current_user)):

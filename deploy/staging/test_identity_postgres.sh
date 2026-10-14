@@ -3,7 +3,7 @@
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 python3 -B "$ROOT/deploy/staging/preflight.py"
-API_IMAGE=ghcr.io/learnhouse/app@sha256:0aca30cd7b772bebfb75c8e4e54613ab4391adb2d4e05403992867388169514f
+API_IMAGE=${LEARNHOUSE_API_TEST_IMAGE:-ghcr.io/learnhouse/app@sha256:0aca30cd7b772bebfb75c8e4e54613ab4391adb2d4e05403992867388169514f}
 DB_IMAGE=pgvector/pgvector@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
 docker image inspect "$API_IMAGE" >/dev/null
 docker image inspect "$DB_IMAGE" >/dev/null

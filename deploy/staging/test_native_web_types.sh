@@ -3,7 +3,7 @@
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 python3 -B "$ROOT/deploy/staging/preflight.py"
-IMAGE=ghcr.io/learnhouse/app@sha256:0aca30cd7b772bebfb75c8e4e54613ab4391adb2d4e05403992867388169514f
+IMAGE=${LEARNHOUSE_WEB_BUILD_IMAGE:-ghcr.io/learnhouse/app@sha256:0aca30cd7b772bebfb75c8e4e54613ab4391adb2d4e05403992867388169514f}
 docker image inspect "$IMAGE" >/dev/null
 docker run --rm --pull never --read-only --memory 3584m --oom-score-adj 500 --cpus 1 --pids-limit 256 \
   --cap-drop ALL --security-opt no-new-privileges --ulimit core=0 \

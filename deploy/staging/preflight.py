@@ -8,7 +8,8 @@ import subprocess
 import sys
 
 GIB = 1024 ** 3
-MIN_FREE_GIB = 25
+# Owner revised the staging disk reserve to 10 GiB on 2026-10-14.
+MIN_FREE_GIB = 10
 IMAGE_RESERVE_GIB = 2
 MIN_AVAILABLE_MEMORY_GIB = 3
 

@@ -7,7 +7,7 @@ OUT=${1:?Provide a new private evidence directory}
 [[ ! -e "$OUT" ]] || { echo 'Evidence directory must be new' >&2; exit 1; }
 mkdir -m 700 -p "$OUT"
 mkdir -m 700 "$OUT/dependencies"
-IMAGE=ghcr.io/learnhouse/app@sha256:0aca30cd7b772bebfb75c8e4e54613ab4391adb2d4e05403992867388169514f
+IMAGE=${LEARNHOUSE_WEB_BUILD_IMAGE:-ghcr.io/learnhouse/app@sha256:0aca30cd7b772bebfb75c8e4e54613ab4391adb2d4e05403992867388169514f}
 NAME="lh-native-web-build-$$"
 cleanup() {
   docker rm -f "$NAME" >/dev/null 2>&1 || true

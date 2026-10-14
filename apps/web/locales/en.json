@@ -1,4 +1,9 @@
 {
+  "classes_preview": {
+    "nav": "Classes preview",
+    "admin_only": "This design preview is available to organization managers.",
+    "admin_only_help": "It does not grant teacher or student permissions. Ordinary account access is unchanged."
+  },
   "common": {
     "hello": "Hello",
     "home": "Home",

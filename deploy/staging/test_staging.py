@@ -75,13 +75,14 @@ class RuntimeTests(unittest.TestCase):
 class ResourceTests(unittest.TestCase):
     def test_hard_floor(self):
         gib = preflight.GIB
-        self.assertTrue(preflight.blockers(25 * gib - 1, 4 * gib, False))
-        self.assertFalse(preflight.blockers(25 * gib, 4 * gib, False))
+        self.assertEqual(preflight.MIN_FREE_GIB, 10)
+        self.assertTrue(preflight.blockers(10 * gib - 1, 4 * gib, False))
+        self.assertFalse(preflight.blockers(10 * gib, 4 * gib, False))
 
     def test_pull_reserve(self):
         gib = preflight.GIB
-        self.assertTrue(preflight.blockers(26 * gib, 4 * gib, True))
-        self.assertFalse(preflight.blockers(27 * gib, 4 * gib, True))
+        self.assertTrue(preflight.blockers(12 * gib - 1, 4 * gib, True))
+        self.assertFalse(preflight.blockers(12 * gib, 4 * gib, True))
 
     def test_memory_floor(self):
         self.assertTrue(preflight.blockers(40 * preflight.GIB, 2 * preflight.GIB, False))

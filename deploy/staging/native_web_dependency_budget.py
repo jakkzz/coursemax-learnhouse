@@ -31,7 +31,7 @@ for size, package in sorted(sized, key=lambda pair: pair[0], reverse=True):
     if used + size > budget or size < 1024**2:
         continue
     stats = os.statvfs(destination)
-    if stats.f_bavail * stats.f_frsize - size < 25.1 * 1024**3:
+    if stats.f_bavail * stats.f_frsize - size < 10.1 * 1024**3:
         continue  # Keep this package in tmpfs rather than cross the disk floor.
     target = destination / package.relative_to(modules)
     target.parent.mkdir(parents=True, exist_ok=True)

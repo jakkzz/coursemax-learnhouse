@@ -44,6 +44,7 @@ import { usePlan } from '@components/Hooks/usePlan'
 import { planMeetsRequirement } from '@services/plans/plans'
 import { FeedbackModal } from '@components/Objects/Modals/FeedbackModal'
 import { useCommandPalette } from '@components/Dashboard/CommandPalette/CommandPaletteContext'
+import useAdminStatus from '@components/Hooks/useAdminStatus'
 
 function DashMobileMenu() {
   const org = useOrg() as any
@@ -51,6 +52,7 @@ function DashMobileMenu() {
   const { t, i18n } = useTranslation()
   const pathname = usePathname() || ''
   const plan = usePlan()
+  const { canManageOrg } = useAdminStatus()
   const { toggle: openSearch } = useCommandPalette()
   const [menuOpen, setMenuOpen] = useState(false)
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false)
@@ -218,6 +220,7 @@ function DashMobileMenu() {
               <div className="py-2 px-2 max-h-[52vh] overflow-y-auto overscroll-contain space-y-px">
                 <PanelItem href="/dash" icon={<House size={15} weight="fill" />} label={t('common.home')} active={isActive('/dash')} onClick={close} />
                 <PanelItem href="/dash/courses" icon={<BookOpen size={15} weight="fill" />} label={t('courses.courses')} active={isActive('/dash/courses')} onClick={close} />
+                {canManageOrg && <PanelItem href="/dash/classes-preview" icon={<ChalkboardSimple size={15} weight="fill" />} label={t('classes_preview.nav')} active={isActive('/dash/classes-preview')} onClick={close} />}
                 {isEnabled('folders') && <PanelItem href="/dash/library" icon={<FolderSimple size={15} weight="fill" />} label={t('library.library')} active={isActive('/dash/library')} onClick={close} />}
                 <PanelItem href="/dash/assignments" icon={<Files size={15} weight="fill" />} label={t('common.assignments')} active={isActive('/dash/assignments')} onClick={close} />
                 <PanelItem href="/dash/users/settings/users" icon={<Users size={15} weight="fill" />} label={t('common.users')} active={isActive('/dash/users')} onClick={close} />

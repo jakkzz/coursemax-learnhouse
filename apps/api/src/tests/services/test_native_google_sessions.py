@@ -166,7 +166,9 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
                 r=await c.get('/school-identity/me');self.assertEqual(r.status_code,200)
                 self.assertTrue(r.json()['school_menu']);self.assertEqual(r.json()['school_kind'],'student')
                 self.assertEqual(r.json()['student_number_hint'],'6900000001')
-                self.assertEqual(r.json()['registrar_details_status'],'not_connected')
+                self.assertEqual(r.json()['registrar_details_status'],'waiting_for_class_roster')
+                self.assertEqual(r.json()['student_match_status'],'waiting_for_roster')
+                self.assertEqual(r.json()['courses'],[])
                 self.assertIsNone(r.json()['directory_identity'])
                 self.assertEqual((await c.get('/school-identity/timetable')).status_code,403)
         async with self.sessions() as db:

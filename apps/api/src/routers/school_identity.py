@@ -56,16 +56,22 @@ async def own_identity(request:Request, response:Response, db:AsyncSession=Depen
     # Changed/retired Google evidence never preserves teacher eligibility.
     identity = identity if hint and identity and identity.identity_id == evidence.identity_id else None
     student_number = student_hint(evidence.email, evidence.hosted_domain) if evidence else None
+    from src.services.academic_rosters import own_student
+    from src.services.academic_projection import project
+    student,match_status = await own_student(db,user.id,evidence)
+    classroom = await project(db,user,config.org_id,evidence)
     return {'eligible': bool(hint), 'search_hint': hint,
         'school_menu': bool(identity or student_number),
+        'classes_menu': bool(classroom['classes'] or classroom['can_create']),
         'school_kind': 'staff' if identity else 'student' if student_number else None,
         'student_number_hint': student_number,
-        'registrar_details_status': 'directory_confirmed' if identity else 'waiting_for_class_roster' if student_number else 'not_connected',
-        'student_match_status': 'waiting_for_roster' if student_number else None,
+        'registrar_details_status': 'directory_confirmed' if identity else 'roster_matched' if student else 'identity_conflict' if match_status=='conflict' else 'waiting_for_class_roster' if student_number else 'not_connected',
+        'student_match_status': match_status,
+        'student_profile': {'student_number':student.student_number,'full_name_th':student.full_name_th,'faculty':student.faculty,'program':student.program} if student else None,
         'needs_google_signin': evidence is None,
         'directory_identity': candidate(identity) if identity else None,
         'confirmation_kind': 'self_confirmed_directory' if identity else None,
-        'courses': []}
+        'courses': classroom['classes']}
 
 @router.get('/timetable')
 async def own_timetable(request:Request, response:Response,

@@ -23,6 +23,8 @@ from src.services.orgs.auth_policy import enforce_login_auth_method
 
 async def complete_native_google(db, verified, *, org_id):
     """Call only with server-verified handoff, in a transaction with no prior commit."""
+    from src.services.academic_rosters import serialize, reconcile_login
+    await serialize(db)  # Before user/identity locks; same order as roster imports.
     # Organization-first serializes staging admission and quota checks. All these
     # flows share this order, then user lock, then binding lock/unique constraints.
     org = (await db.exec(select(Organization).where(Organization.id == org_id).with_for_update())).first()
@@ -136,6 +138,8 @@ async def complete_native_google(db, verified, *, org_id):
         evidence.hosted_domain = proof.hosted_domain
         evidence.observed_at = datetime.now(timezone.utc)
     db.add(evidence)
+    await db.flush()
+    await reconcile_login(db, user.id)
     # Resolve the same stable subject through the native request guard before
     # minting; lifetime checks/MFA remain part of the one native session authority.
     from src.security.provider_session import claims, resolve_provider_session

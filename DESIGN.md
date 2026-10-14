@@ -22,6 +22,8 @@ Preserve LearnHouse's native visual world: dark dashboard rail, off-white worksp
 
 Neutral surfaces carry content; amber and green communicate review and linked evidence, always accompanied by text. The frontmatter captures literal scoped focus/selection colors from `preview.module.css`; shared palette authority remains the native styles and UI components.
 
+Account > School identity and `/classes` state the record's status in a tinted band at the top of a white `nice-shadow` card: emerald for a confirmed directory record, amber while waiting for a roster match, blue for an informational or sign-in step and for read-only registrar data, red for failure, neutral while loading or when no state applies. Blue also carries wayfinding and choice — current-page pill, selected candidate row, radio and checkbox accent, external source link — and the scoped focus, selection and caret colors in `school-identity.module.css` (focus `#1d4ed8`, selection `#dbeafe` on `#1e3a8a`). Status colour is never the only channel: every band repeats its state in Thai and English beside a Lucide icon, and all pairs meet WCAG AA.
+
 ## Typography
 
 Retain existing native sans typography. Classes uses a 30px task heading, 14px body/controls and 12px supporting labels. Thai text wraps naturally; identifiers remain readable data, not decorative monospace.
@@ -49,4 +51,4 @@ Reuse `components/ui/button`, `input`, `dialog` and `DashTabBar`. Preserve their
 - Don't grant actual permissions through demo role selectors.
 - Don't promote preview-only composition or inherited shell defects into new global design rules.
 
-Evidence: compiled 1440/390 English/Thai Classes, roster, review and owned-identity task captures, 2026-10-14. Inline finish review, not independent review. No new shipping raster assets. Shared native shell is preserved; broader shell accessibility/branding acceptance is outside this record.
+Evidence: compiled 1440/390 English/Thai Classes, roster, review and owned-identity task captures, 2026-10-14. School identity colour pass, 2026-10-14: 32 compiled English/Thai captures at 1440/390 across loading, failure, sign-in, ineligible, unconfirmed, candidate selection, student waiting, confirmed with registrar timetable and `/classes`, with zero page errors or horizontal overflow, computed AA contrast and a clean mechanical detector run. Inline finish review, not independent review. No new shipping raster assets. Shared native shell is preserved; broader shell accessibility/branding acceptance is outside this record.

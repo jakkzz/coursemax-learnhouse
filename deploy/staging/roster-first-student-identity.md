@@ -1,6 +1,6 @@
 # Student school identity — roster-first port contract
 
-Owner clarified on 2026-10-14: student search requires registrar login. Use CourseMax's class-roster-first logic instead. **Do not build student-portal login/search, scrape its protected pages or copy university/CourseMax sessions.** This contract is not a claim that the class setup/import/matching backend is implemented or deployed.
+Owner clarified on 2026-10-14: student search requires registrar login. Use CourseMax's class-roster-first logic instead. **Do not build student-portal login/search, scrape its protected pages or copy university/CourseMax sessions.** This contract is not a deployment claim. The class setup/import/two-way matching source is now implemented and validated in the [academic classes checkpoint](academic-classes.md); it has not been activated.
 
 ## Authorities and sequence
 

@@ -51,6 +51,7 @@ export const HeaderProfileBox = ({ primaryColor = '' }: { primaryColor?: string 
   const { track } = useLHAnalytics()
   const colors = getMenuColorClasses(primaryColor)
   const [showSchool, setShowSchool] = useState(false)
+  const [showClasses, setShowClasses] = useState(false)
   const [schoolVersion, setSchoolVersion] = useState(0)
   useEffect(() => {
     const refresh = () => setSchoolVersion(value => value + 1)
@@ -60,6 +61,7 @@ export const HeaderProfileBox = ({ primaryColor = '' }: { primaryColor?: string 
   const schoolUser = session?.status === 'authenticated' ? session?.data?.user?.user_uuid : null
   useEffect(() => {
     setShowSchool(false)
+    setShowClasses(false)
     if (!schoolUser) return
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 10000)
@@ -68,7 +70,10 @@ export const HeaderProfileBox = ({ primaryColor = '' }: { primaryColor?: string 
       .then(async response => {
         if (!response.ok) return
         const data = await response.json()
-        if (!controller.signal.aborted) setShowSchool(data.school_menu === true)
+        if (!controller.signal.aborted) {
+          setShowSchool(data.school_menu === true)
+          setShowClasses(data.classes_menu === true)
+        }
       }).catch(() => {}).finally(() => clearTimeout(timeout))
     return () => { clearTimeout(timeout); controller.abort() }
   }, [schoolUser, org?.id, schoolVersion])
@@ -270,6 +275,12 @@ export const HeaderProfileBox = ({ primaryColor = '' }: { primaryColor?: string 
                     <span>{t('user.user_settings')}</span>
                   </Link>
                 </DropdownMenuItem>
+                {showClasses && <DropdownMenuItem asChild>
+                  <Link href={getUriWithOrg(org?.slug, '/classes')} className="flex min-h-11 items-center gap-2">
+                    <GraduationCap size={16} weight="fill" />
+                    <span>{t('account.classes')}</span>
+                  </Link>
+                </DropdownMenuItem>}
                 {showSchool && <DropdownMenuItem asChild>
                   <Link href={getUriWithOrg(org?.slug, '/account/school-identity')} className="flex min-h-11 items-center gap-2">
                     <GraduationCap size={16} weight="fill" />

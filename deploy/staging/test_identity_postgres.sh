@@ -47,7 +47,7 @@ fi
 
 docker run --rm --pull=never --network none --read-only \
   --user "$(id -u):$(id -g)" --cap-drop ALL --security-opt no-new-privileges \
-  --memory 256m --cpus 0.5 --pids-limit 64 --tmpfs /tmp:rw,size=16m \
+  --memory 384m --cpus 0.5 --pids-limit 64 --tmpfs /tmp:rw,size=16m \
   -v "$SCRATCH:/scratch" \
   -v "$ROOT/apps/api/src:/app/api/src:ro" \
   -v "$ROOT/apps/api/migrations:/app/api/migrations:ro" \
@@ -55,4 +55,4 @@ docker run --rm --pull=never --network none --read-only \
   -e LEARNHOUSE_DOMAIN=learn.example.com -e LEARNHOUSE_SSL=true -e LEARNHOUSE_DISABLE_EE=1 \
   -e RUN_IDENTITY_POSTGRES_TESTS=1 -e IDENTITY_TEST_PG_SOCKET=/scratch \
   -w /app/api --entrypoint /app/api/.venv/bin/python "$API_IMAGE" \
-  -B -m unittest src.tests.services.test_native_google_sessions src.tests.services.test_native_line_sessions -v
+  -B -c 'import unittest; from src.tests.services import test_academic_rosters as a; loader=unittest.defaultTestLoader; suite=loader.loadTestsFromNames(["src.tests.services.test_native_google_sessions", "src.tests.services.test_native_line_sessions"]); suite.addTests(a.AcademicRosterTests(name) for name in a.AcademicRosterTests.__dict__ if name.startswith("test_")); suite.addTests(loader.loadTestsFromTestCase(a.ParserTests)); result=unittest.TextTestRunner(verbosity=2).run(suite); raise SystemExit(not result.wasSuccessful())'

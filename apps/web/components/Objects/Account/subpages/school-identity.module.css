@@ -1,6 +1,7 @@
-.workspace ::selection { background: #e5e7eb; color: #111827; }
-.workspace :is(a, button, input, select):focus-visible { outline: 2px solid #171717; outline-offset: 3px; }
-.workspace input { caret-color: #111827; }
+.workspace ::selection { background: #dbeafe; color: #1e3a8a; }
+.workspace :is(a, button, input, select):focus-visible { outline: 2px solid #1d4ed8; outline-offset: 3px; }
+.workspace input { caret-color: #1d4ed8; }
+.workspace input[type='radio'], .workspace input[type='checkbox'] { width: 1.1rem; height: 1.1rem; }
 @media (prefers-reduced-motion: reduce) {
  .workspace * { transition-duration: 0s !important; animation-duration: 0s !important; }
 }

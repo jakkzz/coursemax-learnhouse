@@ -1068,6 +1068,16 @@ async def delete_course(
     # RBAC check
     await check_resource_access(request, db_session, current_user, course.course_uuid, AccessAction.DELETE)
 
+    # Check academic history BEFORE deleting any files. Never let a later FK
+    # refusal leave a preserved class pointing at erased authored content.
+    from src.db.academic_classes import AcademicClass, TeachingAssignment
+    from src.services.academic_rosters import serialize
+    await serialize(db_session)
+    has_class = (await db_session.exec(select(AcademicClass).where(AcademicClass.course_id == course.id))).first()
+    has_assignment = (await db_session.exec(select(TeachingAssignment).where(TeachingAssignment.course_id == course.id))).first()
+    if has_class or has_assignment:
+        raise HTTPException(409, 'This course has teaching or class history. Preserve the course; change its teaching assignment or class membership instead.')
+
     # Clean up content files from storage
     org_statement = select(Organization).where(Organization.id == course.org_id)
     org = (await db_session.execute(org_statement)).scalars().first()

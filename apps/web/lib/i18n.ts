@@ -48,11 +48,15 @@ async function loadLocale(lng: string) {
   }
 }
 
+const languageDetector = new LanguageDetector()
 i18n
-  .use(LanguageDetector)
+  .use(languageDetector)
   .use(initReactI18next)
   .init({
     resources,
+    // The server and first browser render must agree. Restore the saved
+    // language from the provider's mount effect, not during hydration.
+    lng: 'en',
     fallbackLng: 'en',
     ns: ['common'],
     defaultNS: 'common',
@@ -61,7 +65,8 @@ i18n
     },
     detection: {
       order: ['localStorage', 'cookie', 'querystring', 'navigator', 'path', 'subdomain'],
-      caches: ['localStorage', 'cookie'],
+      // Initialization must not overwrite the user's saved language with en.
+      caches: [],
       lookupLocalStorage: 'i18nextLng',
       lookupCookie: 'i18next',
     },
@@ -85,7 +90,20 @@ export const initialLocaleReady = Promise.all([
  */
 export async function changeLanguage(lng: string) {
   await Promise.all([loadLocale(lng), loadDateLocale(lng)])
-  return i18n.changeLanguage(lng)
+  const result = await i18n.changeLanguage(lng)
+  if (typeof window !== 'undefined') {
+    languageDetector.cacheUserLanguage(lng, ['localStorage', 'cookie'])
+  }
+  return result
+}
+
+export async function restorePreferredLanguage() {
+  if (typeof window === 'undefined') return
+  const detected = languageDetector.detect()
+  const choices = Array.isArray(detected) ? detected : [detected]
+  const preferred = choices.find(value => typeof value === 'string' &&
+    (value.split('-')[0] === 'en' || value.split('-')[0] in LOCALE_LOADERS))
+  if (typeof preferred === 'string') await changeLanguage(preferred)
 }
 
 export default i18n;

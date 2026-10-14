@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import i18n from '../../lib/i18n'
+import i18n, { restorePreferredLanguage } from '../../lib/i18n'
 import { applyDocumentDirection } from '../../lib/direction'
 
 export default function I18nProvider({ children }: { children: React.ReactNode }) {
@@ -24,6 +24,8 @@ export default function I18nProvider({ children }: { children: React.ReactNode }
       setLang(lng)
     }
     i18n.on('languageChanged', handleLanguageChanged)
+    // English matched SSR; now restore the detected language with its bundle.
+    void restorePreferredLanguage()
     return () => {
       i18n.off('languageChanged', handleLanguageChanged)
     }

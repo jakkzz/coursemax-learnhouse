@@ -17,13 +17,17 @@ const words = {
 }
 
 export default function SchoolIdentity({ classes = false }: { classes?: boolean }) {
- const { i18n } = useTranslation(); const t = words[i18n.language.startsWith('th') ? 'th' : 'en']
+ const { i18n } = useTranslation()
+ // Match the English server render before applying the saved browser locale.
+ const [mounted,setMounted] = useState(false)
+ useEffect(()=>setMounted(true),[])
+ const t = words[mounted&&i18n.language.startsWith('th') ? 'th' : 'en']
  const [status,setStatus] = useState<Status | null>(null), [error,setError] = useState(''), [busy,setBusy] = useState(false), [retry,setRetry] = useState(0)
  const [search,setSearch] = useState<{search_id:string;candidates:Candidate[]} | null>(null), [selected,setSelected] = useState(''), [own,setOwn] = useState(false)
- useEffect(()=>{const controller=new AbortController();setStatus(null);setError('');const timeout=setTimeout(()=>{setError(t.failed);controller.abort()},12000)
+ useEffect(()=>{if(!mounted)return;const controller=new AbortController();setStatus(null);setError('');const timeout=setTimeout(()=>{setError(t.failed);controller.abort()},12000)
   fetch('/api/v1/school-identity/me',{credentials:'include',cache:'no-store',signal:controller.signal}).then(async r=>{if(!r.ok)throw Error();const data=await r.json();if(!controller.signal.aborted)setStatus(data)}).catch(()=>{if(!controller.signal.aborted)setError(t.failed)}).finally(()=>clearTimeout(timeout))
   return()=>{clearTimeout(timeout);controller.abort()}
- },[retry,t.failed])
+ },[mounted,retry,t.failed])
  const find=async()=>{setBusy(true);setError('');setSearch(null);setSelected('');setOwn(false);try{const r=await fetch('/api/v1/school-identity/search',{method:'POST',credentials:'include'});if(!r.ok)throw Error();setSearch(await r.json())}catch{setError(t.unavailable)}finally{setBusy(false)}}
  const confirm=async()=>{setBusy(true);setError('');try{const r=await fetch('/api/v1/school-identity/confirm',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({search_id:search?.search_id,officer_id:selected,confirm_own_name:own})});if(!r.ok)throw Error();setSearch(null);setRetry(n=>n+1);window.dispatchEvent(new Event('lh-school-identity-changed'));setTimeout(()=>toast.success(t.confirmed),0)}catch{setError(t.conflict)}finally{setBusy(false)}}
  const google=async()=>{setBusy(true);setError('');try{const r=await fetch('/api/auth/google/start',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({intent:'signin',return_path:classes?'/classes':'/account/school-identity'})});const result=await r.json();if(!r.ok||new URL(result.url).origin!=='https://accounts.google.com')throw Error();sessionStorage.setItem('lh_google_intent','signin');window.location.assign(result.url)}catch{setError(t.failed);setBusy(false)}}

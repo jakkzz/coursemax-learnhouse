@@ -1,0 +1,231 @@
+"""Reviewed institutional eligibility -> native private-course read membership.
+
+Existing AcademicClassEvent is append-only configuration/provenance/receipt storage.
+No new schema, second login, native enrollment writer or progress mutation.
+"""
+import hashlib
+import json
+import os
+
+from fastapi import HTTPException
+from sqlalchemy import or_
+from sqlmodel import select
+
+from src.route66_ext.adapters import native_learning_access as native
+from src.route66_ext.db.academic_classes import (
+    AcademicClass, AcademicRosterEntry, SchoolStudent, AcademicClassEvent, CourseRegistryBinding,
+)
+from src.route66_ext.db.school_identity import SchoolGoogleEvidence
+from src.route66_ext.db.provider_identity import ProviderIdentity
+from src.route66_ext.services import academic_rosters as roster
+from src.route66_ext.services.learning_access_policy import membership_delta
+
+_CONFIG = "learning_access_configured"
+_MEMBER = "learning_access_membership"
+_APPLIED = "learning_access_applied"
+
+
+def _positive(value):
+    return type(value) is int and value > 0
+
+
+async def _events(db, kind, course_id=None):
+    # Validate before filtering. SQL JSON-to-int casts or filtering malformed
+    # course IDs first could hide broken provenance or fail with an opaque 500.
+    rows = (await db.exec(select(AcademicClassEvent).where(
+        AcademicClassEvent.kind == kind).order_by(AcademicClassEvent.id))).all()
+    for row in rows:
+        details = row.details
+        if not isinstance(details, dict) or not _positive(details.get("course_id")):
+            native.review()
+        if kind == _CONFIG:
+            if (not _positive(details.get("org_id")) or not _positive(details.get("group_id"))
+                    or not isinstance(details.get("group_uuid"), str) or not details["group_uuid"]
+                    or type(details.get("enabled")) is not bool
+                    or not isinstance(details.get("reason"), str) or len(details["reason"].strip()) < 5
+                    or not _positive(row.class_id)):
+                native.review()
+            cls = await db.get(AcademicClass, row.class_id)
+            if cls is None or cls.course_id != details["course_id"]:
+                native.review()
+        elif kind == _MEMBER:
+            if not _positive(details.get("group_id")):
+                native.review()
+            try:
+                membership_delta([], [], [details.get("membership")])
+            except ValueError:
+                native.review()
+    return [row for row in rows if course_id is None or row.details["course_id"] == course_id]
+
+
+async def _binding(db, course_id):
+    rows = await _events(db, _CONFIG, course_id)
+    if not rows:
+        return None
+    if len({(row.details["group_id"], row.details["group_uuid"], row.details["org_id"]) for row in rows}) != 1:
+        native.review()
+    return {**rows[-1].details, "event_id": rows[-1].id}
+
+
+def _event(db, actor_id, kind, course_id, details, cls=None):
+    roster.event(db, actor_id, kind, {"course_id": course_id, **details}, cls)
+
+
+async def _eligibility(db, course_id, org_id):
+    classes = (await db.exec(select(AcademicClass).where(AcademicClass.course_id == course_id)
+                             .order_by(AcademicClass.id))).all()
+    binding = await db.get(CourseRegistryBinding, course_id)
+    if not binding or any(c.registry_course_id != binding.registry_course_id for c in classes):
+        native.review()
+    pairs = (await db.exec(select(AcademicRosterEntry, SchoolStudent).join(
+        SchoolStudent, SchoolStudent.id == AcademicRosterEntry.student_id).join(
+        AcademicClass, AcademicClass.id == AcademicRosterEntry.class_id).where(
+        AcademicClass.course_id == course_id).order_by(AcademicRosterEntry.id))).all()
+    proofs = (await db.exec(select(SchoolGoogleEvidence).join(ProviderIdentity,
+        ProviderIdentity.id == SchoolGoogleEvidence.identity_id).where(
+        ProviderIdentity.provider == "google", ProviderIdentity.retired_at.is_(None),
+        ProviderIdentity.user_id == SchoolGoogleEvidence.user_id))).all()
+    proof_users = {e.user_id for e in proofs}
+    claims = await roster.active_claims(db)
+    candidates, waiting, conflicts = set(), 0, 0
+    for entry, profile in pairs:
+        if entry.status != "active":
+            continue
+        if profile.user_id is None or profile.user_id not in proof_users:
+            waiting += 1
+            continue
+        if entry.source == "manual":
+            candidates.add(profile.user_id)
+        elif (profile.has_registry_evidence and profile.student_number
+              and set(claims.get(profile.student_number, {})) == {profile.user_id}):
+            candidates.add(profile.user_id)
+        else:
+            conflicts += 1
+    eligible = await native.organization_users(db, org_id, candidates)
+    return sorted(eligible), {
+        "classes": [(c.id, c.version) for c in classes],
+        "proofs": sorted((e.user_id, e.identity_id) for e in proofs if e.user_id in candidates),
+        "registry_course_id": binding.registry_course_id,
+        "waiting_count": waiting + len(candidates - eligible), "conflict_count": conflicts,
+    }
+
+
+async def _state(db, course_id, org_id, group_id, enabled, *, lock=False):
+    binding = await _binding(db, course_id)
+    info = await native.inspect_group(db, course_id, org_id, group_id, lock=lock)
+    if binding:
+        if (binding["org_id"], binding["group_id"], binding["group_uuid"]) != (org_id, group_id, info["group_uuid"]):
+            native.review()
+    elif info["members"]:
+        raise HTTPException(409, "First activation requires an empty dedicated native group linked only to this course")
+    for event in await _events(db, _CONFIG):
+        if event.details["group_id"] == group_id and event.details["course_id"] != course_id:
+            native.review()
+    eligible, facts = await _eligibility(db, course_id, org_id)
+    events = await _events(db, _MEMBER, course_id)
+    if any(row.details["group_id"] != group_id for row in events):
+        native.review()
+    receipts = [row.details["membership"] for row in events]
+    try:
+        delta = membership_delta(eligible if enabled else [], info["members"], receipts)
+    except ValueError:
+        native.review()
+    state = {"binding": binding, "group": info, "facts": facts, "eligible": eligible,
+             "delta": delta, "enabled": enabled, "org_id": org_id, "course_id": course_id}
+    return state
+
+
+def _preview(state, actor_id):
+    fingerprint = hashlib.sha256(json.dumps({"actor_id": actor_id, **state},
+        sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    delta = state["delta"]
+    return {"course_id": state["course_id"], "group_id": state["group"]["group_id"],
+            "enabled": state["enabled"], "expected_fingerprint": fingerprint,
+            "eligible_count": len(state["eligible"]), "add_count": len(delta["add_user_ids"]),
+            "remove_count": len(delta["remove_members"]),
+            "preserved_manual_count": delta["preserved_manual_count"],
+            "waiting_count": state["facts"]["waiting_count"],
+            "conflict_count": state["facts"]["conflict_count"],
+            "course_published": state["group"]["published"],
+            "native_enrollment_changed": False, "progress_changed": False}
+
+
+async def preview(db, actor_id, cls, org_id, group_id, enabled=True):
+    await roster.serialize(db)
+    await db.refresh(cls)
+    await native.authorize_configuration(db, actor_id, org_id)
+    return _preview(await _state(db, cls.course_id, org_id, group_id, enabled), actor_id)
+
+
+async def _sync(db, actor_id, course_id, org_id, binding):
+    state = await _state(db, course_id, org_id, binding["group_id"], binding["enabled"], lock=True)
+    changes = await native.apply_delta(db, org_id, binding["group_id"], state["delta"])
+    for change in changes:
+        _event(db, actor_id, _MEMBER, course_id, {"group_id": binding["group_id"], "membership": change,
+            "authorization_event_id": binding["event_id"], "trigger": "configured_roster_reconciliation"})
+    await db.flush()
+    return {"added_count": sum(c["action"] == "added" for c in changes),
+            "removed_count": sum(c["action"] == "removed" for c in changes),
+            "preserved_manual_count": state["delta"]["preserved_manual_count"],
+            "native_enrollment_changed": False, "progress_changed": False}
+
+
+async def apply(db, actor_id, cls, org_id, *, group_id, enabled, expected_fingerprint, request_id, reason):
+    await roster.serialize(db)
+    await db.refresh(cls)
+    await native.authorize_configuration(db, actor_id, org_id)
+    # Deploying the implementation is not approval to activate real grants.
+    # This gates new configuration only; existing delegations must continue
+    # reconciling safely if configuration is later frozen.
+    if os.getenv("ROUTE66_LEARNING_ACCESS_CONFIGURATION_ENABLED", "false") != "true":
+        raise HTTPException(503, "Learning access activation is disabled pending reviewed recovery and setup acceptance")
+    body = {"actor_id": actor_id, "class_id": cls.id, "org_id": org_id, "group_id": group_id,
+            "enabled": enabled, "expected_fingerprint": expected_fingerprint, "reason": reason}
+    body_hash = hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
+    previous = (await db.exec(select(AcademicClassEvent).where(
+        AcademicClassEvent.kind == _APPLIED,
+        AcademicClassEvent.details["request_id"].as_string() == request_id))).all()
+    if previous:
+        if len(previous) != 1 or previous[0].details.get("body_hash") != body_hash:
+            raise HTTPException(409, "This request identifier is already used; request a new preview")
+        result = previous[0].details.get("result")
+        if not isinstance(result, dict) or result.get("applied") is not True:
+            native.review()
+        return {**result, "replayed": True}
+    async with db.begin_nested():
+        state = await _state(db, cls.course_id, org_id, group_id, enabled, lock=True)
+        if _preview(state, actor_id)["expected_fingerprint"] != expected_fingerprint:
+            raise HTTPException(409, "Eligibility or native access changed. Review a fresh preview")
+        _event(db, actor_id, _CONFIG, cls.course_id, {
+            "org_id": org_id, "group_id": group_id, "group_uuid": state["group"]["group_uuid"],
+            "enabled": enabled, "reason": reason}, cls)
+        await db.flush()
+        binding = await _binding(db, cls.course_id)
+        result = {"applied": True, "enabled": enabled, **await _sync(db, actor_id, cls.course_id, org_id, binding)}
+        _event(db, actor_id, _APPLIED, cls.course_id, {"request_id": request_id, "body_hash": body_hash,
+                                                   "result": result}, cls)
+        await db.flush()
+    return {**result, "replayed": False}
+
+
+async def refresh_course(db, actor_id, course_id):
+    """Caller already holds roster serialization; preserve its outer transaction."""
+    binding = await _binding(db, course_id)
+    if binding is None or binding["enabled"] is not True:
+        return
+    async with db.begin_nested():
+        await _sync(db, actor_id, course_id, binding["org_id"], binding)
+
+
+async def refresh_user(db, user_id):
+    # Include withdrawn rows AND exact-number claims on another existing owner:
+    # a new conflicting claimant must revoke the old managed grant, never claim it.
+    claims = await roster.active_claims(db)
+    numbers = {number for number, owners in claims.items() if user_id in owners}
+    courses = set((await db.exec(select(AcademicClass.course_id).join(
+        AcademicRosterEntry, AcademicRosterEntry.class_id == AcademicClass.id).join(
+        SchoolStudent, SchoolStudent.id == AcademicRosterEntry.student_id).where(or_(
+        SchoolStudent.user_id == user_id,
+        SchoolStudent.student_number.in_(numbers or {""}))))).all())
+    for course_id in sorted(courses):
+        await refresh_course(db, user_id, course_id)

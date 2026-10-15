@@ -68,6 +68,8 @@ async def reconcile_login(db,user_id):
             event(db,user_id,'verified_number_added_to_manual_identity',{'role_grants':False},student=manual)
             await db.flush()
         await reconcile(db,user_id,number,claims)
+    from src.route66_ext.services.learning_access import refresh_user
+    await refresh_user(db,user_id)
 
 async def own_student(db,user_id,evidence):
     hint=student_hint(evidence.email,evidence.hosted_domain) if evidence else None
@@ -171,7 +173,10 @@ async def apply_roster(db,cls,rows,source_hash,actor):
         db.add(entry);event(db,actor,'registry_member_missing',{'missing_count':entry.missing_count,'status':entry.status},cls,await db.get(SchoolStudent,entry.student_id))
     cls.version+=1;cls.last_source_hash=source_hash;cls.last_synced_at=datetime.now(timezone.utc);db.add(cls)
     event(db,actor,'roster_snapshot_applied',{'source_hash':source_hash,'counts':counts,'version':cls.version},cls)
-    await db.flush();return counts
+    await db.flush()
+    from src.route66_ext.services.learning_access import refresh_course
+    await refresh_course(db,actor,cls.course_id)
+    return counts
 
 # Preserve private helper names through legacy compatibility imports.
 __all__ = [name for name in globals() if not name.startswith("__")]

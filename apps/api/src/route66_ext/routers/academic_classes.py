@@ -223,7 +223,10 @@ async def manual(class_id:int,body:ManualMember,request:Request,response:Respons
     if entry is not None:raise HTTPException(409,'This person already has a roster entry. Change that entry; do not create a duplicate.')
     count=(await db.exec(select(AcademicRosterEntry).where(AcademicRosterEntry.class_id==cls.id))).all()
     entry=AcademicRosterEntry(class_id=cls.id,student_id=profile.id,source='manual',display_position=max([e.display_position for e in count],default=0)+1);db.add(entry);cls.version+=1;db.add(cls)
-    service.event(db,user.id,'manual_member_added',{'reason':body.reason,'user_id':target.id},cls,profile);await commit(db);return {'added':True}
+    service.event(db,user.id,'manual_member_added',{'reason':body.reason,'user_id':target.id},cls,profile)
+    from src.route66_ext.services.learning_access import refresh_course
+    await db.flush();await refresh_course(db,user.id,cls.course_id)
+    await commit(db);return {'added':True}
 
 @router.post('/{class_id}/roster/{entry_id}/membership')
 async def membership(class_id:int,entry_id:int,body:Membership,request:Request,response:Response,db:AsyncSession=Depends(get_db_session)):
@@ -232,7 +235,10 @@ async def membership(class_id:int,entry_id:int,body:Membership,request:Request,r
     if not entry or entry.class_id!=cls.id:raise HTTPException(404,'Roster entry not found')
     if cls.version!=body.expected_version:raise HTTPException(409,'Roster changed; reload before changing membership')
     entry.status=body.status;entry.source='manual';entry.missing_count=0;db.add(entry);cls.version+=1;db.add(cls)
-    service.event(db,user.id,'manual_membership_changed',{'entry_id':entry_id,'status':body.status,'reason':body.reason},cls,await db.get(SchoolStudent,entry.student_id));await commit(db);return {'saved':True}
+    service.event(db,user.id,'manual_membership_changed',{'entry_id':entry_id,'status':body.status,'reason':body.reason},cls,await db.get(SchoolStudent,entry.student_id))
+    from src.route66_ext.services.learning_access import refresh_course
+    await db.flush();await refresh_course(db,user.id,cls.course_id)
+    await commit(db);return {'saved':True}
 
 @router.post('/{class_id}/roster/{entry_id}/flag')
 async def flag(class_id:int,entry_id:int,body:Flag,request:Request,response:Response,db:AsyncSession=Depends(get_db_session)):
@@ -241,6 +247,10 @@ async def flag(class_id:int,entry_id:int,body:Flag,request:Request,response:Resp
     if not entry or entry.class_id!=class_id:raise HTTPException(404,'Roster entry not found')
     service.event(db,user.id,'identity_review_requested',{'entry_id':entry_id,'reason':body.reason},cls,await db.get(SchoolStudent,entry.student_id));await commit(db)
     return {'flagged':True,'identity_changed':False}
+
+# Reuse the existing extension mount; no native router/bootstrap hook is added.
+from src.route66_ext.routers.learning_access import router as learning_access_router
+router.include_router(learning_access_router)
 
 # Preserve private helper names through legacy compatibility imports.
 __all__ = [name for name in globals() if not name.startswith("__")]

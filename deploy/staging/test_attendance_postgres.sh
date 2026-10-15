@@ -22,13 +22,14 @@ if [[ $(id -u) == 0 ]]; then echo 'Run this fixture as an unprivileged user' >&2
 printf 'fixture:x:%s:%s:Synthetic fixture:/tmp:/bin/sh\n' "$(id -u)" "$(id -g)" > "$SCRATCH/passwd"
 docker run -d --rm --pull=never --name "$NAME" --network none --read-only \
   --user "$(id -u):$(id -g)" --cap-drop ALL --security-opt no-new-privileges \
-  --memory 384m --cpus 0.5 --pids-limit 96 \
-  --tmpfs "/var/lib/postgresql/data:rw,size=192m,uid=$(id -u),gid=$(id -g)" \
+  --memory 512m --cpus 0.5 --pids-limit 96 \
+  --tmpfs "/var/lib/postgresql/data:rw,size=320m,uid=$(id -u),gid=$(id -g)" \
   --tmpfs "/var/run/postgresql:rw,size=4m,uid=$(id -u),gid=$(id -g)" \
   --tmpfs /tmp:rw,size=16m -v "$SCRATCH:/scratch" -v "$SCRATCH/passwd:/etc/passwd:ro" \
   -e POSTGRES_USER=fixture -e POSTGRES_DB=fixture -e POSTGRES_PASSWORD=synthetic-fixture-only \
   "$DB_IMAGE" -c listen_addresses='' -c unix_socket_directories=/scratch,/var/run/postgresql \
-  -c unix_socket_permissions=0700 -c shared_buffers=16MB -c max_connections=20 >/dev/null
+  -c unix_socket_permissions=0700 -c shared_buffers=16MB -c max_connections=20 \
+  -c min_wal_size=32MB -c max_wal_size=64MB -c checkpoint_timeout=30s >/dev/null
 STARTED=1
 READY=0
 for _ in $(seq 1 60); do
@@ -55,5 +56,31 @@ docker run --rm --pull=never --network none --read-only \
   -e TESTING=true -e LEARNHOUSE_AUTH_JWT_SECRET_KEY=synthetic-fixture-jwt-secret-32-chars \
   -e LEARNHOUSE_DOMAIN=learn.example.com -e LEARNHOUSE_SSL=true -e LEARNHOUSE_DISABLE_EE=1 \
   -e RUN_IDENTITY_POSTGRES_TESTS=1 -e IDENTITY_TEST_PG_SOCKET=/scratch \
+  -e LEARNHOUSE_TEST_LEARNING_ACCESS="${LEARNHOUSE_TEST_LEARNING_ACCESS:-0}" \
+  -e LEARNHOUSE_TEST_LEARNING_ACCESS_ONLY="${LEARNHOUSE_TEST_LEARNING_ACCESS_ONLY:-0}" \
   -w /app/api --entrypoint /app/api/.venv/bin/python "$API_IMAGE" \
-  -B -c 'import unittest; from src.tests.services import test_academic_rosters as a, test_class_attendance as b; loader=unittest.defaultTestLoader; suite=loader.loadTestsFromNames(["src.tests.services.test_native_google_sessions", "src.tests.services.test_native_line_sessions", "src.tests.services.test_attendance_policy", "src.route66_ext.tests.services.test_extension_boundary"]); suite.addTests(a.AcademicRosterTests(name) for name in a.AcademicRosterTests.__dict__ if name.startswith("test_")); suite.addTests(loader.loadTestsFromTestCase(a.ParserTests)); suite.addTests(b.AttendanceTests(name) for name in b.AttendanceTests.__dict__ if name.startswith("test_")); result=unittest.TextTestRunner(verbosity=2).run(suite); raise SystemExit(not result.wasSuccessful())'
+  -B -c '
+import os
+import unittest
+from src.tests.services import test_academic_rosters as a, test_class_attendance as b
+loader = unittest.defaultTestLoader
+extra = os.getenv("LEARNHOUSE_TEST_LEARNING_ACCESS") == "1"
+only = os.getenv("LEARNHOUSE_TEST_LEARNING_ACCESS_ONLY") == "1"
+if only and not extra:
+    raise SystemExit("Learning-access-only requires LEARNHOUSE_TEST_LEARNING_ACCESS=1")
+suite = unittest.TestSuite()
+if not only:
+    suite.addTests(loader.loadTestsFromNames([
+        "src.tests.services.test_native_google_sessions", "src.tests.services.test_native_line_sessions",
+        "src.tests.services.test_attendance_policy", "src.route66_ext.tests.services.test_extension_boundary",
+    ]))
+    suite.addTests(a.AcademicRosterTests(name) for name in a.AcademicRosterTests.__dict__ if name.startswith("test_"))
+    suite.addTests(loader.loadTestsFromTestCase(a.ParserTests))
+    suite.addTests(b.AttendanceTests(name) for name in b.AttendanceTests.__dict__ if name.startswith("test_"))
+if extra:
+    from src.route66_ext.tests.services.test_learning_access import LearningAccessTests
+    suite.addTests(LearningAccessTests(name) for name in LearningAccessTests.__dict__ if name.startswith("test_"))
+    suite.addTests(loader.loadTestsFromName("src.route66_ext.tests.services.test_learning_access_policy"))
+result = unittest.TextTestRunner(verbosity=2).run(suite)
+raise SystemExit(not result.wasSuccessful())
+'

@@ -12,7 +12,7 @@ async def summary(db,cls,course,manageable):
         'active_count':sum(e.status=='active' for e in entries) if manageable else None,
         'registry_course_id':cls.registry_course_id if manageable else None,'registry_class_id':cls.registry_class_id if manageable else None}
 
-async def project(db,user,org_id,evidence):
+async def project(db,user,org_id,evidence,request=None):
     assignments=(await db.exec(select(TeachingAssignment).where(TeachingAssignment.user_id==user.id,TeachingAssignment.active==True))).all();staff_ids={a.course_id for a in assignments}
     student,match_status=await own_student(db,user.id,evidence)
     owned=(await db.exec(select(SchoolStudent).where(SchoolStudent.user_id==user.id))).all();owned_ids={p.id for p in owned}
@@ -22,7 +22,12 @@ async def project(db,user,org_id,evidence):
     data=[]
     for cls,course in rows:
         manager=user.is_superadmin or course.id in staff_ids
-        if manager or cls.id in student_class_ids:data.append(await summary(db,cls,course,manager))
+        if manager or cls.id in student_class_ids:
+            item = await summary(db,cls,course,manager)
+            if request is not None and course.published and not course.public:
+                from src.route66_ext.adapters.native_learning_access import can_read
+                item['course_available'] = await can_read(db,request,user,course)
+            data.append(item)
     return {'classes':data,'student_match_status':match_status,'can_create':user.is_superadmin or bool(staff_ids),'can_assign_teachers':user.is_superadmin}
 
 # Preserve private helper names through legacy compatibility imports.

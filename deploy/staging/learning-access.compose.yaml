@@ -1,6 +1,0 @@
-# Optional configuration gate. Not used for inactive deployment; false by default.
-# Setting true requires separate recovery/setup/real-data authority review.
-services:
-  app:
-    environment:
-      ROUTE66_LEARNING_ACCESS_CONFIGURATION_ENABLED: ${ROUTE66_LEARNING_ACCESS_CONFIGURATION_ENABLED:-false}

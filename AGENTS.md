@@ -6,9 +6,27 @@ framework instructions for affected apps. When this checkout is under the privat
 handoff workspace, also read `../AGENTS.md`, `../STATUS.md`, `../PLAN.md` and the
 referenced scope/identity documents; current decisions supersede historical notes.
 
-## Current deployed extraction
+## End-to-end delivery (owner instruction, 2026-10-15)
 
-Live source/image `fe1877c9`; read `docs/extensions/deployment.md` for actual scope.
+Make the requested workflow work, not merely its backend. Complete ordinary wiring,
+recovery, task UI, tests, builds, owner-fork commits/pushes and bounded app deployment
+without repeatedly asking permission. Do not invent default-off activation barriers
+or declare success with unusable/inactive code. Prefill verified source facts and
+put necessary course/roster decisions in the product, not in a chat approval loop.
+Optional academic-service failure must not prevent sign-in; isolate and recover it
+without retaining provably stale bridge grants or deleting manual access/evidence.
+
+Preserve the mandatory boundary and all real authorization/identity/license/privacy/
+retention/backup/capacity safeguards below. This instruction does not authorize
+impersonation, inferred privileges/course equivalence, destructive unenrollment,
+real historical migration, deletion or cutover. New native-core hook approval is
+still required; solve through owned adapters/routes first. Newest ../STATUS.md and
+current release pointer are authoritative over historical deployment headings.
+
+## Historical extraction baseline
+
+Extraction source/image `fe1877c9`; read the newest `docs/extensions/deployment.md`
+entry and private `../STATUS.md` for the actual live release and scope.
 Owned feature code is extracted; 43 historical original-file patches remain, with
 only the router registration changed further. No schema/data migration. Current
 upstream default `dev` is still our original `45cf5d4f` baseline: isolated pull

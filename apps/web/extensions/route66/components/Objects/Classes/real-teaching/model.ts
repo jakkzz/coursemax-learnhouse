@@ -12,6 +12,12 @@ export type AcademicClassLink = {
   manageable: boolean; course_uuid: string; course_available: boolean
 }
 
+// Native course routes take the unprefixed UUID; getCourseMetadata adds course_.
+// Encode a single route segment, never infer native identity from a course name.
+export function nativeCoursePath(uuid: string): string {
+  return `/course/${encodeURIComponent(uuid.replace(/^course_/, ''))}`
+}
+
 // Navigation only. The destination's native REST authorization remains authoritative.
 export function linkedTeachingClass(context: RegistrarClassContext, classes: AcademicClassLink[]): AcademicClassLink | null {
   const matches = classes.filter(c => typeof c.registry_course_id === 'string' && c.registry_course_id !== '' &&

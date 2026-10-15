@@ -59,7 +59,7 @@ async def own_identity(request:Request, response:Response, db:AsyncSession=Depen
     from src.route66_ext.services.academic_rosters import own_student
     from src.route66_ext.services.academic_projection import project
     student,match_status = await own_student(db,user.id,evidence)
-    classroom = await project(db,user,config.org_id,evidence)
+    classroom = await project(db,user,config.org_id,evidence,request=request)
     return {'eligible': bool(hint), 'search_hint': hint,
         'school_menu': bool(identity or student_number),
         'classes_menu': bool(classroom['classes'] or classroom['can_create']),

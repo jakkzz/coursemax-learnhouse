@@ -1,6 +1,21 @@
 # Internal extension deployment records
 
-## Latest: inactive learning-access backend — 2026-10-15
+## Class connections and access recovery — implementation, 2026-10-15
+
+The owned extension now includes teacher section requests, an administrator course/
+teaching/access review, quota-checked group provisioning, recoverable reading access,
+private-course handoff and explicit successor-group repair. No extra activation flag
+is required. The retired flag-only Compose/env files and six-file historical build
+recipe were removed; use `deploy/staging/Dockerfile.class-connections` with an isolated
+backend-plus-validated-web context. Its parent is exact **396d1a01**, not bf4f2908.
+See [learning-access.md](learning-access.md) for the current authorization/recovery
+contract. The entry below records the previous live behavior, not the new policy.
+
+Source tests, bundle/types and compiled bilingual desktop/mobile workflows are
+validated separately from packaging and protected app deployment. This implementation
+entry alone is not a claim of live deployment or real academic migration.
+
+## Previous: inactive learning-access backend — 2026-10-15
 
 Live source **396d1a012c55198c2798a8cde3c5cfe0f4c45e88**, image
 `coursemax-learnhouse:learning-access-396d1a01`, image ID

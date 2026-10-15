@@ -83,7 +83,7 @@ async def courses(request:Request,response:Response,db:AsyncSession=Depends(get_
     ids={a.course_id for a in assigned}
     courses=(await db.exec(select(Course).where(Course.org_id==config.org_id))).all()
     bindings={b.course_id:b for b in (await db.exec(select(CourseRegistryBinding))).all()}
-    courses=[{'id':c.id,'name':c.name,'course_uuid':c.course_uuid,'registry_course_id':bindings[c.id].registry_course_id if c.id in bindings else None,'course_code':bindings[c.id].course_code if c.id in bindings else None} for c in courses if user.is_superadmin or c.id in ids]
+    courses=[{'id':c.id,'name':c.name,'course_uuid':c.course_uuid,'registry_course_id':bindings[c.id].registry_course_id if c.id in bindings else None,'course_code':bindings[c.id].course_code if c.id in bindings else None,'private':c.public is False} for c in courses if user.is_superadmin or c.id in ids]
     teachers=[];assignments=[]
     if user.is_superadmin:
         members=(await db.exec(select(User).join(UserOrganization,UserOrganization.user_id==User.id).where(UserOrganization.org_id==config.org_id))).all()
@@ -111,14 +111,18 @@ async def assign(body:Assignment,request:Request,response:Response,db:AsyncSessi
     record=(await db.exec(select(TeachingAssignment).where(TeachingAssignment.course_id==body.course_id,TeachingAssignment.user_id==body.user_id))).first()
     if record is None:record=TeachingAssignment(course_id=body.course_id,user_id=body.user_id)
     record.active=body.active;db.add(record)
-    service.event(db,user.id,'teaching_assignment_changed',body.model_dump());await commit(db)
+    service.event(db,user.id,'teaching_assignment_changed',body.model_dump())
+    await db.flush()
+    from src.route66_ext.services.learning_access import refresh_course
+    await refresh_course(db,user.id,body.course_id)
+    await commit(db)
     return {'saved':True,'active':record.active,'native_roles_changed':False}
 
 @router.get('')
 async def classes(request:Request,response:Response,db:AsyncSession=Depends(get_db_session)):
     private(response);user,config,evidence=await context(request,db)
     from src.route66_ext.services.academic_projection import project
-    return await project(db,user,config.org_id,evidence)
+    return await project(db,user,config.org_id,evidence,request=request)
 
 @router.post('')
 async def create(body:ClassSetup,request:Request,response:Response,db:AsyncSession=Depends(get_db_session)):
@@ -251,6 +255,8 @@ async def flag(class_id:int,entry_id:int,body:Flag,request:Request,response:Resp
 # Reuse the existing extension mount; no native router/bootstrap hook is added.
 from src.route66_ext.routers.learning_access import router as learning_access_router
 router.include_router(learning_access_router)
+from src.route66_ext.routers.class_connections import router as class_connections_router
+router.include_router(class_connections_router)
 
 # Preserve private helper names through legacy compatibility imports.
 __all__ = [name for name in globals() if not name.startswith("__")]

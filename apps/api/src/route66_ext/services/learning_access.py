@@ -5,7 +5,6 @@ No new schema, second login, native enrollment writer or progress mutation.
 """
 import hashlib
 import json
-import os
 
 from fastapi import HTTPException
 from sqlalchemy import or_
@@ -13,7 +12,7 @@ from sqlmodel import select
 
 from src.route66_ext.adapters import native_learning_access as native
 from src.route66_ext.db.academic_classes import (
-    AcademicClass, AcademicRosterEntry, SchoolStudent, AcademicClassEvent, CourseRegistryBinding,
+    AcademicClass, AcademicRosterEntry, SchoolStudent, AcademicClassEvent, CourseRegistryBinding, TeachingAssignment,
 )
 from src.route66_ext.db.school_identity import SchoolGoogleEvidence
 from src.route66_ext.db.provider_identity import ProviderIdentity
@@ -29,11 +28,27 @@ def _positive(value):
     return type(value) is int and value > 0
 
 
+def _receipt_authorized(row, configurations):
+    d = row.details
+    if (not isinstance(d, dict) or not _positive(d.get("authorization_event_id"))
+            or not _positive(d.get("course_id")) or not _positive(d.get("group_id"))):
+        return False
+    authorization = configurations.get(d["authorization_event_id"])
+    if authorization is None or authorization.id >= row.id:
+        return False
+    a = authorization.details
+    return (authorization.kind == _CONFIG and isinstance(a, dict)
+            and a.get("course_id") == d.get("course_id") and a.get("group_id") == d.get("group_id")
+            and (row.class_id is None or row.class_id == authorization.class_id))
+
+
 async def _events(db, kind, course_id=None):
     # Validate before filtering. SQL JSON-to-int casts or filtering malformed
     # course IDs first could hide broken provenance or fail with an opaque 500.
     rows = (await db.exec(select(AcademicClassEvent).where(
         AcademicClassEvent.kind == kind).order_by(AcademicClassEvent.id))).all()
+    authorizations = {r.id: r for r in (await db.exec(select(AcademicClassEvent).where(
+        AcademicClassEvent.kind == _CONFIG))).all()} if kind == _MEMBER else {}
     for row in rows:
         details = row.details
         if not isinstance(details, dict) or not _positive(details.get("course_id")):
@@ -49,7 +64,7 @@ async def _events(db, kind, course_id=None):
             if cls is None or cls.course_id != details["course_id"]:
                 native.review()
         elif kind == _MEMBER:
-            if not _positive(details.get("group_id")):
+            if not _positive(details.get("group_id")) or not _receipt_authorized(row, authorizations):
                 native.review()
             try:
                 membership_delta([], [], [details.get("membership")])
@@ -62,16 +77,22 @@ async def _binding(db, course_id):
     rows = await _events(db, _CONFIG, course_id)
     if not rows:
         return None
-    if len({(row.details["group_id"], row.details["group_uuid"], row.details["org_id"]) for row in rows}) != 1:
-        native.review()
-    return {**rows[-1].details, "event_id": rows[-1].id}
+    previous = rows[0]
+    for row in rows[1:]:
+        old = tuple(previous.details[k] for k in ("group_id", "group_uuid", "org_id"))
+        new = tuple(row.details[k] for k in ("group_id", "group_uuid", "org_id"))
+        if old != new and (row.details.get("previous_event_id") != previous.id
+                          or row.details["org_id"] != previous.details["org_id"]):
+            native.review()
+        previous = row
+    return {**previous.details, "event_id": previous.id}
 
 
 def _event(db, actor_id, kind, course_id, details, cls=None):
     roster.event(db, actor_id, kind, {"course_id": course_id, **details}, cls)
 
 
-async def _eligibility(db, course_id, org_id):
+async def _eligibility(db, course_id, org_id, *, include_teachers=True):
     classes = (await db.exec(select(AcademicClass).where(AcademicClass.course_id == course_id)
                              .order_by(AcademicClass.id))).all()
     binding = await db.get(CourseRegistryBinding, course_id)
@@ -87,7 +108,10 @@ async def _eligibility(db, course_id, org_id):
         ProviderIdentity.user_id == SchoolGoogleEvidence.user_id))).all()
     proof_users = {e.user_id for e in proofs}
     claims = await roster.active_claims(db)
-    candidates, waiting, conflicts = set(), 0, 0
+    teachers = (await db.exec(select(TeachingAssignment).where(TeachingAssignment.course_id == course_id)
+                              .order_by(TeachingAssignment.id))).all()
+    teacher_ids = {t.user_id for t in teachers if t.active and include_teachers}
+    candidates, waiting, conflicts = teacher_ids & proof_users, 0, 0
     for entry, profile in pairs:
         if entry.status != "active":
             continue
@@ -104,13 +128,14 @@ async def _eligibility(db, course_id, org_id):
     eligible = await native.organization_users(db, org_id, candidates)
     return sorted(eligible), {
         "classes": [(c.id, c.version) for c in classes],
+        "teachers": [(t.id, t.user_id, t.active) for t in teachers],
         "proofs": sorted((e.user_id, e.identity_id) for e in proofs if e.user_id in candidates),
         "registry_course_id": binding.registry_course_id,
         "waiting_count": waiting + len(candidates - eligible), "conflict_count": conflicts,
     }
 
 
-async def _state(db, course_id, org_id, group_id, enabled, *, lock=False):
+async def _state(db, course_id, org_id, group_id, enabled, *, lock=False, include_teachers=None):
     binding = await _binding(db, course_id)
     info = await native.inspect_group(db, course_id, org_id, group_id, lock=lock)
     if binding:
@@ -121,11 +146,14 @@ async def _state(db, course_id, org_id, group_id, enabled, *, lock=False):
     for event in await _events(db, _CONFIG):
         if event.details["group_id"] == group_id and event.details["course_id"] != course_id:
             native.review()
-    eligible, facts = await _eligibility(db, course_id, org_id)
+    if include_teachers is None:
+        include_teachers = binding is None or binding.get("eligibility_policy") == "students_and_assigned_teachers"
+    eligible, facts = await _eligibility(db, course_id, org_id, include_teachers=include_teachers)
     events = await _events(db, _MEMBER, course_id)
-    if any(row.details["group_id"] != group_id for row in events):
+    reserved = {row.details["group_id"] for row in await _events(db, _CONFIG, course_id)}
+    if any(row.details["group_id"] not in reserved for row in events):
         native.review()
-    receipts = [row.details["membership"] for row in events]
+    receipts = [row.details["membership"] for row in events if row.details["group_id"] == group_id]
     try:
         delta = membership_delta(eligible if enabled else [], info["members"], receipts)
     except ValueError:
@@ -133,6 +161,19 @@ async def _state(db, course_id, org_id, group_id, enabled, *, lock=False):
     state = {"binding": binding, "group": info, "facts": facts, "eligible": eligible,
              "delta": delta, "enabled": enabled, "org_id": org_id, "course_id": course_id}
     return state
+
+
+async def _configuration_state(db, course_id, org_id, group_id, enabled, replace_group=False, lock=False):
+    binding = await _binding(db, course_id)
+    if group_id is None and binding and not replace_group:
+        group_id = binding["group_id"]
+    if group_id is not None:
+        return await _state(db, course_id, org_id, group_id, enabled, lock=lock, include_teachers=True)
+    info = await native.provision_state(db, course_id, org_id)
+    eligible, facts = await _eligibility(db, course_id, org_id)
+    return {"binding": binding, "group": info, "facts": facts, "eligible": eligible,
+            "delta": membership_delta(eligible if enabled else [], [], []),
+            "enabled": enabled, "org_id": org_id, "course_id": course_id}
 
 
 def _preview(state, actor_id):
@@ -147,14 +188,16 @@ def _preview(state, actor_id):
             "waiting_count": state["facts"]["waiting_count"],
             "conflict_count": state["facts"]["conflict_count"],
             "course_published": state["group"]["published"],
-            "native_enrollment_changed": False, "progress_changed": False}
+            "native_enrollment_changed": False, "progress_changed": False,
+            "will_create_group": state["group"]["group_id"] is None,
+            "restricts_org_wide_access": state["group"].get("restricts_org_wide_access", False)}
 
 
-async def preview(db, actor_id, cls, org_id, group_id, enabled=True):
+async def preview(db, actor_id, cls, org_id, group_id=None, enabled=True, replace_group=False):
     await roster.serialize(db)
     await db.refresh(cls)
     await native.authorize_configuration(db, actor_id, org_id)
-    return _preview(await _state(db, cls.course_id, org_id, group_id, enabled), actor_id)
+    return _preview(await _configuration_state(db, cls.course_id, org_id, group_id, enabled, replace_group), actor_id)
 
 
 async def _sync(db, actor_id, course_id, org_id, binding):
@@ -170,17 +213,13 @@ async def _sync(db, actor_id, course_id, org_id, binding):
             "native_enrollment_changed": False, "progress_changed": False}
 
 
-async def apply(db, actor_id, cls, org_id, *, group_id, enabled, expected_fingerprint, request_id, reason):
+async def apply(db, actor_id, cls, org_id, *, group_id=None, enabled=True, expected_fingerprint, request_id, reason, replace_group=False):
     await roster.serialize(db)
     await db.refresh(cls)
     await native.authorize_configuration(db, actor_id, org_id)
-    # Deploying the implementation is not approval to activate real grants.
-    # This gates new configuration only; existing delegations must continue
-    # reconciling safely if configuration is later frozen.
-    if os.getenv("ROUTE66_LEARNING_ACCESS_CONFIGURATION_ENABLED", "false") != "true":
-        raise HTTPException(503, "Learning access activation is disabled pending reviewed recovery and setup acceptance")
     body = {"actor_id": actor_id, "class_id": cls.id, "org_id": org_id, "group_id": group_id,
-            "enabled": enabled, "expected_fingerprint": expected_fingerprint, "reason": reason}
+            "enabled": enabled, "expected_fingerprint": expected_fingerprint, "reason": reason,
+            "replace_group": replace_group}
     body_hash = hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
     previous = (await db.exec(select(AcademicClassEvent).where(
         AcademicClassEvent.kind == _APPLIED,
@@ -193,15 +232,27 @@ async def apply(db, actor_id, cls, org_id, *, group_id, enabled, expected_finger
             native.review()
         return {**result, "replayed": True}
     async with db.begin_nested():
-        state = await _state(db, cls.course_id, org_id, group_id, enabled, lock=True)
+        state = await _configuration_state(db, cls.course_id, org_id, group_id, enabled, replace_group, lock=True)
         if _preview(state, actor_id)["expected_fingerprint"] != expected_fingerprint:
             raise HTTPException(409, "Eligibility or native access changed. Review a fresh preview")
+        previous = state["binding"]
+        if replace_group and previous:
+            from src.route66_ext.services.learning_access_recovery import release
+            await release(db, actor_id, cls.course_id, previous)
+        if state["group"]["group_id"] is None:
+            group_id = await native.provision_group(db, actor_id, cls.course_id, org_id)
+            info = await native.inspect_group(db, cls.course_id, org_id, group_id, lock=True)
+        else:
+            info = state["group"]; group_id = info["group_id"]
         _event(db, actor_id, _CONFIG, cls.course_id, {
-            "org_id": org_id, "group_id": group_id, "group_uuid": state["group"]["group_uuid"],
-            "enabled": enabled, "reason": reason}, cls)
+            "org_id": org_id, "group_id": group_id, "group_uuid": info["group_uuid"],
+            "previous_event_id": previous["event_id"] if previous else None,
+            "enabled": enabled, "reason": reason,
+            "eligibility_policy": "students_and_assigned_teachers"}, cls)
         await db.flush()
         binding = await _binding(db, cls.course_id)
         result = {"applied": True, "enabled": enabled, **await _sync(db, actor_id, cls.course_id, org_id, binding)}
+        _event(db, actor_id, "learning_access_ready", cls.course_id, {"authorization_event_id": binding["event_id"]}, cls)
         _event(db, actor_id, _APPLIED, cls.course_id, {"request_id": request_id, "body_hash": body_hash,
                                                    "result": result}, cls)
         await db.flush()
@@ -210,11 +261,8 @@ async def apply(db, actor_id, cls, org_id, *, group_id, enabled, expected_finger
 
 async def refresh_course(db, actor_id, course_id):
     """Caller already holds roster serialization; preserve its outer transaction."""
-    binding = await _binding(db, course_id)
-    if binding is None or binding["enabled"] is not True:
-        return
-    async with db.begin_nested():
-        await _sync(db, actor_id, course_id, binding["org_id"], binding)
+    from src.route66_ext.services.learning_access_recovery import reconcile
+    return await reconcile(db, actor_id, course_id)
 
 
 async def refresh_user(db, user_id):
@@ -227,5 +275,6 @@ async def refresh_user(db, user_id):
         SchoolStudent, SchoolStudent.id == AcademicRosterEntry.student_id).where(or_(
         SchoolStudent.user_id == user_id,
         SchoolStudent.student_number.in_(numbers or {""}))))).all())
+    courses.update((await db.exec(select(TeachingAssignment.course_id).where(TeachingAssignment.user_id == user_id))).all())
     for course_id in sorted(courses):
         await refresh_course(db, user_id, course_id)

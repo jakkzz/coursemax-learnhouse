@@ -15,19 +15,19 @@ from src.route66_ext.adapters.native_learning_access_test_support import (
     UserGroup, UserGroupResource, UserGroupUser, Course, Activity, ActivityTypeEnum,
     ActivitySubTypeEnum, ResourceAuthor, Trail, TrailRun, StatusEnum, TrailStep,
     User, PublicUser, AnonymousUser, OrganizationConfig, check_resource_access,
-    AccessAction, get_db_session, native_courses_router,
+    AccessAction, get_db_session, native_courses_router, Chapter, CourseChapter,
 )
 
 
 class LearningAccessTests(AcademicRosterTests):
     async def asyncSetUp(self):
         await super().asyncSetUp()
-        self.configuration_gate = patch.dict(os.environ, {"ROUTE66_LEARNING_ACCESS_CONFIGURATION_ENABLED": "true"})
-        self.configuration_gate.start()
         async with self.engine.begin() as conn:
             for model in (UserGroup, UserGroupResource, UserGroupUser, ResourceAuthor, Trail, TrailRun, Activity, TrailStep):
                 await conn.run_sync(model.__table__.create)
         async with self.sessions.begin() as db:
+            from src.db.organization_config import OrganizationConfig
+            db.add(OrganizationConfig(org_id=1, config={"config_version": "2.0", "plan": "standard"}))
             admin = await db.get(User, 3)
             admin.is_superadmin = True; admin.email_verified = True; db.add(admin)
             course = await db.get(Course, 10); course.published = True; db.add(course)
@@ -35,36 +35,71 @@ class LearningAccessTests(AcademicRosterTests):
             await db.flush()
             db.add(UserGroupResource(usergroup_id=30, org_id=1, resource_uuid="course_fixture_10"))
 
-    async def asyncTearDown(self):
-        self.configuration_gate.stop()
-        await super().asyncTearDown()
-
-    async def test_default_configuration_gate_refuses_activation_without_any_writes(self):
+    async def test_configuration_works_without_an_extra_activation_flag(self):
         await self.active()
         with patch.dict(os.environ):
             os.environ.pop("ROUTE66_LEARNING_ACCESS_CONFIGURATION_ENABLED", None)
-            with self.assertRaises(HTTPException) as raised:
-                await self.configure()
-        self.assertEqual(raised.exception.status_code, 503)
-        self.assertEqual(await self.members(), [])
-        async with self.sessions() as db:
-            self.assertEqual(await access._events(db, access._CONFIG), [])
+            result = await self.configure()
+        self.assertTrue(result["applied"])
+        self.assertTrue(await self.decision(1))
 
-    async def test_configuration_gate_requires_explicit_true_not_truthy_values(self):
+    async def test_retired_flag_cannot_disable_ordinary_approved_configuration(self):
         await self.active()
-        for value in ("false", "1", "yes", "TRUE", ""):
-            with patch.dict(os.environ, {"ROUTE66_LEARNING_ACCESS_CONFIGURATION_ENABLED": value}):
-                with self.assertRaises(HTTPException) as raised:
-                    await self.configure()
-                self.assertEqual(raised.exception.status_code, 503)
+        with patch.dict(os.environ, {"ROUTE66_LEARNING_ACCESS_CONFIGURATION_ENABLED": "false"}):
+            self.assertTrue((await self.configure())["applied"])
+
+    async def test_native_plan_failure_releases_owned_access_not_the_roster(self):
+        await self.active(); await self.configure()
+        async with self.sessions.begin() as db:
+            db.add(UserGroupUser(usergroup_id=30, org_id=1, user_id=2, creation_date="manual", update_date="manual"))
+        with patch("src.route66_ext.adapters.native_learning_access.check_org_plan", new=AsyncMock(side_effect=HTTPException(403, "Synthetic plan loss"))):
+            await self.snapshot("6900000001")
+        self.assertEqual([m.user_id for m in await self.members()], [2])
+        async with self.sessions() as db:
+            pending = await access._events(db, "learning_access_pending", 10)
+            self.assertEqual(len(pending), 1)
+            self.assertEqual((await db.exec(select(AcademicRosterEntry))).one().status, "active")
+
+    async def test_verified_google_login_succeeds_when_native_plan_temporarily_fails(self):
+        from dataclasses import replace
+        await self.link()
+        proof = replace(self.google, verified_email="6900000001@nrru.ac.th", hosted_domain="nrru.ac.th")
+        await self.login(proof); await self.snapshot("6900000001"); await self.configure()
+        with patch("src.route66_ext.adapters.native_learning_access.check_org_plan", new=AsyncMock(side_effect=HTTPException(403, "Synthetic plan loss"))):
+            user_id, result = await self.login(proof)
+        self.assertEqual(user_id, 1); self.assertTrue(result.access_token)
         self.assertEqual(await self.members(), [])
 
-    async def test_freezing_configuration_keeps_existing_delegation_reconciliation(self):
+    async def test_automatic_provision_and_explicit_recovery_keep_manual_group_members(self):
+        await self.active()
+        async with self.sessions.begin() as db:
+            cls = await db.get(AcademicClass, 20)
+            p = await access.preview(db, 3, cls, 1)
+            self.assertTrue(p["will_create_group"])
+            await access.apply(db, 3, cls, 1, expected_fingerprint=p["expected_fingerprint"],
+                request_id=uuid.uuid4().hex, reason="Synthetic reviewed group provisioning")
+            binding = await access._binding(db, 10); old_group = binding["group_id"]
+            db.add(UserGroupUser(usergroup_id=old_group, org_id=1, user_id=2, creation_date="manual", update_date="manual"))
+        async with self.sessions.begin() as db:
+            cls = await db.get(AcademicClass, 20)
+            p = await access.preview(db, 3, cls, 1, replace_group=True)
+            await access.apply(db, 3, cls, 1, replace_group=True, expected_fingerprint=p["expected_fingerprint"],
+                request_id=uuid.uuid4().hex, reason="Synthetic explicit recovery")
+            self.assertNotEqual((await access._binding(db, 10))["group_id"], old_group)
+        self.assertEqual([m.user_id for m in await self.members(old_group)], [2])
+        self.assertTrue(await self.decision(1))
+
+    async def test_deleted_group_recovers_with_new_identity_without_losing_progress(self):
         await self.active(); await self.configure()
-        with patch.dict(os.environ, {"ROUTE66_LEARNING_ACCESS_CONFIGURATION_ENABLED": "false"}):
-            await self.snapshot("6900000002"); await self.snapshot("6900000002")
-        self.assertEqual(await self.members(), [])
-        self.assertFalse(await self.decision(1))
+        async with self.sessions.begin() as db:
+            await db.delete(await db.get(UserGroup, 30))
+        await self.claim()
+        async with self.sessions.begin() as db:
+            cls = await db.get(AcademicClass, 20)
+            p = await access.preview(db, 3, cls, 1, replace_group=True)
+            await access.apply(db, 3, cls, 1, replace_group=True, expected_fingerprint=p["expected_fingerprint"],
+                request_id=uuid.uuid4().hex, reason="Synthetic deleted-group repair")
+        self.assertTrue(await self.decision(1))
 
     async def configure(self, enabled=True, request_id=None, expected=None, group_id=30):
         async with self.sessions.begin() as db:
@@ -90,6 +125,114 @@ class LearningAccessTests(AcademicRosterTests):
             result = await check_resource_access(request, db, actor, "course_fixture_10", action,
                                                   raise_on_deny=False)
             return result.allowed
+
+    async def test_group_org_drift_releases_original_owned_rows_not_new_org_members(self):
+        from src.route66_ext.adapters.db_organizations import Organization
+        await self.active(); await self.configure()
+        async with self.sessions.begin() as db:
+            db.add(Organization(id=2, name="Synthetic other org", slug="synthetic2", email="fixture2@example.com", org_uuid="org_fixture2"))
+            await db.flush()
+            group = await db.get(UserGroup, 30); group.org_id = 2; db.add(group)
+            db.add(UserGroupUser(usergroup_id=30, org_id=2, user_id=2, creation_date="manual", update_date="manual"))
+        await self.claim()
+        self.assertEqual([m.user_id for m in await self.members()], [2])
+        self.assertFalse(await self.decision(1))
+
+    async def test_recovery_never_adopts_a_receipt_without_its_authorization(self):
+        await self.active(); await self.configure()
+        async with self.sessions.begin() as db:
+            manual = UserGroupUser(usergroup_id=30, org_id=1, user_id=2, creation_date="manual", update_date="manual")
+            db.add(manual); await db.flush()
+            db.add(AcademicClassEvent(actor_user_id=3, kind=access._MEMBER, details={"course_id": 10,
+                "group_id": 30, "membership": {"id": manual.id, "user_id": 2, "creation_date": "manual", "action": "added"}}))
+        await self.claim()
+        self.assertEqual([m.user_id for m in await self.members()], [2])
+        async with self.sessions() as db:
+            self.assertTrue(await access._events(db, "learning_access_pending", 10))
+
+    async def test_private_course_handoff_uses_native_read_not_public_visibility(self):
+        await self.active()
+        from src.route66_ext.services.academic_projection import project
+        from src.route66_ext.db.school_identity import SchoolGoogleEvidence
+        req = Request({"type": "http", "method": "GET", "path": "/api/v1/academic-classes", "headers": [], "query_string": b""})
+        async def available():
+            async with self.sessions() as db:
+                user = PublicUser.model_validate(await db.get(User, 1))
+                proof = (await db.exec(select(SchoolGoogleEvidence).where(SchoolGoogleEvidence.user_id == 1))).one()
+                return (await project(db, user, 1, proof, request=req))["classes"][0]["course_available"]
+        self.assertFalse(await available()); await self.configure(); self.assertTrue(await available())
+
+    async def test_explicit_teacher_read_is_not_authorship_and_revokes_with_assignment(self):
+        from dataclasses import replace
+        from src.route66_ext.db.academic_classes import TeachingAssignment
+        proof = replace(self.google, subject="synthetic-teacher", verified_email="fixture.teacher@nrru.ac.th", hosted_domain="nrru.ac.th")
+        await self.link(user=2, proof=proof); await self.login(proof)
+        await self.configure()
+        self.assertTrue(await self.decision(2)); self.assertFalse(await self.decision(2, AccessAction.UPDATE))
+        async with self.sessions.begin() as db:
+            assignment = (await db.exec(select(TeachingAssignment))).one()
+            assignment.active = False; db.add(assignment); await db.flush()
+            await access.refresh_course(db, 3, 10)
+        self.assertFalse(await self.decision(2))
+
+    async def test_native_teacher_request_admin_connection_and_idempotent_private_access(self):
+        from dataclasses import replace
+        from types import SimpleNamespace
+        from contextlib import asynccontextmanager
+        from fastapi import FastAPI
+        import httpx
+        from src.route66_ext.routers import academic_classes as api, school_identity, class_connections as connections
+        from src.route66_ext.db.school_identity import NrruTeacherIdentity
+        teacher = replace(self.google, subject="synthetic-requesting-teacher", verified_email="fixture.teacher@nrru.ac.th", hosted_domain="nrru.ac.th")
+        identity_id = await self.link(user=2, proof=teacher); _, teacher_session = await self.login(teacher)
+        async with self.sessions.begin() as db:
+            db.add(NrruTeacherIdentity(user_id=2, identity_id=identity_id, officer_id="90001", officer_code="90002", name_th="ผู้สอนทดสอบ", name_en="Synthetic teacher"))
+        admin = replace(self.google, subject="synthetic-connecting-admin", verified_email="fixture-admin@example.com")
+        await self.link(user=3, proof=admin); _, admin_session = await self.login(admin)
+        config = SimpleNamespace(org_id=1, handoff=SimpleNamespace(client=SimpleNamespace(public_origin="https://learn.example.com")))
+        app = FastAPI(); app.include_router(api.router, prefix="/api/v1/academic-classes")
+        async def database():
+            async with self.sessions() as db: yield db
+        app.dependency_overrides[get_db_session] = database
+        @asynccontextmanager
+        async def source_resources(_): yield None, None
+        timetable = {"academic_year": 2569, "semester": 2, "classes": [{"registry_course_id": "100", "section": "P2", "course_code": "990001", "title": "Synthetic official course"}]}
+        with patch.object(school_identity, "settings", return_value=config), patch.object(connections, "resources", source_resources), patch.object(connections, "throttle", AsyncMock()), patch.object(connections, "teacher_timetable", AsyncMock(return_value=timetable)):
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://learn.example.com", headers={"Origin": "https://learn.example.com"}, cookies={"LH_access": teacher_session.access_token}) as learner:
+                path = "/api/v1/academic-classes/connections/requests"
+                body = {"registry_course_id": "100", "academic_year": 2569, "semester": 2, "section": "P2", "roster_url": "https://reg.nrru.ac.th/registrar/student_inclass_all.asp?classid=201&courseid=100&acadyear=2569&semester=2"}
+                denied = await learner.post(path, json=body, headers={"Origin": "https://foreign.invalid"})
+                self.assertEqual(denied.status_code, 403)
+                sent = await learner.post(path, json=body); self.assertEqual(sent.status_code, 200, sent.text)
+                ident = sent.json()["id"]; self.assertEqual((await learner.post(path, json=body)).json()["id"], ident)
+                self.assertEqual((await learner.post(f"{path}/{ident}/preview", json={"course_id": 10})).status_code, 403)
+                self.assertFalse(await self.decision(2))
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://learn.example.com", headers={"Origin": "https://learn.example.com"}, cookies={"LH_access": admin_session.access_token}) as owner:
+                self.assertEqual(len((await owner.get(path)).json()["requests"]), 1)
+                p = await owner.post(f"{path}/{ident}/preview", json={"course_id": 10})
+                self.assertEqual(p.status_code, 200, p.text)
+                apply_body = {"course_id": 10, "confirm_changes": True, "expected_fingerprint": p.json()["expected_fingerprint"], "request_id": uuid.uuid4().hex}
+                rejected = await owner.post(f"{path}/{ident}/connect", json={**apply_body, "confirm_changes": False})
+                self.assertEqual(rejected.status_code, 400)
+                connected = await owner.post(f"{path}/{ident}/connect", json=apply_body)
+                self.assertEqual(connected.status_code, 200, connected.text)
+                self.assertFalse(connected.json()["roster_imported"])
+                self.assertEqual((await owner.post(f"{path}/{ident}/connect", json=apply_body)).json()["class_id"], connected.json()["class_id"])
+        self.assertTrue(await self.decision(2)); self.assertFalse(await self.decision(2, AccessAction.UPDATE))
+        async with self.sessions() as db:
+            self.assertEqual(len((await db.exec(select(AcademicClass))).all()), 2)
+            self.assertEqual((await db.exec(select(AcademicRosterEntry))).all(), [])
+            self.assertEqual((await db.exec(select(Trail))).all(), [])
+            rows = (await db.exec(select(AcademicClassEvent).where(AcademicClassEvent.kind == "class_connection_completed"))).all()
+            self.assertEqual(len(rows), 1); self.assertEqual(rows[0].actor_user_id, 3)
+
+    async def test_roster_link_parser_rejects_cross_course_credentials_duplicate_ids_and_inference(self):
+        from src.route66_ext.routers.class_connections import roster_class_id
+        facts = {"registry_course_id": "100", "academic_year": 2569, "semester": 2}
+        valid = "https://reg.nrru.ac.th/registrar/student_inclass_all.asp?classid=201&courseid=100&acadyear=2569&semester=2"
+        self.assertEqual(roster_class_id(valid, facts), "201")
+        for value in (valid.replace("reg.nrru.ac.th", "elsewhere.invalid"), valid + "&CLASSID=201", valid.replace("courseid=100", "courseid=101"), valid.replace("https://", "https://user:secret@"), valid.replace("classid=201&", ""), valid.replace("classid=201", "classid=0201")):
+            with self.assertRaises(HTTPException): roster_class_id(value, facts)
 
     async def test_native_private_read_is_granted_only_to_matching_student(self):
         await self.active()
@@ -136,6 +279,12 @@ class LearningAccessTests(AcademicRosterTests):
         self.assertTrue(await self.decision(1))
 
     async def test_conflicting_verified_claims_remove_owned_membership_without_merge(self):
+        from src.route66_ext.db.academic_classes import TeachingAssignment
+        async with self.sessions.begin() as db:
+            # This case exercises two students, not the fixture's independent
+            # explicit teacher entitlement (which is tested separately).
+            assignment = (await db.exec(select(TeachingAssignment))).one()
+            assignment.active = False; db.add(assignment)
         await self.active(); await self.configure(); await self.claim(user=2)
         self.assertEqual(await self.members(), [])
         async with self.sessions() as db:
@@ -343,15 +492,17 @@ class LearningAccessTests(AcademicRosterTests):
         async with self.sessions() as db:
             self.assertTrue((await db.get(Course, 10)).public)
 
-    async def test_native_group_edits_are_detected_before_roster_mutation_commits(self):
+    async def test_native_group_drift_preserves_roster_and_requires_repair(self):
         await self.active(); await self.configure()
         async with self.sessions.begin() as db:
             db.add(UserGroupResource(usergroup_id=30, org_id=1, resource_uuid="course_fixture_11"))
-        with self.assertRaises(HTTPException):
-            await self.snapshot("6900000002")
+        await self.snapshot("6900000002")
+        self.assertEqual(await self.members(), [])
         async with self.sessions() as db:
-            entry = (await db.exec(select(AcademicRosterEntry))).one()
-            self.assertEqual(entry.missing_count, 0)
+            entries = (await db.exec(select(AcademicRosterEntry))).all()
+            self.assertEqual(len(entries), 2)
+            self.assertEqual(max(e.missing_count for e in entries), 1)
+            self.assertTrue(await access._events(db, "learning_access_pending", 10))
 
     async def test_native_admin_session_http_preview_confirm_apply_and_retry(self):
         from dataclasses import replace
@@ -400,12 +551,13 @@ class LearningAccessTests(AcademicRosterTests):
         from fastapi import FastAPI
         import httpx
 
+        async with self.engine.begin() as conn:
+            for model in (Chapter, CourseChapter):
+                await conn.run_sync(model.__table__.create)
         await self.link()
         _, session = await self.login(replace(self.google,
             verified_email="6900000001@nrru.ac.th", hosted_domain="nrru.ac.th"))
         await self.snapshot("6900000001")
-        async with self.sessions.begin() as db:
-            db.add(OrganizationConfig(org_id=1, config={"features": {"courses": {"enabled": True}}}))
         app = FastAPI(); app.include_router(native_courses_router(), prefix="/courses")
         async def database():
             async with self.sessions() as db:
@@ -419,9 +571,16 @@ class LearningAccessTests(AcademicRosterTests):
             granted = await client.get(path)
             self.assertEqual(granted.status_code, 200)
             self.assertEqual(granted.json()["course_uuid"], "course_fixture_10")
+            metadata = await client.get(path + "/meta")
+            self.assertEqual(metadata.status_code, 200)
+            self.assertEqual(metadata.json()["course_uuid"], "course_fixture_10")
+            self.assertEqual(metadata.json()["chapters"], [])
             async with self.sessions.begin() as db:
                 course = await db.get(Course, 10); course.published = False; db.add(course)
             self.assertEqual((await client.get(path)).status_code, 403)
+            # Exercise the full page metadata handler, not only its initial
+            # DASHBOARD check: the chapter reader retains the publication guard.
+            self.assertEqual((await client.get(path + "/meta")).status_code, 403)
             async with self.sessions.begin() as db:
                 course = await db.get(Course, 10); course.published = True; db.add(course)
                 config = (await db.exec(select(OrganizationConfig))).one()

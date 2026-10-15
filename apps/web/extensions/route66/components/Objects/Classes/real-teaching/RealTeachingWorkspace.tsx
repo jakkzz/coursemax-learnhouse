@@ -4,15 +4,16 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, CalendarClock, Clock3, MapPin } from 'lucide-react'
 import { Button } from '@/extensions/route66/adapters/ui'
-import type { AcademicClassLink, RegistrarClassContext } from './model'
+import { nativeCoursePath, type AcademicClassLink, type RegistrarClassContext } from './model'
+import { SectionConnection } from '../ClassConnections'
 import { weekdayKey } from '../../Account/subpages/timetable-colors'
 import colors from '../../Account/subpages/timetable-colors.module.css'
 import styles from './workspace.module.css'
 
 type View = 'overview' | 'timetable' | 'plan' | 'roster' | 'syllabus'
-export default function RealTeachingWorkspace({ context, linked, linksKnown, th, onClose, onOpenRoster }: {
+export default function RealTeachingWorkspace({ context, linked, linksKnown, th, onClose, onOpenRoster, onChanged }: {
   context: RegistrarClassContext; linked: AcademicClassLink | null; linksKnown: boolean; th: boolean
-  onClose: () => void; onOpenRoster: () => void
+  onClose: () => void; onOpenRoster: () => void; onChanged?: () => void
 }) {
   const [view, setView] = useState<View>('overview'), heading = useRef<HTMLHeadingElement>(null)
   useEffect(() => { window.scrollTo(0, 0); heading.current?.focus({ preventScroll: true }) }, [])
@@ -28,7 +29,7 @@ export default function RealTeachingWorkspace({ context, linked, linksKnown, th,
     dates: 'วันสอนที่บันทึกไว้', datesHelp: 'ตารางรายสัปดาห์ไม่ใช่แผนรายวัน เปิดกำหนดการชั้นเรียนเพื่อตรวจสอบวันสอน วันงดเรียน และวันชดเชยที่บันทึกไว้ ไม่สร้างวันหรือหัวข้อขึ้นจากตารางทะเบียน',
     openSchedule: 'เปิดกำหนดการชั้นเรียน', people: 'รายชื่อที่บันทึกไว้', peopleHelp: 'เปิดพื้นที่รายชื่อเดิมเพื่อตรวจสอบสมาชิกและสถานะบัญชี การเปิดหน้านี้ไม่ดึงหรือบันทึกรายชื่อนักศึกษาใหม่', openRoster: 'เปิดรายชื่อชั้นเรียน',
     outline: 'ประมวลรายวิชาเป็นเนื้อหาร่วมของรายวิชา', outlineHelp: 'ยังไม่ได้เชื่อมประมวลรายวิชาในหน้านี้ หากรายวิชาที่เผยแพร่มีเอกสารอยู่แล้ว ให้เปิดอ่านจากรายวิชานั้น ไม่สร้างผลลัพธ์การเรียนรู้ หัวข้อ หรือเกณฑ์คะแนนขึ้นเอง',
-    openCourse: 'เปิดรายวิชาที่เผยแพร่แล้ว', notReleased: 'เนื้อหารายวิชายังไม่เผยแพร่ ไม่ได้หมายความว่าไม่มีประมวลรายวิชา',
+    openCourse: 'เปิดรายวิชาที่เผยแพร่แล้ว', notReleased: 'บัญชีนี้ยังเปิดเนื้อหารายวิชาไม่ได้ ไม่ได้หมายความว่าไม่มีประมวลรายวิชา',
   } : {
     back: 'Back to My classes', section: 'Section', title: 'Class workspace', tasks: 'Class tasks',
     source: 'Your actual registrar timetable · Read-only', sourceHelp: 'Records belong to the signed-in account. Opening this page does not create a LearnHouse class, roster or dated sessions.',
@@ -40,9 +41,9 @@ export default function RealTeachingWorkspace({ context, linked, linksKnown, th,
     dates: 'Saved teaching dates', datesHelp: 'A weekly pattern is not a dated plan. Open the class schedule to review saved sessions, closures and make-up dates. No dates or topics are generated from the registrar listing.',
     openSchedule: 'Open class schedule', people: 'Saved class roster', peopleHelp: 'Use the existing roster workspace to inspect membership and account matches. Opening this page does not fetch or apply a new student roster.', openRoster: 'Open class roster',
     outline: 'The syllabus belongs to the course', outlineHelp: 'A syllabus is not connected here. Open the released course to consult an existing syllabus if provided. No outcomes, topics or grading policy are invented.',
-    openCourse: 'Open released course', notReleased: 'Course content is not released. This does not establish whether a syllabus exists.',
+    openCourse: 'Open released course', notReleased: 'Course content is not available to this account. This does not establish whether a syllabus exists.',
   }
-  const missing = <div className={styles.missing}><h3>{linksKnown ? t.unlinked : t.unknown}</h3><p>{linksKnown ? t.unlinkedHelp : t.unknownHelp}</p></div>
+  const missing = <div className={styles.missing}><h3>{linksKnown ? t.unlinked : t.unknown}</h3>{linksKnown ? <SectionConnection context={context} th={th} onChanged={onChanged ?? (() => {})} /> : <p>{t.unknownHelp}</p>}</div>
   return <section className={styles.workspace} aria-labelledby="real-class-title">
     <Button variant="ghost" className="min-h-11" onClick={onClose}><ArrowLeft size={16} aria-hidden="true" />{t.back}</Button>
     <header className={styles.heading}><h1 id="real-class-title" ref={heading} tabIndex={-1}>{c.title}</h1><p>{c.course_code} · {context.semester}/{context.academic_year} · {t.section} {c.section}</p></header>
@@ -54,7 +55,7 @@ export default function RealTeachingWorkspace({ context, linked, linksKnown, th,
     </div>}
     {view === 'plan' && <div className={styles.task} role="region" aria-label={t.plan}><h2>{t.dates}</h2><p>{t.datesHelp}</p>{linked ? <Link className={styles.action} href={`/attendance?class=${linked.id}`}>{t.openSchedule}</Link> : missing}</div>}
     {view === 'roster' && <div className={styles.task} role="region" aria-label={t.roster}><h2>{t.people}</h2><p>{t.peopleHelp}</p>{linked ? <Button className="min-h-11" variant="outline" onClick={onOpenRoster}>{t.openRoster}</Button> : missing}</div>}
-    {view === 'syllabus' && <div className={styles.task} role="region" aria-label={t.syllabus}><h2>{t.outline}</h2><p>{t.outlineHelp}</p>{linked ? linked.course_available ? <Link className={styles.action} href={`/course/${linked.course_uuid}`}>{t.openCourse}</Link> : <p>{t.notReleased}</p> : missing}</div>}
+    {view === 'syllabus' && <div className={styles.task} role="region" aria-label={t.syllabus}><h2>{t.outline}</h2><p>{t.outlineHelp}</p>{linked ? linked.course_available ? <Link className={styles.action} href={nativeCoursePath(linked.course_uuid)}>{t.openCourse}</Link> : <p>{t.notReleased}</p> : missing}</div>}
     <p className={styles.fetched}>{t.fetched}: <time dateTime={context.fetched_at}>{new Date(context.fetched_at).toLocaleString(th ? 'th-TH' : 'en-GB')}</time></p>
   </section>
 }

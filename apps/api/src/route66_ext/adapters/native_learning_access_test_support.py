@@ -8,6 +8,8 @@ from src.db.usergroups import UserGroup
 from src.db.usergroup_resources import UserGroupResource
 from src.db.usergroup_user import UserGroupUser
 from src.db.courses.courses import Course
+from src.db.courses.chapters import Chapter
+from src.db.courses.course_chapters import CourseChapter
 from src.db.courses.activities import Activity, ActivityTypeEnum, ActivitySubTypeEnum
 from src.db.resource_authors import ResourceAuthor
 from src.db.trails import Trail

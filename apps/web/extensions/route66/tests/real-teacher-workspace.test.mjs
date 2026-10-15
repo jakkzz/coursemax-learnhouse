@@ -1,7 +1,20 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import { linkedTeachingClass } from '../components/Objects/Classes/real-teaching/model.ts'
+import { linkedTeachingClass, nativeCoursePath } from '../components/Objects/Classes/real-teaching/model.ts'
+
+test('native course handoff strips exactly one API prefix and encodes one route segment',()=>{
+ assert.equal(nativeCoursePath('course_abc-123'),'/course/abc-123')
+ assert.equal(nativeCoursePath('course_synthetic_fixture'),'/course/synthetic_fixture')
+ assert.equal(nativeCoursePath('course_a/b?c#d'),'/course/a%2Fb%3Fc%23d')
+ const native=fs.readFileSync(new URL('../../../services/courses/courses.ts',import.meta.url),'utf8')
+ assert.match(native,/courses\/course_\$\{course_uuid\}\/meta/)
+ for(const file of ['ClassesWorkspace.tsx','real-teaching/RealTeachingWorkspace.tsx']){
+  const source=fs.readFileSync(new URL('../components/Objects/Classes/'+file,import.meta.url),'utf8')
+  assert.match(source,/href=\{nativeCoursePath\(/)
+  assert.doesNotMatch(source,/href=\{`\/course\/\$\{/)
+ }
+})
 
 const context={academic_year:2569,semester:1,fetched_at:'2026-10-15T00:00:00Z',classRow:{registry_course_id:'501',course_code:'TEST501',title:'Synthetic test fixture only',section:'S1',meetings:[{day:'Wednesday',start_time:'09:00',end_time:'12:00',details:'Original rotation description'}]}}
 const row={id:21,registry_course_id:'501',academic_year:2569,semester:1,section:'S1',manageable:true,course_uuid:'course_fixture',course_available:false}

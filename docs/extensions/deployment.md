@@ -1,6 +1,46 @@
 # Internal extension deployment records
 
-## Class connections and access recovery — implementation, 2026-10-15
+## Latest: class connections and access recovery — deployed 2026-10-15
+
+Live source **7bf6ed1fde349f9a580ff92ad610e742cf389b09**, image
+`coursemax-learnhouse:class-connections-7bf6ed1f`, ID
+`sha256:dbd796717b14505016aa02801f8353566b094e383aac811f5f38b3465b565d11`.
+Eight owned backend overlays and a rebuilt frontend on exact **396d1a01**. All
+1,001 API/config/migration hashes and 5,291 required web bytes/links/modes/owners
+verified; native runtime image configuration and parent rootfs prefix preserved.
+No new native hook, dependency, schema migration or activation environment change.
+
+209 full isolated PostgreSQL/native HTTP/auth/roster/attendance tests pass. A
+52-test focused recheck additionally exercises the actual native course-page metadata
+handler: released private content is readable after delegation, while unpublished
+content remains denied. 42 web and 13 boundary-tool tests, corrected full production
+bundle/types, separate generated-route types, and 12 compiled EN/TH desktop/mobile
+journeys pass. Four stateful journeys complete teacher request → explicit admin
+review/connect → reviewed roster apply/reload → native student course page → access
+repair, preserving manual readers/work. These use synthetic fixture APIs; native
+session/authorization/transactions are checked separately in PostgreSQL integration.
+Two live native-auth and four live bilingual desktop/mobile workspace flows pass.
+Approved owner Chrome verifies the real own section and usable request action without
+submitting it; the existing settings tab remains untouched. No real academic writes.
+
+Fresh protected DB/content/runtime backups and isolated socket-only restoration pass.
+Exact compatible **396d1a01** image is recoverable from a protected full saved bf4 OCI
+base plus verified 396d delta/config; the reconstructed archive was round-trip loaded.
+Only staging app recreated and gateway reloaded. Schema, account/provider ownership,
+profiles, audited grants, role permissions, academic evidence, groups, native learning
+progress, runtime/env and every other container ID preserved. Only four default-role
+`update_date` fields refresh through unchanged native startup; all other role fields
+individually verified. Source disclosure points to exact published owner-fork source.
+
+Protected release: `class-connections-7bf6ed1f-20261015`. App-only rollback to 396d
+refuses access-evidence-bearing recovery; use a compatible forward app fix instead.
+Never restore historical live DB/files/grants/evidence. Generated UI scratch was
+recoverably archived with full manifests and process/mount checks; no source, live
+data, images or protected backups pruned. CourseMax remains live and untouched.
+Actual course/roster review stays in the product; real migration, native enrollment
+automation, provider/device and full academic parity are not claimed.
+
+### Implementation contract
 
 The owned extension now includes teacher section requests, an administrator course/
 teaching/access review, quota-checked group provisioning, recoverable reading access,
@@ -11,9 +51,9 @@ backend-plus-validated-web context. Its parent is exact **396d1a01**, not bf4f29
 See [learning-access.md](learning-access.md) for the current authorization/recovery
 contract. The entry below records the previous live behavior, not the new policy.
 
-Source tests, bundle/types and compiled bilingual desktop/mobile workflows are
-validated separately from packaging and protected app deployment. This implementation
-entry alone is not a claim of live deployment or real academic migration.
+The validation and protected deployment above supersede the previous inactive
+release below. They do not authorize inferred course equivalence, unreviewed real
+roster import, historical migration, data deletion or platform cutover.
 
 ## Previous: inactive learning-access backend — 2026-10-15
 

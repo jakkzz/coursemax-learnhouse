@@ -1,6 +1,6 @@
 # Class connections and roster-based native course access
 
-Implementation update, 2026-10-15. Release validation/deployment is recorded in
+Deployed source **7bf6ed1f**, 2026-10-15. Release validation/deployment is recorded in
 [deployment.md](deployment.md) and the private current-release record. The prior
 396d1a01 backend was inactive; its extra activation flag is now removed. Normal
 native-session administrator review in the product is the approval boundary.
@@ -120,7 +120,7 @@ writers, never silently overwritten.
 ## Validation
 
 ```sh
-LEARNHOUSE_API_TEST_IMAGE=coursemax-learnhouse:learning-access-396d1a01 \
+LEARNHOUSE_API_TEST_IMAGE=coursemax-learnhouse:class-connections-7bf6ed1f \
 LEARNHOUSE_TEST_LEARNING_ACCESS=1 \
   bash deploy/staging/test_attendance_postgres.sh
 python3 -B scripts/extensions/check_boundary.py

@@ -1,6 +1,18 @@
 # Internal extension deployment records
 
-## Latest: teacher school workspace — 2026-10-15
+## Latest: registrar timetable color — 2026-10-15
+
+Live source/image **4d9b24e0**, frontend-only overlay on teacher-workspace parent
+**7fe104c9**. See [registrar-timetable-color.md](registrar-timetable-color.md).
+5,286 baked web entries verified;995 measured backend/config/migration files unchanged.
+33 web/13 boundary tests,full bundle/types,four compiled bilingual teacher flows,
+four live workspace/two native-auth flows and actual owner teacher Chrome pass.
+Labelled weekday categories,AA contrast,forced colors and color-vision simulations
+checked. Protected backups/isolated DB restore/saved parent retained;schema/identity/
+grants/runtime/other containers unchanged. App only replaced,gateway reloaded;
+no migration/import/assignment/roster/student-account/message/security changes.
+
+## Previous: teacher school workspace — 2026-10-15
 
 Live `learn.route66.click`: source/image **7fe104c9**, frontend-only overlay on
 attendance-capable **fe1877c9**. See [teacher-school-workspace.md](teacher-school-workspace.md).

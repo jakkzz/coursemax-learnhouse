@@ -1,6 +1,35 @@
 # Internal extension deployment records
 
-## Latest: remove live teaching demonstration — 2026-10-15
+## Latest: actual registrar class workspace — 2026-10-15
+
+Live source/image **f9bc5b2a**, frontend-only on exact compatible **4d9b24e0** parent.
+See [real-teacher-workspace.md](real-teacher-workspace.md). Open each actual registrar
+section into Overview/Timetable/Teaching plan/Roster/Syllabus;original meetings
+preserved. Exact unambiguous authorized links hand off to canonical workspaces;
+missing setup/content stays explicit. The simulator source/entry is deleted,not
+relabeled. No new native hooks,API/schema,permissions,student import or generation.
+
+5,295 baked web entries verified;995 measured backend/config/migration files unchanged.
+38web/13boundary-tool tests,full bundle/post-bundle tsc,separate route-typegen/tsc,
+6compiled EN/TH1440/1920/390 journeys pass,including ambiguous-link refusal and
+canonical roster/released-course handoffs. No academic writes/page errors/overflow.
+One detector[];inline finish/documenter verdict ship(not independent);DESIGN unchanged.
+4live bootstrap workspace/2native-auth flows pass with private/origin/anonymous guards.
+Actual owner Chrome separately opens all3real1/2569 sections,Overview/Timetable each,
+and all5tasks for000204/P7;no fabricated proof/session copying. Tab released.
+
+Fresh protected backups/isolated socket-only DB restore and saved exact4d parent
+checksum/config digest passed. Only app recreated/gateway reloaded;schema,identity/
+provider/profile keys,grants,runtime/env and other service IDs unchanged. Source menu
+exactf9bc5b2a. App-only rollback retains new data/evidence,never restores old DB/files.
+All7checked academic tables remain0;real class mapping/assignment/roster and actual
+approved teaching plans/syllabi remain absent,not invented. No CourseMax changes.
+Owner-authorized bounded cleanup archived/verified49,970entries before removing8old
+rebuildable tmpfs UI copies(1.30876GiB);no app data/source/images/existing backups
+removed. Headroom recovered;failed attempts retained. Final12.32GiB disk/4.33GiB RAM;
+recheck before further heavy work. Protected release:real-teacher-f9bc5b2a-20261015.
+
+## Previous recovery: remove live teaching demonstration — 2026-10-15
 
 Owner rejected dummy roster/data. Live app recovered to the previously validated
 exact **4d9b24e0** image;healthy,source menu/release pointer restored accordingly.
@@ -12,8 +41,8 @@ performed on live. Actual signed-in owner Chrome confirms own1/2569three section
 and absence of fictional entry. Four simulation source files/retired test removed
 from pending source;protected release/Git provenance retained.
 
-Pending real5-task UI is not deployed:38web tests/boundary pass,but production build
-timed out without accepted archives. Actual class mapping/assignment and roster
+At that recovery checkpoint,the real5-task UI was not yet deployed:38web tests/
+boundary passed,but production build had timed out without accepted archives. Actual class mapping/assignment and roster
 import are unconfigured;official teaching plan/syllabus sources still required.
 Do not relabel fictional data or infer real content from timetable facts. See
 [real-teacher-workspace.md](real-teacher-workspace.md). Private recovery evidence:
@@ -21,7 +50,7 @@ remove-dummy-teaching-20261015. No new cleanup/prune,privilege or student-data i
 
 ## Retired: fictional teacher planning preview — 2026-10-15
 
-Live source/image **c52f2e7b**, frontend-only on exact **4d9b24e0** parent.
+Previously served source/image **c52f2e7b**, frontend-only on exact **4d9b24e0** parent.
 See [teacher-planning-preview.md](teacher-planning-preview.md). Teacher discovery
 entry in My classes; weekly timetable, dated plan, roster and shared syllabus use
 fictional component-memory data only, discarded on exit/reload. No new native hook,
@@ -36,7 +65,7 @@ replaced,gateway reloaded;schema,identity ownership/grants,runtime/environment a
 other container IDs unchanged. Source menu exactc52f2e7b;owner-fork push only.
 Brief2.91GiB post-workspace memory pause respected;remaining tests resumed above
 floor and pass. Final checkpoint12.95GiB disk/3.19GiB RAM;recheck before heavy work.
-Current protected release:teacher-preview-c52f2e7b-20261015. No additional cleanup.
+Retained historical protected release:teacher-preview-c52f2e7b-20261015. This is not the current live release.
 
 ## Previous: registrar timetable color — 2026-10-15
 

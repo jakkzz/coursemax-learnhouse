@@ -1,6 +1,8 @@
 # Teacher planning preview
 
-Status: deployed on owner approval, source/image **c52f2e7b**, healthy at `learn.route66.click`. Open **My classes → Preview teaching workspace**. Fictional teacher-only preview, not a working academic generator. Owner confirmed all three meanings of class table (weekly grid, dated teaching plan, roster), and a teacher-only clickable preview first. Audit areas B01–B03/C01; no parity acceptance or real academic writer implied.
+Status: **retired and removed from live use on owner request, 2026-10-15**. Live recovered to validated **4d9b24e0**; four simulation modules and their retired unit test removed from pending source. No saved academic roster rows existed to purge. Protected release/Git provenance remains; the following is a historical record, not current UI or permission to restore the simulator. See [real-teacher-workspace.md](real-teacher-workspace.md).
+
+Originally source/image **c52f2e7b**, an approved fictional teacher-only preview, not a working academic generator. Owner confirmed all three meanings of class table (weekly grid, dated teaching plan, roster), and a teacher-only clickable preview first. Audit areas B01–B03/C01; no parity acceptance or real academic writer implied.
 
 ## Direction contract
 

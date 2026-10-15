@@ -7,7 +7,9 @@ import { Button } from '@/extensions/route66/adapters/ui'
 import SchoolTimetable from '../Account/subpages/SchoolTimetable'
 import { confirmedStaff, type StaffProjection } from '../Account/subpages/school-workspace-model'
 
-export default function TeacherTimetable({ th, collapsed = false, onStaffStatus }: { th: boolean; collapsed?: boolean; onStaffStatus?: (staff: boolean) => void }) {
+import type { RegistrarClassContext } from './real-teaching/model'
+
+export default function TeacherTimetable({ th, collapsed = false, onStaffStatus, onOpenClass }: { th: boolean; collapsed?: boolean; onStaffStatus?: (staff: boolean) => void; onOpenClass?: (context: RegistrarClassContext) => void }) {
   const [expanded, setExpanded] = useState(!collapsed)
   const [status, setStatus] = useState<StaffProjection | null>(null)
   const [failed, setFailed] = useState(false)
@@ -30,7 +32,7 @@ export default function TeacherTimetable({ th, collapsed = false, onStaffStatus 
   </div>
   if (!status) return <p role="status" className="flex items-center gap-2 text-sm text-neutral-600"><Loader2 size={16} className="animate-spin" aria-hidden="true" />{th ? 'กำลังตรวจสอบตารางสอนของคุณ…' : 'Checking your teaching timetable…'}</p>
   if (confirmedStaff(status) && status.directory_identity) {
-    const timetable = <SchoolTimetable staffId={status.directory_identity.officer_id} teacherName={status.directory_identity.name_th} />
+    const timetable = <SchoolTimetable staffId={status.directory_identity.officer_id} teacherName={status.directory_identity.name_th} onOpenClass={onOpenClass} />
     return collapsed ? <details className="border-t border-neutral-200 pt-4" onToggle={event => setExpanded(event.currentTarget.open)}><summary className="min-h-11 cursor-pointer text-sm font-medium">{th ? 'ตารางสอนจากทะเบียน (อ่านอย่างเดียว)' : 'Registrar timetable (read-only)'}</summary>{expanded && timetable}</details> : timetable
   }
   if (status.school_kind !== 'staff') return null

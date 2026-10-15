@@ -1,6 +1,25 @@
 # Internal extension deployment records
 
-## Latest: fictional teacher planning preview — 2026-10-15
+## Latest: remove live teaching demonstration — 2026-10-15
+
+Owner rejected dummy roster/data. Live app recovered to the previously validated
+exact **4d9b24e0** image;healthy,source menu/release pointer restored accordingly.
+The fictional teaching workspace is no longer served;actual own registrar timetable
+remains. Fresh protected backups and isolated DB identity restore/checksums passed;
+only app replaced/gateway reloaded,identity/grants/runtime/other services preserved.
+Seven checked academic tables had zero rows;no academic data purge or DB restore
+performed on live. Actual signed-in owner Chrome confirms own1/2569three sections
+and absence of fictional entry. Four simulation source files/retired test removed
+from pending source;protected release/Git provenance retained.
+
+Pending real5-task UI is not deployed:38web tests/boundary pass,but production build
+timed out without accepted archives. Actual class mapping/assignment and roster
+import are unconfigured;official teaching plan/syllabus sources still required.
+Do not relabel fictional data or infer real content from timetable facts. See
+[real-teacher-workspace.md](real-teacher-workspace.md). Private recovery evidence:
+remove-dummy-teaching-20261015. No new cleanup/prune,privilege or student-data import.
+
+## Retired: fictional teacher planning preview — 2026-10-15
 
 Live source/image **c52f2e7b**, frontend-only on exact **4d9b24e0** parent.
 See [teacher-planning-preview.md](teacher-planning-preview.md). Teacher discovery

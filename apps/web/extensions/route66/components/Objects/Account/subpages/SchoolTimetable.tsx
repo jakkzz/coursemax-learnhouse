@@ -8,23 +8,23 @@ import { filterTimetable, readSavedTerm, timetableYears, type RegistrarTerm } fr
 import { weekdayKey } from './timetable-colors'
 import colors from './timetable-colors.module.css'
 
-type Timetable = { academic_year: number; semester: number; fetched_at: string; classes: { registry_course_id: string; course_code: string; title: string; section: string; meetings: { day: string; start_time: string; end_time: string; details: string }[] }[] }
+import type { RegistrarTimetable as Timetable, RegistrarClassContext } from '../../Classes/real-teaching/model'
 
-export default function SchoolTimetable({ staffId, teacherName }: { staffId: string; teacherName?: string }) {
+export default function SchoolTimetable({ staffId, teacherName, onOpenClass }: { staffId: string; teacherName?: string; onOpenClass?: (context: RegistrarClassContext) => void }) {
   const { i18n } = useTranslation(), th = i18n.language.startsWith('th')
-  const yearId = useId(), semesterId = useId(), searchId = useId()
+  const yearId = useId(), semesterId = useId(), searchId = useId(), workspaceId = useId()
   const t = th ? {
     title: 'ตารางสอนจากทะเบียน', note: 'ตารางสอนจากทะเบียนมหาวิทยาลัย แยกจากชั้นเรียนในระบบ การแสดงข้อมูลนี้ไม่มอบหมายรายวิชาและไม่เพิ่มสมาชิกโดยอัตโนมัติ',
     year: 'ปีการศึกษา (พ.ศ.)', term: 'ภาคเรียน', loading: 'กำลังดึงตารางสอน…', error: 'ดึงตารางสอนไม่ได้ โปรดลองอีกครั้ง', retry: 'ลองอีกครั้ง',
     empty: 'ทะเบียนไม่แสดงชั้นเรียนในภาคเรียนนี้', emptyHelp: 'ลองเลือกภาคเรียนหรือปีการศึกษาอื่น ข้อมูลนี้ไม่ได้หมายความว่าคุณไม่มีรายวิชาที่ได้รับมอบหมายในระบบ',
     asof: 'ดึงข้อมูลเมื่อ', section: 'กลุ่มเรียน', readonly: 'ข้อมูลทะเบียน · อ่านอย่างเดียว', teacher: 'ตารางสอนของ',
-    search: 'ค้นหาวิชา กลุ่มเรียน วัน หรือห้อง', noMatch: 'ไม่พบชั้นเรียนที่ตรงกับคำค้น', clear: 'ล้างคำค้น', results: 'กลุ่มเรียน',
+    search: 'ค้นหาวิชา กลุ่มเรียน วัน หรือห้อง', noMatch: 'ไม่พบชั้นเรียนที่ตรงกับคำค้น', clear: 'ล้างคำค้น', results: 'กลุ่มเรียน', openClass: 'เปิดพื้นที่ชั้นเรียน',
   } : {
     title: 'Registrar timetable', note: 'Your university timetable, separate from LearnHouse classes. These entries do not assign courses or enroll students automatically.',
     year: 'Academic year (Buddhist Era)', term: 'Semester', loading: 'Loading registrar timetable…', error: 'The registrar timetable could not be loaded. Try again.', retry: 'Try again',
     empty: 'No registrar classes for this semester', emptyHelp: 'Try another semester or academic year. This does not describe your LearnHouse teaching assignments.',
     asof: 'Fetched', section: 'Section', readonly: 'Registrar data · Read-only', teacher: 'Timetable for',
-    search: 'Search course, section, day or room', noMatch: 'No classes match your search', clear: 'Clear search', results: 'sections',
+    search: 'Search course, section, day or room', noMatch: 'No classes match your search', clear: 'Clear search', results: 'sections', openClass: 'Open class workspace',
   }
   const [data, setData] = useState<Timetable | null>(null), [selection, setSelection] = useState<RegistrarTerm | null>(null)
   const [ready, setReady] = useState(false), [error, setError] = useState(false), [busy, setBusy] = useState(true), [attempt, setAttempt] = useState(0), [query, setQuery] = useState('')
@@ -82,6 +82,7 @@ export default function SchoolTimetable({ staffId, teacherName }: { staffId: str
           : <ul className="-mx-4 divide-y divide-neutral-200 border-y border-neutral-200 sm:-mx-6">{visible.map(c => <li key={`${c.registry_course_id}-${c.section}`} className="space-y-3 px-4 py-5 sm:px-6">
             <div><p className="inline-flex rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold tabular-nums text-blue-900">{c.course_code} · {t.section} {c.section}</p><h3 className="mt-2 break-words text-base font-semibold text-blue-950">{c.title}</h3></div>
             <ul className="space-y-3">{c.meetings.map((m, index) => <li key={index} className="space-y-1.5 text-sm"><p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium tabular-nums text-blue-950"><span className={colors.day} data-weekday={weekdayKey(m.day)}><Clock3 size={14} className="shrink-0" aria-hidden="true" /><span className="min-w-0 break-words">{m.day}</span></span><span aria-hidden="true">{' · '}</span><span>{m.start_time}–{m.end_time}</span></p>{m.details && <p className="flex items-start gap-2 leading-relaxed text-neutral-600"><MapPin size={16} className="mt-0.5 shrink-0 text-blue-700" aria-hidden="true" /><span className="min-w-0 break-words">{m.details}</span></p>}</li>)}</ul>
+            {onOpenClass && <Button id={`${workspaceId}-${c.registry_course_id}-${encodeURIComponent(c.section)}`} variant="outline" className="min-h-11" aria-label={`${t.openClass}: ${c.course_code} ${c.section}`} onClick={() => onOpenClass({ classRow: c, academic_year: data.academic_year, semester: data.semester, fetched_at: data.fetched_at, returnFocusId: `${workspaceId}-${c.registry_course_id}-${encodeURIComponent(c.section)}` })}>{t.openClass}</Button>}
           </li>)}</ul>}
         <p className="text-xs tabular-nums text-neutral-600">{t.asof}: <time dateTime={data.fetched_at}>{new Date(data.fetched_at).toLocaleString(th ? 'th-TH' : 'en-GB')}</time></p>
       </>}

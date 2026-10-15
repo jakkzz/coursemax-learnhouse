@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, BadgeCheck, BookOpen, Clock3, ExternalLink, GraduationCap, Info, Loader2, Search, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, ArrowRight, BadgeCheck, Clock3, ExternalLink, Info, Loader2, Search, ShieldCheck } from 'lucide-react'
 import { Button } from '@/extensions/route66/adapters/ui'
 import { toast } from 'react-hot-toast'
 import styles from './school-identity.module.css'
 import SchoolTimetable from './SchoolTimetable'
+import SchoolWorkspaceNav from './SchoolWorkspaceNav'
 import StudentRegistrarDetails from './StudentRegistrarDetails'
 
 type Candidate = { officer_id: string; officer_code: string; name_th: string; name_en: string }
@@ -17,14 +18,18 @@ const words = {
  th: { title:'ข้อมูลสถานศึกษาของฉัน', classes:'ชั้นเรียนของฉัน', intro:'ยืนยันชื่อของคุณในทะเบียนบุคลากร มหาวิทยาลัยราชภัฏนครราชสีมา (NRRU) การยืนยันนี้ไม่เปลี่ยนบัญชี Google หรือ LINE ไม่ให้สิทธิ์ผู้ดูแล และไม่เพิ่มชื่อเข้าชั้นเรียน', loading:'กำลังตรวจสอบข้อมูลสถานศึกษา…', failed:'โหลดข้อมูลสถานศึกษาไม่ได้ โปรดลองอีกครั้ง', retry:'ลองอีกครั้ง', google:'เข้าสู่ระบบด้วย Google ของมหาวิทยาลัยอีกครั้ง', googleHelp:'ต้องยืนยันบัญชี Google ของมหาวิทยาลัยจากฝั่งเซิร์ฟเวอร์ ใช้บัญชีมหาวิทยาลัยเดิมของคุณ โดยไม่รวมบัญชีเข้าด้วยกัน', ineligible:'บัญชี Google นี้ไม่เข้าเกณฑ์ค้นหาทะเบียนบุคลากร บัญชีนักศึกษาและบัญชีส่วนตัวใช้ขั้นตอนแยกกัน', search:'ค้นหาชื่อของฉันในทะเบียนบุคลากร', searching:'กำลังค้นหาทะเบียนบุคลากร…', hint:'ชื่อที่ค้นหาจากอีเมลที่ยืนยันแล้ว', results:'เลือกชื่อของคุณในทะเบียน', empty:'ไม่พบชื่อที่ตรงกัน', emptyHelp:'ทะเบียนมหาวิทยาลัยไม่พบชื่อบุคลากรที่ตรงกัน โปรดตรวจสอบบัญชีหรือติดต่อผู้ดูแล', own:'ฉันยืนยันว่าชื่อนี้เป็นชื่อของฉันในทะเบียนบุคลากร', confirm:'ยืนยันชื่อของฉัน', confirmed:'ยืนยันชื่อในทะเบียนแล้ว', confirmedHelp:'เป็นการยืนยันด้วยตนเอง ไม่ใช่การอนุมัติจากมหาวิทยาลัย หากต้องแก้ไขหรือมีข้อโต้แย้งเรื่องเจ้าของบัญชี ต้องให้ผู้ดูแลตรวจสอบ', noCourses:'ยังไม่มีรายวิชาที่ได้รับมอบหมาย', noCoursesHelp:'การยืนยันชื่อไม่เพิ่มรายวิชา ชั้นเรียนจะปรากฏเมื่อผู้ดูแลจับคู่กับการมอบหมายงานสอนโดยตรงแล้วเท่านั้น', school:'ข้อมูลสถานศึกษา', conflict:'บันทึกการยืนยันไม่ได้ โปรดค้นหาใหม่ หากชื่อนี้เชื่อมกับบัญชีอื่นแล้ว ให้ติดต่อผู้ดูแลเพื่อตรวจสอบ', source:'ทะเบียนมหาวิทยาลัยราชภัฏนครราชสีมา (NRRU)', unavailable:'ติดต่อทะเบียนมหาวิทยาลัยไม่ได้ โปรดลองใหม่ภายหลัง', student:'บัญชีนักศึกษามหาวิทยาลัยราชภัฏนครราชสีมา (NRRU)', identifier:'รหัสนักศึกษาจากอีเมล Google ที่ยืนยันแล้ว', pendingData:'รอจับคู่กับรายชื่อชั้นเรียน โปรดให้ผู้สอนตั้งค่าชั้นเรียนและดึงรายชื่อจากทะเบียน ชื่อ คำนำหน้า คณะ สาขาวิชา และชั้นเรียนจะปรากฏเมื่อรหัสนักศึกษาที่คุณยืนยันตรงกับรายชื่อดังกล่าว ไม่ต้องเข้าสู่ระบบทะเบียนนักศึกษา และข้อความนี้ไม่ได้หมายความว่าคุณไม่มีชั้นเรียน', officialName:'ชื่อและคำนำหน้าตามทะเบียน', stateLoading:'กำลังตรวจสอบ', stateFailed:'ใช้งานไม่ได้', stateConfirmed:'ยืนยันแล้ว', stateWaiting:'รอจับคู่รายชื่อ', stateSignin:'ต้องเข้าสู่ระบบอีกครั้ง', stateSearch:'ยังไม่ได้ยืนยัน', stateIneligible:'ไม่เข้าเกณฑ์', navLabel:'หน้าข้อมูลสถานศึกษา'  },
 }
 // Status colour is a second channel only: every state also states itself in words.
-const navLink = 'inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors'
+const teacherWords = {
+ en: { intro: 'Your directory record, linked to this account. View your teaching timetable and classes in My classes.', meaning: 'What this confirmation means', next: 'View my classes', nextHelp: 'Your registrar timetable and LearnHouse classes are shown separately.' },
+ th: { intro: 'ชื่อในทะเบียนบุคลากรที่เชื่อมกับบัญชีนี้ ดูตารางสอนและชั้นเรียนได้ที่ชั้นเรียนของฉัน', meaning: 'การยืนยันนี้หมายถึงอะไร', next: 'ดูชั้นเรียนของฉัน', nextHelp: 'แสดงตารางสอนจากทะเบียนแยกจากชั้นเรียนในระบบ' },
+}
 
 export default function SchoolIdentity({ classes = false }: { classes?: boolean }) {
  const { i18n } = useTranslation()
  // Match the English server render before applying the saved browser locale.
  const [mounted,setMounted] = useState(false)
  useEffect(()=>setMounted(true),[])
- const t = words[mounted&&i18n.language.startsWith('th') ? 'th' : 'en']
+ const th = mounted && i18n.language.startsWith('th')
+ const t = words[th ? 'th' : 'en'], teacher = teacherWords[th ? 'th' : 'en']
  const [status,setStatus] = useState<Status | null>(null), [error,setError] = useState(''), [busy,setBusy] = useState(false), [retry,setRetry] = useState(0)
  const [search,setSearch] = useState<{search_id:string;candidates:Candidate[]} | null>(null), [selected,setSelected] = useState(''), [own,setOwn] = useState(false)
  useEffect(()=>{if(!mounted)return;const controller=new AbortController();setStatus(null);setError('');const timeout=setTimeout(()=>{setError(t.failed);controller.abort()},12000)
@@ -45,11 +50,8 @@ export default function SchoolIdentity({ classes = false }: { classes?: boolean 
   ineligible:{tone:'bg-neutral-100 text-neutral-700',icon:<Info size={14}/>,label:t.stateIneligible},
  }[state]
  return <section className={`${styles.workspace} space-y-6 text-neutral-900`} aria-labelledby="school-title">
-  <div><h1 id="school-title" className="text-3xl font-semibold tracking-tight">{classes?t.classes:t.title}</h1><p className="mt-2 max-w-prose text-sm leading-relaxed text-neutral-600">{status?.school_kind==='student'?(i18n.language.startsWith('th')?'ข้อมูลสถานศึกษาของคุณมาจากรายชื่อชั้นเรียนในทะเบียน การจับคู่ไม่เปลี่ยนชื่อโปรไฟล์หรือวิธีเข้าสู่ระบบของคุณ':'Your school details come from your official class roster. Matching does not change your profile name or sign-in methods.'):t.intro}</p></div>
-  <nav aria-label={t.navLabel} className="flex flex-wrap gap-2 text-sm">
-   <Link className={`${navLink} ${classes?'bg-blue-50 text-blue-700 outline outline-1 outline-blue-200':'text-neutral-700 hover:bg-neutral-100'}`} aria-current={classes?'page':undefined} href="/classes"><BookOpen size={18} className={classes?'text-blue-600':'text-neutral-500'}/>{t.classes}</Link>
-   <Link className={`${navLink} ${classes?'text-neutral-700 hover:bg-neutral-100':'bg-blue-50 text-blue-700 outline outline-1 outline-blue-200'}`} aria-current={classes?undefined:'page'} href="/account/school-identity"><GraduationCap size={18} className={classes?'text-neutral-500':'text-blue-600'}/>{t.school}</Link>
-  </nav>
+  <div><h1 id="school-title" className="text-3xl font-semibold tracking-tight">{classes?t.classes:t.title}</h1><p className="mt-2 max-w-prose text-sm leading-relaxed text-neutral-600">{status?.school_kind==='student'?(i18n.language.startsWith('th')?'ข้อมูลสถานศึกษาของคุณมาจากรายชื่อชั้นเรียนในทะเบียน การจับคู่ไม่เปลี่ยนชื่อโปรไฟล์หรือวิธีเข้าสู่ระบบของคุณ':'Your school details come from your official class roster. Matching does not change your profile name or sign-in methods.'):status?.directory_identity?teacher.intro:t.intro}</p></div>
+  <SchoolWorkspaceNav active={classes?'classes':'identity'} th={th} />
   <div className="overflow-hidden rounded-xl bg-white nice-shadow">
    <p className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold ${banner.tone}`}>{banner.icon}{banner.label}</p>
    <div className="space-y-6 p-4 sm:p-6">
@@ -60,11 +62,11 @@ export default function SchoolIdentity({ classes = false }: { classes?: boolean 
     {status&&!status.needs_google_signin&&!status.eligible&&status.school_kind!=='student'&&<p className="flex max-w-prose gap-2.5 text-sm leading-relaxed text-neutral-700"><Info size={16} className="mt-0.5 shrink-0 text-neutral-500"/>{t.ineligible}</p>}
     {status?.eligible&&!status.directory_identity&&<div className="space-y-4"><p className="text-sm text-neutral-600">{t.hint}: <strong className="font-semibold text-neutral-900">{status.search_hint}</strong></p><Button className="min-h-11" disabled={busy} onClick={find}>{busy?t.searching:t.search}</Button></div>}
     {search&&<fieldset className="space-y-4"><legend className="mb-3 text-lg font-semibold">{t.results}</legend>{search.candidates.length===0?<div><h2 className="font-semibold">{t.empty}</h2><p className="mt-2 max-w-prose text-sm leading-relaxed text-neutral-600">{t.emptyHelp}</p></div>:<><div className="-mx-4 divide-y divide-neutral-200 border-y border-neutral-200 sm:-mx-6">{search.candidates.map(c=><label key={c.officer_id} className={`flex min-h-11 cursor-pointer items-start gap-3 px-4 py-4 transition-colors sm:px-6 ${selected===c.officer_id?'bg-blue-50':'hover:bg-neutral-50'}`}><input className="mt-1 accent-blue-700" type="radio" name="directory-record" value={c.officer_id} checked={selected===c.officer_id} onChange={()=>{setSelected(c.officer_id);setOwn(false)}}/><span className="min-w-0 break-words"><strong className={`block text-sm ${selected===c.officer_id?'text-blue-900':''}`}>{c.name_th}</strong><span className="mt-1 block text-sm text-neutral-600">{c.name_en}</span><span className="mt-1 block text-xs tabular-nums text-neutral-500">{c.officer_code}</span></span></label>)}</div><label className="flex min-h-11 items-start gap-3 text-sm leading-relaxed"><input type="checkbox" className="mt-1 accent-blue-700" checked={own} disabled={!selected||busy} onChange={e=>setOwn(e.target.checked)}/>{t.own}</label><Button className="min-h-11" disabled={!selected||!own||busy} onClick={confirm}>{t.confirm}</Button></>}</fieldset>}
-    {status?.directory_identity&&<div className="space-y-2"><h2 className="text-lg font-semibold">{t.officialName}</h2><p className="text-xl font-semibold tracking-tight">{status.directory_identity.name_th}</p><p className="text-sm text-neutral-700">{status.directory_identity.name_en}</p><p role="status" className="flex items-center gap-1.5 pt-1 text-sm font-medium text-emerald-700"><BadgeCheck size={16}/>{t.confirmed}</p><p className="max-w-prose text-sm leading-relaxed text-neutral-600">{t.confirmedHelp}</p></div>}
+    {status?.directory_identity&&<div className="space-y-2"><h2 className="text-lg font-semibold">{t.officialName}</h2><p className="text-xl font-semibold tracking-tight">{status.directory_identity.name_th}</p><p className="text-sm text-neutral-700">{status.directory_identity.name_en}</p><p className="max-w-prose pt-1 text-sm leading-relaxed text-neutral-600">{t.confirmedHelp}</p><details className="border-t border-neutral-200 pt-3"><summary className="min-h-11 cursor-pointer text-sm font-medium">{teacher.meaning}</summary><p className="max-w-prose pb-3 text-sm leading-relaxed text-neutral-600">{t.intro}</p></details>{!classes&&<div className="space-y-2 border-t border-neutral-200 pt-4"><Link href="/classes" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-neutral-900 px-4 text-sm font-medium text-white hover:bg-neutral-800">{teacher.next}<ArrowRight size={16} aria-hidden="true"/></Link><p className="text-sm leading-relaxed text-neutral-600">{teacher.nextHelp}</p></div>}</div>}
     {classes&&status?.eligible&&<div className="space-y-2"><h2 className="text-lg font-semibold">{t.noCourses}</h2><p className="flex max-w-prose gap-2.5 text-sm leading-relaxed text-neutral-700"><Info size={16} className="mt-0.5 shrink-0 text-neutral-500"/>{t.noCoursesHelp}</p></div>}
    </div>
   </div>
-  {status?.directory_identity&&<SchoolTimetable staffId={status.directory_identity.officer_id}/>}
+  {classes&&status?.directory_identity&&<SchoolTimetable staffId={status.directory_identity.officer_id}/>}
   {status?.school_kind!=='student'&&<a className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-blue-700 underline underline-offset-4 hover:text-blue-900" href="https://reg.nrru.ac.th/registrar/teach_time.asp?avs671304179=1" target="_blank" rel="noopener noreferrer">{t.source}<ExternalLink size={14}/></a>}
  </section>
 }

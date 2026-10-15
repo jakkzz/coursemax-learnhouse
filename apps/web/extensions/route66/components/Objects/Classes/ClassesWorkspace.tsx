@@ -9,6 +9,10 @@ import { toast } from 'react-hot-toast'
 import styles from '../Account/subpages/school-identity.module.css'
 import SchoolWorkspaceNav from '../Account/subpages/SchoolWorkspaceNav'
 import TeacherTimetable from './TeacherTimetable'
+import dynamic from 'next/dynamic'
+import { canPreviewTeaching } from './teaching-preview/model'
+
+const TeacherPlanningPreview = dynamic(() => import('./teaching-preview/TeacherPlanningPreview'))
 
 type ClassRow={id:number;course_id:number;course_uuid:string;course_name:string;course_available:boolean;academic_year:number;semester:number;section:string;manageable:boolean;version:number;active_count:number|null;last_synced_at:string|null;registry_course_id:string|null;registry_class_id:string|null}
 type Person={id:number;student_number:string|null;full_name_th:string;faculty:string;program:string;source:string;status:string;account_status:string;missing_count:number}
@@ -29,6 +33,7 @@ export default function ClassesWorkspace(){
  const {i18n}=useTranslation(),[mounted,setMounted]=useState(false);useEffect(()=>setMounted(true),[]);const t=copy[mounted&&i18n.language.startsWith('th')?'th':'en']
  const th = mounted && i18n.language.startsWith('th'), workspace = workspaceCopy[th ? 'th' : 'en']
  const [isSchoolStaff,setIsSchoolStaff] = useState(false)
+ const [planningPreview,setPlanningPreview] = useState(false)
  const [data,setData]=useState<{classes:ClassRow[];can_create:boolean;student_match_status:string|null}|null>(null),[catalog,setCatalog]=useState<Catalog|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[refresh,setRefresh]=useState(0),[query,setQuery]=useState('')
  const [selected,setSelected]=useState<number|null>(null),[roster,setRoster]=useState<Roster|null>(null),[preview,setPreview]=useState<Preview|null>(null),[reviewed,setReviewed]=useState(false),[setup,setSetup]=useState(false),[editing,setEditing]=useState(false),[assigning,setAssigning]=useState(false),[manual,setManual]=useState(false),[person,setPerson]=useState<Person|null>(null),[reason,setReason]=useState(''),[studentQuery,setStudentQuery]=useState(''),[membershipFilter,setMembershipFilter]=useState('all'),[accountFilter,setAccountFilter]=useState('all')
  const [form,setForm]=useState({course_id:'',academic_year:String(new Date().getFullYear()+543),semester:'1',section:'',registry_course_id:'',registry_class_id:''}),[teacherId,setTeacherId]=useState(''),[assignmentCourse,setAssignmentCourse]=useState(''),[assignmentRegistry,setAssignmentRegistry]=useState(''),[assignmentCode,setAssignmentCode]=useState(''),[email,setEmail]=useState('')
@@ -39,9 +44,12 @@ export default function ClassesWorkspace(){
  async function loadPreview(){setBusy(true);setError('');setPreview(null);setReviewed(false);try{setPreview(await request(`/${selected}/roster/preview`,{}))}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
  const current=data?.classes.find(c=>c.id===selected),visible=data?.classes.filter(c=>`${c.course_name} ${c.section} ${c.academic_year} ${c.semester}`.toLowerCase().includes(query.toLowerCase()))||[],people=roster?.students.filter(p=>`${p.full_name_th} ${p.student_number||''} ${p.faculty} ${p.program}`.toLowerCase().includes(studentQuery.toLowerCase())&&(membershipFilter==='all'||p.status===membershipFilter)&&(accountFilter==='all'||p.account_status===accountFilter))||[]
  const reasonField=<label className="flex flex-col gap-2 text-sm font-medium">{t.reason}<Input className="min-h-11" value={reason} maxLength={500} onChange={e=>setReason(e.target.value)} required minLength={5}/></label>
+ const canPreview = canPreviewTeaching(isSchoolStaff, data?.classes.some(c => c.manageable === true))
+ if (planningPreview && canPreview) return <TeacherPlanningPreview th={th} onClose={() => { setPlanningPreview(false); requestAnimationFrame(() => document.getElementById('teaching-preview-entry')?.focus()) }} />
  return <section className={`${styles.workspace} space-y-6 px-4 pb-24 pt-8 md:px-8`} aria-labelledby="classes-title">
  <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 id="classes-title" className="text-3xl font-semibold">{t.title}</h1><p className="mt-2 max-w-prose text-sm leading-relaxed text-neutral-600">{isSchoolStaff?workspace.intro:t.intro}</p></div>{!current&&data?.can_create&&<Button className="min-h-11" onClick={()=>{setSetup(true);setEditing(false);setAssigning(false)}}>{t.setup}</Button>}</header>
  <SchoolWorkspaceNav active="classes" th={th} />
+ {!current&&!setup&&!assigning&&canPreview&&<div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 pb-4"><p className="max-w-prose text-sm text-neutral-600">{th?'ทดลองจัดวางตารางสอน แผน รายชื่อ และประมวลรายวิชาด้วยข้อมูลสมมติ':'Explore timetable, teaching plan, roster and syllabus placement with fictional data.'}</p><Button id="teaching-preview-entry" variant="outline" className="min-h-11" onClick={()=>setPlanningPreview(true)}>{th?'ดูตัวอย่างพื้นที่เตรียมการสอน':'Preview teaching workspace'}</Button></div>}
  {mounted&&!current&&!setup&&!assigning&&data?.classes.length===0&&<TeacherTimetable th={th} onStaffStatus={setIsSchoolStaff} />}
  {!current&&data&&(isSchoolStaff||data.can_create)&&<div className="space-y-1"><h2 className="text-xl font-semibold tracking-tight">{workspace.linked}</h2><p className="text-sm leading-relaxed text-neutral-600">{workspace.linkedHelp}</p></div>}
  {error&&<div role="alert" className="space-y-3"><p className="text-sm text-red-800">{error}</p><Button variant="outline" className="min-h-11" onClick={()=>setRefresh(n=>n+1)} disabled={busy}>{t.retry}</Button></div>}

@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next'
 import { AlertTriangle, CalendarClock, Clock3, Loader2, MapPin, Search } from 'lucide-react'
 import { Button, Input } from '@/extensions/route66/adapters/ui'
 import { filterTimetable, readSavedTerm, timetableYears, type RegistrarTerm } from './school-workspace-model'
+import { weekdayKey } from './timetable-colors'
+import colors from './timetable-colors.module.css'
 
 type Timetable = { academic_year: number; semester: number; fetched_at: string; classes: { registry_course_id: string; course_code: string; title: string; section: string; meetings: { day: string; start_time: string; end_time: string; details: string }[] }[] }
 
@@ -46,17 +48,17 @@ export default function SchoolTimetable({ staffId, teacherName }: { staffId: str
   }, [staffId, selection, attempt, ready])
   const chosenYear = selection?.year ?? data?.academic_year ?? currentYear, chosenSemester = selection?.semester ?? data?.semester ?? 1
   const visible = filterTimetable(data?.classes ?? [], query)
-  const control = 'min-h-11 w-full rounded-lg border border-neutral-300 bg-white px-3 text-sm text-neutral-900 disabled:opacity-50'
+  const control = 'min-h-11 w-full rounded-lg border border-blue-500 bg-white px-3 text-sm text-blue-950 hover:border-blue-700 disabled:opacity-50'
   function chooseTerm(next: RegistrarTerm) {
     setSelection(next); setQuery('')
     try { sessionStorage.setItem(storageKey, JSON.stringify(next)) } catch { /* Storage is optional, never an access requirement. */ }
   }
-  return <section className="overflow-hidden rounded-xl bg-white nice-shadow" aria-labelledby="registrar-title" aria-busy={busy}>
-    <p className="flex items-center gap-2 bg-blue-50 px-4 py-2.5 text-xs font-semibold text-blue-700"><CalendarClock size={14} aria-hidden="true" />{t.readonly}</p>
+  return <section className="overflow-hidden rounded-xl border border-blue-100 bg-white nice-shadow" aria-labelledby="registrar-title" aria-busy={busy}>
+    <p className="flex items-center gap-2 bg-blue-100 px-4 py-2.5 text-xs font-semibold text-blue-900"><CalendarClock size={14} aria-hidden="true" />{t.readonly}</p>
     <div className="space-y-5 p-4 sm:p-6">
-      <header><h2 id="registrar-title" className="text-xl font-semibold tracking-tight">{t.title}</h2>
-        {teacherName && <p className="mt-2 break-words text-sm text-neutral-700">{t.teacher} <strong className="font-medium text-neutral-900">{teacherName}</strong></p>}
-        <p className="mt-2 max-w-prose text-sm leading-relaxed text-neutral-600">{t.note}</p>
+      <header className={`${colors.header} -mx-4 -mt-4 px-4 pb-5 pt-4 sm:-mx-6 sm:-mt-6 sm:px-6 sm:pt-6`}><h2 id="registrar-title" className="text-xl font-semibold tracking-tight text-blue-950">{t.title}</h2>
+        {teacherName && <p className="mt-2 break-words text-sm text-blue-800">{t.teacher} <strong className="font-medium text-blue-950">{teacherName}</strong></p>}
+        <p className="mt-2 max-w-prose text-sm leading-relaxed text-blue-800">{t.note}</p>
       </header>
       <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end sm:gap-4">
         <div className="flex min-w-0 flex-col gap-2 text-xs font-medium text-neutral-700"><label htmlFor={yearId}>{t.year}</label>
@@ -73,13 +75,13 @@ export default function SchoolTimetable({ staffId, teacherName }: { staffId: str
       {busy && <p role="status" className="flex items-center gap-2 text-sm text-neutral-600"><Loader2 size={16} className="animate-spin" aria-hidden="true" />{t.loading}</p>}
       {error && <div role="alert" className="space-y-3"><p className="flex items-start gap-2 text-sm font-medium text-red-700"><AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />{t.error}</p><Button variant="outline" className="min-h-11" onClick={() => setAttempt(n => n + 1)}>{t.retry}</Button></div>}
       {data && <>
-        {data.classes.length > 0 && <div className="space-y-2"><label htmlFor={searchId} className="flex items-center gap-2 text-sm font-medium"><Search size={16} aria-hidden="true" />{t.search}</label><Input id={searchId} className="min-h-11" value={query} onChange={e => setQuery(e.target.value)} /></div>}
-        <p role="status" className="text-xs font-medium tabular-nums text-neutral-600">{data.semester}/{data.academic_year} · {visible.length} {t.results}</p>
+        {data.classes.length > 0 && <div className="space-y-2"><label htmlFor={searchId} className="flex items-center gap-2 text-sm font-medium text-blue-900"><Search size={16} aria-hidden="true" />{t.search}</label><Input id={searchId} className="min-h-11 border-blue-500 text-blue-950 hover:border-blue-700" value={query} onChange={e => setQuery(e.target.value)} /></div>}
+        <p role="status" className="inline-flex rounded-md bg-blue-50 px-2 py-1 text-xs font-medium tabular-nums text-blue-800">{data.semester}/{data.academic_year} · {visible.length} {t.results}</p>
         {data.classes.length === 0 ? <div className="space-y-2 border-t border-neutral-200 py-5"><h3 className="font-semibold">{t.empty}</h3><p className="max-w-prose text-sm leading-relaxed text-neutral-600">{t.emptyHelp}</p></div>
           : visible.length === 0 ? <div className="space-y-2 border-t border-neutral-200 py-5"><h3 className="font-semibold">{t.noMatch}</h3><Button variant="outline" className="min-h-11" onClick={() => setQuery('')}>{t.clear}</Button></div>
           : <ul className="-mx-4 divide-y divide-neutral-200 border-y border-neutral-200 sm:-mx-6">{visible.map(c => <li key={`${c.registry_course_id}-${c.section}`} className="space-y-3 px-4 py-5 sm:px-6">
-            <div><p className="text-xs font-medium tabular-nums text-neutral-600">{c.course_code} · {t.section} {c.section}</p><h3 className="mt-1 break-words text-base font-semibold">{c.title}</h3></div>
-            <ul className="space-y-3">{c.meetings.map((m, index) => <li key={index} className="space-y-1.5 text-sm"><p className="flex items-start gap-2 font-medium tabular-nums"><Clock3 size={16} className="mt-0.5 shrink-0 text-neutral-500" aria-hidden="true" /><span>{m.day} · {m.start_time}–{m.end_time}</span></p>{m.details && <p className="flex items-start gap-2 leading-relaxed text-neutral-600"><MapPin size={16} className="mt-0.5 shrink-0" aria-hidden="true" /><span className="min-w-0 break-words">{m.details}</span></p>}</li>)}</ul>
+            <div><p className="inline-flex rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold tabular-nums text-blue-900">{c.course_code} · {t.section} {c.section}</p><h3 className="mt-2 break-words text-base font-semibold text-blue-950">{c.title}</h3></div>
+            <ul className="space-y-3">{c.meetings.map((m, index) => <li key={index} className="space-y-1.5 text-sm"><p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium tabular-nums text-blue-950"><span className={colors.day} data-weekday={weekdayKey(m.day)}><Clock3 size={14} className="shrink-0" aria-hidden="true" /><span className="min-w-0 break-words">{m.day}</span></span><span aria-hidden="true">{' · '}</span><span>{m.start_time}–{m.end_time}</span></p>{m.details && <p className="flex items-start gap-2 leading-relaxed text-neutral-600"><MapPin size={16} className="mt-0.5 shrink-0 text-blue-700" aria-hidden="true" /><span className="min-w-0 break-words">{m.details}</span></p>}</li>)}</ul>
           </li>)}</ul>}
         <p className="text-xs tabular-nums text-neutral-600">{t.asof}: <time dateTime={data.fetched_at}>{new Date(data.fetched_at).toLocaleString(th ? 'th-TH' : 'en-GB')}</time></p>
       </>}

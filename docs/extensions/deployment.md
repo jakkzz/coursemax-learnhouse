@@ -1,6 +1,25 @@
 # Internal extension deployment records
 
-## Latest: registrar timetable color — 2026-10-15
+## Latest: fictional teacher planning preview — 2026-10-15
+
+Live source/image **c52f2e7b**, frontend-only on exact **4d9b24e0** parent.
+See [teacher-planning-preview.md](teacher-planning-preview.md). Teacher discovery
+entry in My classes; weekly timetable, dated plan, roster and shared syllabus use
+fictional component-memory data only, discarded on exit/reload. No new native hook,
+backend/schema writer, real academic generation, student setup or parity acceptance.
+5,292 baked web entries verified;995 backend/config/migration files unchanged.
+41 web/13 boundary tests,corrected full bundle/types,six compiled EN/TH1440/930/390
+teacher flows,four live native-bootstrap workspace/two auth flows pass. Actual owner
+teacher Chrome separately verifies all five views,review/acceptance,section-isolated
+sample roster and reload reset. No fabricated institutional identity or session copy.
+Protected backups/isolated restore/saved compatible4d9b24e0 parent retained. App only
+replaced,gateway reloaded;schema,identity ownership/grants,runtime/environment and
+other container IDs unchanged. Source menu exactc52f2e7b;owner-fork push only.
+Brief2.91GiB post-workspace memory pause respected;remaining tests resumed above
+floor and pass. Final checkpoint12.95GiB disk/3.19GiB RAM;recheck before heavy work.
+Current protected release:teacher-preview-c52f2e7b-20261015. No additional cleanup.
+
+## Previous: registrar timetable color — 2026-10-15
 
 Live source/image **4d9b24e0**, frontend-only overlay on teacher-workspace parent
 **7fe104c9**. See [registrar-timetable-color.md](registrar-timetable-color.md).

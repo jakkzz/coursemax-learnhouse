@@ -1,6 +1,40 @@
 # Internal extension deployment records
 
-## Latest: actual registrar class workspace — 2026-10-15
+## Latest: My classes native account layout — 2026-10-15
+
+Live source/image **bf4f2908**, frontend-only on exact compatible **f9bc5b2a** parent.
+See [classes-account-layout.md](classes-account-layout.md). My classes now uses the
+same native account wrapper, breadcrumbs, sticky profile sidebar, mobile name/actions
+and content framing as School identity. Duplicate class padding removed. Scoped
+mobile footer allowance fixes fixed-action overlap without a native source edit.
+Existing actual registrar facts, five tasks, strict linking and canonical handoffs
+remain unchanged; no academic setup, permission, backend or schema change.
+
+41 web / 13 boundary-tool tests, placement gate, corrected full production bundle /
+post-bundle tsc and separate generated-route types pass. Eight compiled EN/TH
+1440/1920/930/390 teacher+student journeys check matching framing, footer clearance,
+task completion, reload/recovery/focus and zero academic writes/errors/overflow.
+Inline finish/documenter review, not independent; disposition ship. DESIGN unchanged.
+5,304 baked web entries verified by bytes/links/modes;995 measured backend/config /
+migration files unchanged. Native production runtime regeneration and no fixture
+endpoints verified. Initial fixture/packaging failures retained, not accepted.
+
+Fresh protected backups, isolated socket DB restore/identity check and saved exact f9
+parent checksum/config digest pass. Only staging app recreated/gateway reloaded;
+schema, identity/provider/profile keys, audited grants, runtime/env and other running
+container IDs preserved. Four live bilingual desktop/mobile native-bootstrap workspace
+flows and two native-auth flows/private-origin-anonymous guards pass. Actual owner
+English desktop Chrome separately checks both account frames, three real sections and
+one actual section's Overview/Timetable. Tab released at My classes list; no session
+copying or mutation. This is not institutional student/device lifecycle acceptance.
+
+All seven checked academic tables remain zero; actual mappings, assignments, rosters
+and approved plans/syllabi are still absent, not invented. CourseMax unchanged and
+healthy. Protected release: `classes-layout-bf4f2908-20261015`. Rollback app only to
+f9; never restore old live DB/files or undo evidence/grants. No old-folder cleanup or
+image pruning. Final preflight 11.15GiB disk / 4.10GiB available RAM; recheck.
+
+## Previous: actual registrar class workspace — 2026-10-15
 
 Live source/image **f9bc5b2a**, frontend-only on exact compatible **4d9b24e0** parent.
 See [real-teacher-workspace.md](real-teacher-workspace.md). Open each actual registrar

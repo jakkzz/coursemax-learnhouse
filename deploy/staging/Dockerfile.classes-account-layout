@@ -1,0 +1,6 @@
+# Native account presentation for My classes; no backend/schema changes.
+FROM coursemax-learnhouse:f9bc5b2a
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.source="https://github.com/jakkzz/coursemax-learnhouse" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}"
+ADD web-delta.tar.gz /app/web/

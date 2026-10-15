@@ -45,8 +45,8 @@ export default function ClassesWorkspace(){
  const workspaceLink = workspaceClass ? linkedTeachingClass(workspaceClass, data?.classes ?? []) : null
  return <>
  {workspaceClass && <RealTeachingWorkspace context={workspaceClass} linked={workspaceLink} linksKnown={data!==null} th={th} onClose={() => { const id=workspaceClass.returnFocusId; setWorkspaceClass(null); requestAnimationFrame(() => { if(id)document.getElementById(id)?.focus() }) }} onOpenRoster={() => { if(workspaceLink?.manageable===true){setSelected(workspaceLink.id);setWorkspaceClass(null)} }} />}
- <section hidden={Boolean(workspaceClass)} className={`${styles.workspace} space-y-6 px-4 pb-24 pt-8 md:px-8`} aria-labelledby="classes-title">
- <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 id="classes-title" className="text-3xl font-semibold">{t.title}</h1><p className="mt-2 max-w-prose text-sm leading-relaxed text-neutral-600">{isSchoolStaff?workspace.intro:t.intro}</p></div>{!current&&data?.can_create&&<Button className="min-h-11" onClick={()=>{setSetup(true);setEditing(false);setAssigning(false)}}>{t.setup}</Button>}</header>
+ <section hidden={Boolean(workspaceClass)} className={`${styles.workspace} space-y-6 pb-24`} aria-labelledby="classes-title">
+ <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 id="classes-title" className="text-3xl font-semibold tracking-tight">{t.title}</h1><p className="mt-2 max-w-prose text-sm leading-relaxed text-neutral-600">{isSchoolStaff?workspace.intro:t.intro}</p></div>{!current&&data?.can_create&&<Button className="min-h-11" onClick={()=>{setSetup(true);setEditing(false);setAssigning(false)}}>{t.setup}</Button>}</header>
  <SchoolWorkspaceNav active="classes" th={th} />
  {mounted&&!current&&!setup&&!assigning&&data?.classes.length===0&&<TeacherTimetable th={th} onStaffStatus={setIsSchoolStaff} onOpenClass={setWorkspaceClass} />}
  {!current&&data&&(isSchoolStaff||data.can_create)&&<div className="space-y-1"><h2 className="text-xl font-semibold tracking-tight">{workspace.linked}</h2><p className="text-sm leading-relaxed text-neutral-600">{workspace.linkedHelp}</p></div>}

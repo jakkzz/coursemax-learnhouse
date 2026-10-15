@@ -1,6 +1,20 @@
-# Internal extension release deployed — 2026-10-14
+# Internal extension deployment records
 
-Live `learn.route66.click`: source/image **fe1877c9**. Source extraction details:
+## Latest: teacher school workspace — 2026-10-15
+
+Live `learn.route66.click`: source/image **7fe104c9**, frontend-only overlay on
+attendance-capable **fe1877c9**. See [teacher-school-workspace.md](teacher-school-workspace.md).
+5,283 baked web entries verified;995 measured backend/config/migration files unchanged.
+Full build/types,30 web/13 boundary tests,four compiled bilingual teacher flows,
+four live workspace/two native-auth flows and the owner's read-only teacher Chrome
+term/search/reload tasks pass. Protected backups/isolated DB restore and saved parent
+retained;schema/identity/grants/runtime/other containers unchanged. App only replaced,
+gateway reloaded;no migration/import/assignment/roster/student-account/message change.
+Native enrollment bridge and full institutional/private-file parity remain open.
+
+## Historical extraction release — 2026-10-14
+
+Extraction source/image **fe1877c9**. Source extraction details:
 [extraction.md](extraction.md); agent contract: [development.md](development.md).
 This is namespace isolation, not a new enrollment bridge or full CourseMax parity.
 

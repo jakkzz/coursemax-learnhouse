@@ -1,6 +1,6 @@
-# Teacher school workspace — source-ready, not deployed
+# Teacher school workspace — deployed
 
-2026-10-15. Scoped refinement of `/classes` and `/account/school-identity`, preserving LearnHouse's native visual system and existing URLs. Audit context: B01/B02/C10; this does not accept those items in full.
+2026-10-15. Live source/image **7fe104c9** at `learn.route66.click`. Scoped refinement of `/classes` and `/account/school-identity`, preserving LearnHouse's native visual system and existing URLs. Audit context: B01/B02/C10; this does not accept those items in full.
 
 ## Teacher tasks
 
@@ -36,4 +36,12 @@ The owner's signed-in teacher account was inspected read-only through the approv
 
 ## Release boundary
 
-No deployment, image switch, real import, account change or shared-host mutation performed. Live staging remains the existing `fe1877c9` release. Final build archives and protected test evidence are retained outside the repository. Deployment requires its normal approval, capacity, backups, retained compatible image, baked-artifact verification and live acceptance gates. Any later code rollback must retain the database, identities and all academic evidence; do not restore an old database for a UI rollback.
+The owner approved staging deployment after source acceptance. Frontend-only image `coursemax-learnhouse:7fe104c9` overlays the exact attendance-capable `fe1877c9` parent. 5,283 desired web entries verified against baked bytes/links/modes; all 995 measured backend/configuration/migration files remain identical. Source committed and pushed only to the owner-controlled fork; no upstream changes or push.
+
+Protected DB/content/runtime backups and a saved/checksummed `fe1877c9` rollback image are retained. The fresh database backup was restored over an isolated, network-disabled PostgreSQL socket and identities matched; content/runtime archives and checksums passed. This is not coordinated off-host DR acceptance.
+
+Only the staging app was replaced; the existing gateway reloaded. Other container IDs, runtime files/environment, identity profiles/provider ownership and audited grants are unchanged. Schema dumps match except random pg_dump restriction markers. No migration, backfill, real import, account/assignment/roster change, proactive message or broad host mutation. Existing source-menu link updated through the supported native API to the exact deployed revision. No student account setup or manual student testing.
+
+Four live English/Thai 1440/390 native-bootstrap workspace flows and two native-auth flows passed without school/academic writes, page errors or overflow. Private/no-store, foreign-origin denial and anonymous denial checks passed. The native bootstrap did not impersonate an institutional teacher. Separately, the owner's manually signed-in teacher Chrome verified identity → classes, semester selection, search/clear and reload persistence against their own actual read-only registrar timetable. This does not approve class mappings, rosters, enrollment integration or institutional staff status.
+
+Current protected release record: `releases/teacher-7fe104c9-20261015` outside Git; final build archives and test evidence remain protected. Compatible code rollback retains the live database, identities and all new academic evidence; never restore an old database for a UI rollback. Inline review, not independent; remaining provider/device, private-file and full academic parity gates remain separate.

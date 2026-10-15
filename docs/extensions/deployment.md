@@ -1,6 +1,51 @@
 # Internal extension deployment records
 
-## Latest: My classes native account layout — 2026-10-15
+## Latest: inactive learning-access backend — 2026-10-15
+
+Live source **396d1a012c55198c2798a8cde3c5cfe0f4c45e88**, image
+`coursemax-learnhouse:learning-access-396d1a01`, image ID
+`sha256:48c51641cfd838005075f6c8063311a4be29ecd534d57269e27cdee9d1ccde3f`.
+Six owned backend files overlay exact healthy **bf4f2908**; all 5,304 accepted web
+entries remain byte/link/mode-identical. No frontend rebuild or new UI acceptance
+claimed. 999 API/config/migration hashes verified; runtime image configuration and
+parent rootfs prefix preserved. No new core hook, dependency or schema migration.
+See [learning-access.md](learning-access.md) for separate enrollment and recovery gates.
+
+**Configuration remains locked off by default.** The optional configuration Compose
+layer is NOT applied; production environment/runtime unchanged. Preview is read-only;
+new configuration apply requires the explicit owned gate in addition to all native
+authorization/plan/origin checks. Existing delegations would still reconcile if new
+configuration were frozen; deployment verified zero delegations/events and seven
+empty academic tables before and after. No mapping, class, roster, group, enrollment
+or grant was created. Real activation remains separately prohibited pending recovery/
+setup/authority acceptance. CourseMax untouched; no cleanup or image pruning.
+
+200 isolated PostgreSQL/native HTTP/auth/roster/attendance tests pass (43 new), plus
+13 boundary tools and 41 existing web tests. Ten baked policy cases, baked disabled-
+configuration 503, native OpenAPI routes and 999/5,304 artifact checks pass. Private
+manifest verification runs as each artifact owner's UID without widening permissions;
+failed owner/manifest-format attempts retained. Fresh DB/content/runtime backups,
+exact saved bf4 image checksum/config-digest verification, and isolated socket-only
+restore/identity checks pass. Additional pre-release restore confirms native org-role
+assignments/definitions/provider/profile keys/course rows unchanged, excluding only
+four default roles' `update_date`, refreshed by unchanged native startup code; each
+other role field was independently compared before accepting that timestamp difference.
+No historical evidence was restored or modified on live.
+
+Only app recreated; gateway reloaded. Schema, identities/audited owner grants, native
+groups/enrollment/progress, runtime/env, and all other container IDs preserved. Live
+native auth/privacy/source disclosure and new-route anonymous/foreign-origin/nonexistent-
+class denials pass. Two desktop/mobile native-auth and four EN/TH workspace journeys
+pass with no academic writes/errors/overflow. No provider consent, actual institutional
+student/device lifecycle or full parity acceptance claimed.
+
+Protected release: `learning-access-396d1a01-20261015`. Rollback is app-only to the
+exact saved **bf4f2908** parent; guard refuses rollback if learning-access events exist.
+Never restore an old live DB/files/grants/evidence. Current live source link points to
+the published owner fork at exact396d1a01. Full operational recovery/activation remains
+separate; inactive code deployment is not approval to enable real grants.
+
+## Previous: My classes native account layout — 2026-10-15
 
 Live source/image **bf4f2908**, frontend-only on exact compatible **f9bc5b2a** parent.
 See [classes-account-layout.md](classes-account-layout.md). My classes now uses the

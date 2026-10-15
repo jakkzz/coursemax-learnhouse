@@ -1,7 +1,8 @@
 # Roster-driven native learning access
 
-**Backend implementation; not deployed or activated.** No real mappings, classes,
-students, groups, grants, imports or migrations were created during development.
+**Backend deployed inactive on 2026-10-15**, source/image `396d1a01` over exact
+`bf4f2908`; see [deployment.md](deployment.md). Configuration is locked off; no real
+mappings, classes, students, groups, grants, imports or migrations were created.
 The existing integrated-extension boundary remains authoritative. This is not an
 API-token service, an upstream plugin API, or a complete enrollment/parity port.
 

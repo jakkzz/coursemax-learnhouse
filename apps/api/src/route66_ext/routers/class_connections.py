@@ -1,7 +1,7 @@
 """One reviewed connection: official section, native course, teaching and access.
 
-Requests are self-attested, never permissions. Only a native-session platform
-administrator can approve the native course choice and access-policy effect.
+Assigned teachers reuse explicit course mappings for routine section setup.
+New mappings and native access-policy changes use the existing administrator review.
 """
 import asyncio
 import hashlib
@@ -34,9 +34,19 @@ class Section(BaseModel):
     semester: int = Field(ge=1, le=3, strict=True)
     section: str = Field(pattern=r"^[A-Za-z0-9/-]{1,40}$")
 
+class SectionQuery(Section):
+    # URL query values arrive as strings; write DTOs remain strict JSON integers.
+    academic_year: int = Field(ge=2500, le=2700)
+    semester: int = Field(ge=1, le=3)
+
+
 class Choice(BaseModel):
     model_config = ConfigDict(extra="forbid")
     course_id: int = Field(gt=0, strict=True)
+
+class Setup(Section):
+    course_id: int = Field(gt=0, strict=True)
+
 
 class Connect(Choice):
     confirm_changes: StrictBool
@@ -57,10 +67,7 @@ async def completed(db, event):
     return next((r for r in rows if r.details.get("connection_request_id") == event.id), None)
 
 
-@router.post("/requests")
-async def request_connection(body: Section, request: Request, response: Response,
-                             db: AsyncSession = Depends(get_db_session)):
-    private(response); user, config, evidence = await context(request, db); boundary(request, config)
+async def verified_section(db, user, config, evidence, body, request):
     identity = await db.get(NrruTeacherIdentity, user.id)
     if not eligible(evidence) or identity is None or identity.identity_id != evidence.identity_id:
         raise HTTPException(403, "Confirm your own staff record and sign in with your verified institutional Google account")
@@ -73,8 +80,97 @@ async def request_connection(body: Section, request: Request, response: Response
     exact = [c for c in timetable["classes"] if (c["registry_course_id"], c["section"]) == (body.registry_course_id, body.section)]
     if len(exact) != 1 or (timetable["academic_year"], timetable["semester"]) != (body.academic_year, body.semester):
         raise HTTPException(409, "Select one exact section from your current registrar timetable")
-    facts = {**body.model_dump(), "course_code": exact[0]["course_code"],
-             "title": exact[0]["title"], "org_id": config.org_id, "teacher_id": user.id}
+    return {**Section.model_validate(body.model_dump(include=set(Section.model_fields))).model_dump(),
+            "course_code": exact[0]["course_code"], "title": exact[0]["title"],
+            "org_id": config.org_id, "teacher_id": user.id}
+
+
+async def assigned_courses(db, user_id, org_id, registry_course_id):
+    return (await db.exec(select(Course).join(CourseRegistryBinding,
+        CourseRegistryBinding.course_id == Course.id).join(TeachingAssignment,
+        TeachingAssignment.course_id == Course.id).where(Course.org_id == org_id,
+        CourseRegistryBinding.registry_course_id == registry_course_id,
+        TeachingAssignment.user_id == user_id, TeachingAssignment.active == True))).all()
+
+
+async def section_classes(db, body):
+    # Count every official candidate before considering its native course/permissions.
+    return (await db.exec(select(AcademicClass).where(
+        AcademicClass.registry_course_id == body.registry_course_id,
+        AcademicClass.academic_year == body.academic_year,
+        AcademicClass.semester == body.semester, AcademicClass.section == body.section))).all()
+
+
+async def own_section_request(db, user_id, org_id, body):
+    events = (await db.exec(select(AcademicClassEvent).where(
+        AcademicClassEvent.kind == _REQUEST, AcademicClassEvent.actor_user_id == user_id)
+        .order_by(AcademicClassEvent.id.desc()))).all()
+    return next((e for e in events if e.details.get("org_id") == org_id and all(
+        e.details.get(k) == getattr(body, k) for k in Section.model_fields)), None)
+
+
+@router.get("/section")
+async def section_status(request: Request, response: Response, body: SectionQuery = Depends(),
+                         db: AsyncSession = Depends(get_db_session)):
+    private(response); user, config, evidence = await context(request, db)
+    courses = await assigned_courses(db, user.id, config.org_id, body.registry_course_id)
+    candidates = await section_classes(db, body)
+    course_ids = {c.id for c in courses}
+    connected = candidates[0] if len(candidates) == 1 and candidates[0].course_id in course_ids else None
+    event = await own_section_request(db, user.id, config.org_id, body)
+    can_request = bool(eligible(evidence) and await db.get(NrruTeacherIdentity, user.id))
+    return {"status": "connected" if connected else "conflict" if candidates else
+            "ready" if courses else "requested" if event else "needs_course",
+            "class_id": connected.id if connected else None,
+            "request_id": event.id if event else None, "can_request": can_request,
+            "courses": [{"id": c.id, "name": c.name} for c in courses]}
+
+
+@router.post("/setup")
+async def setup_section(body: Setup, request: Request, response: Response,
+                        db: AsyncSession = Depends(get_db_session)):
+    private(response); user, config, evidence = await context(request, db); boundary(request, config)
+    facts = await verified_section(db, user, config, evidence, body, request)
+    await roster.serialize(db)
+    courses = await assigned_courses(db, user.id, config.org_id, body.registry_course_id)
+    if body.course_id not in {c.id for c in courses}:
+        raise HTTPException(403, "Choose a course already assigned to you and mapped to this official subject")
+    binding = await db.get(CourseRegistryBinding, body.course_id)
+    if binding.course_code != facts["course_code"]:
+        raise HTTPException(409, "The official course code changed. Review its course mapping")
+    candidates = await section_classes(db, body)
+    if len(candidates) > 1 or (candidates and candidates[0].course_id != body.course_id):
+        raise HTTPException(409, "This section is already connected elsewhere. Refresh its status")
+    if candidates:
+        return {"status": "connected", "class_id": candidates[0].id}
+    cls = AcademicClass(course_id=body.course_id, registry_course_id=body.registry_course_id,
+        registry_course_code=binding.course_code, academic_year=body.academic_year,
+        semester=body.semester, section=body.section, registry_class_id=None)
+    try:
+        rows, digest = await asyncio.wait_for(roster.fetch_roster(cls), timeout=10)
+        selected = roster.source(cls)
+    except (ValueError, TimeoutError):
+        raise HTTPException(503, "The official roster is unavailable. Retry setup") from None
+    async with db.begin_nested():
+        db.add(cls); await db.flush()
+        roster.event(db, user.id, "class_created", {**facts, "course_id": body.course_id,
+            "setup": "assigned_teacher"}, cls)
+        await roster.apply_roster(db, cls, rows, digest, user.id, selected["kind"], selected["url"])
+        event = await own_section_request(db, user.id, config.org_id, body)
+        if event and not await completed(db, event):
+            roster.event(db, user.id, _CONNECTED, {"connection_request_id": event.id,
+                "course_id": body.course_id, "teacher_id": user.id, "official": facts,
+                "source_digest": digest, "setup": "assigned_teacher"}, cls)
+    from src.route66_ext.routers.academic_classes import commit
+    await commit(db)
+    return {"status": "connected", "class_id": cls.id, "roster_count": len(rows)}
+
+
+@router.post("/requests")
+async def request_connection(body: Section, request: Request, response: Response,
+                             db: AsyncSession = Depends(get_db_session)):
+    private(response); user, config, evidence = await context(request, db); boundary(request, config)
+    facts = await verified_section(db, user, config, evidence, body, request)
     await roster.serialize(db)
     prior = (await db.exec(select(AcademicClassEvent).where(AcademicClassEvent.kind == _REQUEST,
         AcademicClassEvent.actor_user_id == user.id).order_by(AcademicClassEvent.id.desc()))).all()

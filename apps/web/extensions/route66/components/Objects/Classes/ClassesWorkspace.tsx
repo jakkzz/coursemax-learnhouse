@@ -24,8 +24,8 @@ const copy={
 }
 const attendanceLabel={en:'Attendance',th:'การเข้าเรียน'}
 const workspaceCopy = {
- en: { intro: 'View your teaching timetable and classes by course, semester and section.', linked: 'LearnHouse classes', linkedHelp: 'Classes with approved teaching assignments or roster membership.', emptyHelp: 'Open your registrar section and request its connection. The administrator selects the correct native course and approves teaching and reading access together.' },
- th: { intro: 'ดูตารางสอนและชั้นเรียน แยกตามรายวิชา ภาคเรียน และกลุ่มเรียน', linked: 'ชั้นเรียนในระบบ', linkedHelp: 'ชั้นเรียนที่ได้รับมอบหมายงานสอนหรือมีชื่อเป็นสมาชิกแล้ว', emptyHelp: 'เปิดกลุ่มเรียนจากตารางทะเบียนแล้วขอเชื่อมชั้นเรียน ผู้ดูแลเลือกรายวิชาที่ถูกต้อง พร้อมอนุมัติงานสอนและสิทธิ์อ่านในครั้งเดียว' },
+ en: { intro: 'View your teaching timetable and classes by course, semester and section.', linked: 'LearnHouse classes', linkedHelp: 'Your saved classes and student rosters.', emptyHelp: 'Open a section above to set up your class and load its roster.' },
+ th: { intro: 'ดูตารางสอนและชั้นเรียน แยกตามรายวิชา ภาคเรียน และกลุ่มเรียน', linked: 'ชั้นเรียนในระบบ', linkedHelp: 'ชั้นเรียนและรายชื่อนักศึกษาที่บันทึกไว้', emptyHelp: 'เปิดกลุ่มเรียนด้านบนเพื่อตั้งค่าชั้นเรียนและโหลดรายชื่อนักศึกษา' },
 }
 const control='min-h-11 min-w-0 max-w-full rounded-lg border border-neutral-300 bg-white px-3 text-sm text-neutral-900'
 export default function ClassesWorkspace(){

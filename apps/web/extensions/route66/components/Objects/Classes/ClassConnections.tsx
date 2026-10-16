@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'react-hot-toast'
 import { Button } from '@/extensions/route66/adapters/ui'
@@ -11,7 +11,8 @@ export async function classRequest(path: string, th: boolean, body?: unknown, si
   const r = await fetch('/api/v1/academic-classes' + path, { credentials: 'include', cache: 'no-store', signal,
     method: body === undefined ? 'GET' : 'POST', headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body) })
-  const data = await r.json().catch(() => ({}))
+  // An aborted successful response must not become an empty, apparently valid result.
+  const data = r.ok ? await r.json() : await r.json().catch(() => ({}))
   if (!r.ok) throw new Error(th ? r.status === 409 ? 'ข้อมูลเปลี่ยนแล้ว โปรดโหลดข้อมูลใหม่และตรวจสอบชั้นเรียนที่เลือก' : r.status === 401 || r.status === 403 ? 'โปรดตรวจสอบบัญชีและสิทธิ์จัดการรายวิชา แล้วลองอีกครั้ง' : r.status === 503 ? 'ระบบทะเบียนยังไม่พร้อม โปรดลองดึงข้อมูลของชั้นเรียนนี้อีกครั้ง' : 'ดำเนินการไม่ได้ โปรดตรวจสอบชั้นเรียนที่เลือกแล้วลองอีกครั้ง' : typeof data.detail === 'string' ? data.detail : r.status === 503 ? 'The registrar source is temporarily unavailable. Retry source retrieval.' : 'Could not complete this action. Check the selected class and retry.')
   return data
 }
@@ -21,23 +22,54 @@ type Connection = { id: number; teacher_name: string; registry_course_id: string
 export type ConnectionCourse = { id: number; name: string; private?: boolean }
 type ConnectionPreview = { expected_fingerprint: string; course_name: string; restricts_org_wide_access: boolean; roster_count: number; source_kind?: string; source_url?: string; source_digest?: string; native_access?: string }
 
+type SectionStatus = { status: 'ready' | 'requested' | 'connected' | 'needs_course' | 'conflict'; class_id: number | null; can_request: boolean; courses: { id: number; name: string }[] }
+
 export function SectionConnection({ context, th, onChanged }: { context: RegistrarClassContext; th: boolean; onChanged: () => void }) {
-  const [busy, setBusy] = useState(false), [result, setResult] = useState(''), [error, setError] = useState('')
-  async function send() {
+  const [data, setData] = useState<SectionStatus | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState('')
+  const [version, setVersion] = useState(0), [course, setCourse] = useState(''), changed = useRef(onChanged)
+  changed.current = onChanged
+  const { registry_course_id, section } = context.classRow, { academic_year, semester } = context
+  useEffect(() => {
+    const controller = new AbortController(); let timer: ReturnType<typeof setTimeout> | undefined
+    setData(null); setError(''); setCourse('')
+    async function load() {
+      try {
+        const query = new URLSearchParams({ registry_course_id, academic_year: String(academic_year), semester: String(semester), section })
+        const next: SectionStatus = await classRequest('/connections/section?' + query, th, undefined, controller.signal)
+        if (controller.signal.aborted) return
+        setData(next); setError(''); setCourse(previous => next.courses.some(c => String(c.id) === previous) ? previous : next.courses.length === 1 ? String(next.courses[0].id) : '')
+        if (next.status === 'connected') changed.current()
+        else if (next.status === 'requested') timer = setTimeout(() => void load(), 15000)
+      } catch (e) { if (!controller.signal.aborted) setError((e as Error).message) }
+    }
+    void load()
+    return () => { controller.abort(); clearTimeout(timer) }
+  }, [registry_course_id, academic_year, semester, section, th, version])
+  async function submit() {
+    if (!data) return
     setBusy(true); setError('')
     try {
-      const r = await classRequest('/connections/requests', th, { registry_course_id: context.classRow.registry_course_id,
-        academic_year: context.academic_year, semester: context.semester, section: context.classRow.section })
-      setResult(r.status); onChanged()
+      const direct = data.status === 'ready'
+      const result = await classRequest(direct ? '/connections/setup' : '/connections/requests', th,
+        { registry_course_id, academic_year, semester, section, ...(direct ? { course_id: Number(course) } : {}) })
+      setData({ ...data, status: result.status })
+      if (result.status === 'connected') changed.current()
+      setVersion(v => v + 1)
     } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }
-  return <div className="space-y-4">
-    <p className="max-w-prose text-sm leading-relaxed">{th ? 'ส่งข้อมูลกลุ่มเรียนนี้ให้ผู้ดูแลเลือกรายวิชาในระบบและมอบหมายงานสอนในครั้งเดียว ไม่เปลี่ยนสิทธิ์บัญชีหรือผลงานเดิม' : 'Send this exact section for one in-app review: the administrator chooses its LearnHouse course and approves teaching and roster access together. Account roles and existing work stay unchanged.'}</p>
-    {!result ? <form className="max-w-xl space-y-3" onSubmit={e => { e.preventDefault(); void send() }}>
-      <p className="text-sm text-neutral-600">{th ? 'ระบบจะดึงรายชื่อทางการของกลุ่มเรียนนี้จากระบบทะเบียนของมหาวิทยาลัยโดยอัตโนมัติ ผู้ดูแลจะตรวจสอบจำนวนก่อนนำเข้ารายชื่อ' : 'The system retrieves this section’s official NRRU roster automatically. An administrator reviews the count before the initial roster import.'}</p>
-      <Button className="min-h-11" disabled={busy}>{busy ? th ? 'กำลังส่ง…' : 'Sending…' : th ? 'ขอเชื่อมชั้นเรียนนี้' : 'Request this class connection'}</Button>
-    </form> : <p role="status" className="text-sm font-medium">{result === 'connected' ? th ? 'เชื่อมชั้นเรียนแล้ว กำลังโหลดข้อมูลล่าสุด' : 'Class connected. Refreshing its workspace.' : th ? 'ส่งคำขอแล้ว ผู้ดูแลตรวจสอบได้ในชั้นเรียนของฉัน ไม่ต้องส่งคำขอซ้ำ' : 'Request sent. It is in the administrator’s My classes review queue; no repeat request is needed.'}</p>}
+  const heading = !data ? th ? 'กำลังโหลดชั้นเรียน…' : 'Loading class…' : data.status === 'ready' ? th ? 'พร้อมตั้งค่าชั้นเรียน' : 'Ready to set up this class' : data.status === 'requested' ? th ? 'รอเลือกรายวิชา' : 'Waiting for a course match' : data.status === 'connected' ? th ? 'ชั้นเรียนพร้อมใช้งานแล้ว' : 'Class is ready' : data.status === 'conflict' ? th ? 'ต้องตรวจสอบการเชื่อมรายวิชา' : 'Course connection needs review' : th ? 'ตั้งค่าชั้นเรียนนี้' : 'Set up this class'
+  return <div className="space-y-3" aria-busy={busy} aria-live="polite">
+    <h3 className="text-base font-semibold">{heading}</h3>
+    {data?.status === 'ready' && <form className="max-w-xl space-y-3" onSubmit={e => { e.preventDefault(); void submit() }}>
+      {data.courses.length > 1 ? <label className="flex flex-col gap-2 text-sm">{th ? 'รายวิชาสำหรับชั้นเรียนนี้' : 'Course for this class'}<select required className={control} value={course} onChange={e => setCourse(e.target.value)}><option value="">{th ? 'เลือกรายวิชา' : 'Choose a course'}</option>{data.courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label> : <p className="text-sm">{data.courses[0]?.name}</p>}
+      <p className="text-sm text-neutral-600">{th ? 'ตั้งค่ากลุ่มเรียนและโหลดรายชื่อนักศึกษาจากทะเบียน' : 'Set up this section and load its official student roster.'}</p>
+      <Button className="min-h-11" disabled={busy || !course}>{busy ? th ? 'กำลังโหลดรายชื่อ…' : 'Loading roster…' : th ? 'ตั้งค่าชั้นเรียนและโหลดรายชื่อ' : 'Set up class and load roster'}</Button>
+    </form>}
+    {data?.status === 'requested' && <p className="max-w-prose text-sm text-neutral-600">{th ? 'บันทึกคำขอแล้ว ผู้ดูแลกำลังเลือกรายวิชาสำหรับกลุ่มเรียนนี้ หน้านี้จะอัปเดตเมื่อพร้อมใช้งาน' : 'Your request is saved. An administrator needs to select the course for this section. This page updates when it is ready.'}</p>}
+    {data?.status === 'needs_course' && <><p className="max-w-prose text-sm text-neutral-600">{th ? 'เลือกรายวิชาที่ใช้กับกลุ่มเรียนนี้ก่อนโหลดรายชื่อนักศึกษา' : 'This section needs a course match before its roster can be loaded.'}</p>{data.can_request ? <Button className="min-h-11" disabled={busy} onClick={() => void submit()}>{busy ? th ? 'กำลังส่ง…' : 'Sending…' : th ? 'ส่งให้เลือกรายวิชา' : 'Request course match'}</Button> : <Link className="inline-flex min-h-11 items-center text-sm underline underline-offset-4" href="/account/school-identity">{th ? 'ตรวจสอบข้อมูลผู้สอน' : 'Review school identity'}</Link>}</>}
+    {data?.status === 'conflict' && <p className="max-w-prose text-sm text-neutral-600">{th ? 'กลุ่มเรียนนี้มีการเชื่อมข้อมูลอยู่แล้ว โปรดตรวจสอบรายวิชาและงานสอนในชั้นเรียนของฉัน' : 'This section already has a connection. Review its course and teaching assignment in My classes.'}</p>}
     {error && <p role="alert" className="text-sm text-red-800">{error}</p>}
+    {(error || data?.status === 'requested' || data?.status === 'connected' || data?.status === 'conflict') && <Button variant="outline" className="min-h-11" disabled={busy} onClick={() => { setVersion(v => v + 1); changed.current() }}>{th ? 'ตรวจสอบสถานะอีกครั้ง' : 'Refresh status'}</Button>}
   </div>
 }
 

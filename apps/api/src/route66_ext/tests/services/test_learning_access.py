@@ -263,6 +263,78 @@ class LearningAccessTests(AcademicRosterTests):
             self.assertEqual(len(snapshots), 1)
             self.assertEqual((snapshots[0].details["source_kind"], snapshots[0].details["source_hash"]), ("course_rtf", "b" * 64))
 
+    async def test_assigned_teacher_section_setup_and_persisted_request_status(self):
+        from dataclasses import replace
+        from types import SimpleNamespace
+        from contextlib import asynccontextmanager
+        from fastapi import FastAPI
+        import httpx
+        from src.route66_ext.routers import academic_classes as api, school_identity, class_connections as connections
+        from src.route66_ext.db.school_identity import NrruTeacherIdentity
+        from src.route66_ext.db.academic_classes import TeachingAssignment
+        proof = replace(self.google, subject="synthetic-direct-teacher", verified_email="direct.teacher@nrru.ac.th", hosted_domain="nrru.ac.th")
+        identity = await self.link(user=2, proof=proof); _, session = await self.login(proof)
+        async with self.sessions.begin() as db:
+            db.add(NrruTeacherIdentity(user_id=2, identity_id=identity, officer_id="90001", officer_code="90002", name_th="ผู้สอนทดสอบ", name_en="Synthetic teacher"))
+            assignment = (await db.exec(select(TeachingAssignment).where(TeachingAssignment.user_id == 2))).one()
+            assignment.active = False; db.add(assignment)
+        app = FastAPI(); app.include_router(api.router, prefix="/api/v1/academic-classes")
+        async def database():
+            async with self.sessions() as db: yield db
+        app.dependency_overrides[get_db_session] = database
+        config = SimpleNamespace(org_id=1, handoff=SimpleNamespace(client=SimpleNamespace(public_origin="https://learn.example.com")))
+        @asynccontextmanager
+        async def resources(_): yield None, None
+        facts = {"registry_course_id": "100", "academic_year": 2569, "semester": 2, "section": "P2"}
+        timetable = {**facts, "classes": [{"registry_course_id": "100", "section": "P2", "course_code": "990001", "title": "Synthetic subject"}]}
+        fetch = AsyncMock(return_value=(self.rows("6900000001"), "d" * 64))
+        with patch.object(school_identity, "settings", return_value=config), patch.object(connections, "resources", resources), patch.object(connections, "throttle", AsyncMock()), patch.object(connections, "teacher_timetable", AsyncMock(return_value=timetable)), patch.object(connections.roster, "fetch_roster", fetch):
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://learn.example.com", headers={"Origin": "https://learn.example.com"}, cookies={"LH_access": session.access_token}) as client:
+                base = "/api/v1/academic-classes/connections"
+                status = await client.get(base + "/section", params=facts)
+                self.assertEqual(status.status_code, 200, status.text)
+                self.assertEqual(status.json()["status"], "needs_course")
+                self.assertIn("no-store", status.headers["cache-control"])
+                request = await client.post(base + "/requests", json=facts)
+                self.assertEqual(request.status_code, 200, request.text)
+                status = (await client.get(base + "/section", params=facts)).json()
+                self.assertEqual((status["status"], status["request_id"]), ("requested", request.json()["id"]))
+                self.assertEqual(fetch.await_count, 0)
+                denied = await client.post(base + "/setup", json={**facts, "course_id": 10})
+                self.assertEqual(denied.status_code, 403)
+                async with self.sessions.begin() as db:
+                    assignment = (await db.exec(select(TeachingAssignment).where(TeachingAssignment.user_id == 2))).one()
+                    assignment.active = True; db.add(assignment)
+                status = (await client.get(base + "/section", params=facts)).json()
+                self.assertEqual(status["status"], "ready"); self.assertEqual([c["id"] for c in status["courses"]], [10])
+                self.assertEqual((await client.post(base + "/setup", json={**facts, "course_id": 11})).status_code, 403)
+                self.assertEqual((await client.post(base + "/setup", json={**facts, "course_id": 10}, headers={"Origin": "https://foreign.invalid"})).status_code, 403)
+                self.assertEqual((await client.post(base + "/setup", json={**facts, "section": "P99", "course_id": 10})).status_code, 409)
+                fetch.side_effect = ValueError("Synthetic outage")
+                self.assertEqual((await client.post(base + "/setup", json={**facts, "course_id": 10})).status_code, 503)
+                async with self.sessions() as db:
+                    self.assertEqual(len((await db.exec(select(AcademicClass))).all()), 1)
+                    self.assertEqual((await db.exec(select(AcademicRosterEntry))).all(), [])
+                fetch.side_effect = None
+                ready = await client.post(base + "/setup", json={**facts, "course_id": 10})
+                self.assertEqual(ready.status_code, 200, ready.text)
+                self.assertEqual(ready.json()["roster_count"], 1)
+                fetches = fetch.await_count
+                self.assertEqual((await client.post(base + "/setup", json={**facts, "course_id": 10})).json()["class_id"], ready.json()["class_id"])
+                self.assertEqual((await client.get(base + "/section", params=facts)).json()["status"], "connected")
+                self.assertEqual(fetch.await_count, fetches)
+                async with self.sessions.begin() as db:
+                    assignment = (await db.exec(select(TeachingAssignment).where(TeachingAssignment.user_id == 2))).one()
+                    assignment.active = False; db.add(assignment)
+                self.assertEqual((await client.post(base + "/setup", json={**facts, "course_id": 10})).status_code, 403)
+        async with self.sessions() as db:
+            self.assertEqual(len((await db.exec(select(AcademicRosterEntry))).all()), 1)
+            self.assertEqual(len((await db.exec(select(AcademicClassEvent).where(AcademicClassEvent.kind == "class_connection_completed"))).all()), 1)
+            self.assertFalse((await db.get(User, 2)).is_superadmin)
+            self.assertEqual((await db.exec(select(UserGroupUser))).all(), [])
+            self.assertEqual((await db.exec(select(ResourceAuthor))).all(), [])
+            self.assertEqual((await db.exec(select(TrailRun))).all(), [])
+
     async def test_connection_dto_rejects_pasted_urls_and_source_is_fixed(self):
         from pydantic import ValidationError
         from types import SimpleNamespace

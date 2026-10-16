@@ -1,6 +1,11 @@
 # Real teacher class workspace
 
-Status: live healthy source/image f9bc5b2a, deployed app-only on exact compatible4d9b24e0 parent. The five-task workspace opens actual registrar sections; the former simulator is removed. Owner explicitly requests real course records and deleting dummy data/wording. Approved course/official-ID/section mapping and actual plan/syllabus sources remain unresolved; no real academic import performed. No privilege inference or schedule generation.
+Current development: [section setup and persistent status](class-section-setup.md)
+replaces placeholder tabs with three working views and permits direct setup using
+existing assignments and course bindings. See the latest deployment record for live
+revision; the original implementation and validation below are historical.
+
+Original release: source/image f9bc5b2a, deployed app-only on exact compatible4d9b24e0 parent. The five-task workspace opens actual registrar sections; the former simulator is removed. Owner explicitly requests real course records and deleting dummy data/wording. Approved course/official-ID/section mapping and actual plan/syllabus sources remain unresolved; no real academic import performed. No privilege inference or schedule generation.
 
 ## Direction contract
 

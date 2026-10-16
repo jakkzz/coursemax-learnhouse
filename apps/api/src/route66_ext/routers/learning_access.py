@@ -41,7 +41,13 @@ async def _class(db, user, org_id, class_id):
     if cls is None:
         raise HTTPException(404, "Class not found")
     await academic_rosters.can_manage(db, user, cls, org_id)
+    unmatched(cls)
     return cls
+
+
+def unmatched(cls):
+    if cls.course_id is None:
+        raise HTTPException(409, "Connect this school class to a native course before configuring learning access")
 
 
 @router.get("/{class_id}/learning-access/preview")
@@ -62,6 +68,7 @@ async def status(class_id: int, request: Request, response: Response,
     cls = await db.get(AcademicClass, class_id)
     if cls is None: raise HTTPException(404, "Class not found")
     await academic_rosters.can_manage(db, user, cls, config.org_id)
+    if cls.course_id is None: return {"status": "not_matched", "can_configure": False}
     try:
         binding = await learning_access._binding(db, cls.course_id)
         if binding is None: return {"status": "not_configured", "can_configure": user.is_superadmin is True}
@@ -85,6 +92,7 @@ async def retry(class_id: int, request: Request, response: Response,
     cls = await db.get(AcademicClass, class_id)
     if cls is None: raise HTTPException(404, "Class not found")
     await academic_rosters.can_manage(db, user, cls, config.org_id)
+    unmatched(cls)
     result = await learning_access.refresh_course(db, user.id, cls.course_id)
     if result["status"] == "not_configured":
         db.add(AcademicClassEvent(actor_user_id=user.id, class_id=cls.id, kind="learning_access_pending",

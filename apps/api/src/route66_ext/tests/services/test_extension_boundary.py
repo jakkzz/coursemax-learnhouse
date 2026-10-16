@@ -75,13 +75,16 @@ class DiscoveryTests(unittest.TestCase):
         from src.route66_ext.bootstrap import register_models
         modules = register_models()
         tables = set()
+        # Modules added after extraction have no legacy native shim to preserve.
+        unshimmed = {'src.route66_ext.db.school_calendar'}
         for owned in modules:
-            legacy = importlib.import_module(owned.__name__.replace('src.route66_ext.', 'src.', 1))
+            legacy = None if owned.__name__ in unshimmed else importlib.import_module(owned.__name__.replace('src.route66_ext.', 'src.', 1))
             for name, value in vars(owned).items():
                 if inspect.isclass(value) and value.__module__ == owned.__name__ and hasattr(value, '__table__'):
-                    self.assertIs(getattr(legacy, name), value)
+                    if legacy is not None:
+                        self.assertIs(getattr(legacy, name), value)
                     tables.add(value.__table__.name)
-        self.assertEqual(len(tables), 15)
+        self.assertEqual(len(tables), 19)
         self.assertEqual(register_models(), modules)
 
     def test_bootstrap_unique_existing_route_paths(self):
@@ -99,7 +102,7 @@ class DiscoveryTests(unittest.TestCase):
         identifiers = [operation['operationId'] for path in schema['paths'].values()
                        for operation in path.values() if isinstance(operation, dict) and 'operationId' in operation]
         self.assertEqual(len(identifiers), len(set(identifiers)))
-        for path in ('/auth/google/start', '/auth/line/start', '/school-identity/me', '/academic-classes', '/attendance/check-in'):
+        for path in ('/auth/google/start', '/auth/line/start', '/school-identity/me', '/academic-classes', '/attendance/check-in', '/school-calendars', '/school-calendars/schedules/apply'):
             self.assertIn(path, schema['paths'])
 
     def test_migration_wrappers_preserve_revision_graph(self):
@@ -120,7 +123,8 @@ class DiscoveryTests(unittest.TestCase):
         from alembic.script import ScriptDirectory
         from src.route66_ext.migrations.config import migration_config
         script = ScriptDirectory.from_config(migration_config())
-        self.assertEqual(script.get_heads(), ["f47eb52fa044"])
+        self.assertEqual(script.get_heads(), ["b3e9c4d1a702"])
+        self.assertEqual(script.get_revision("b3e9c4d1a702").down_revision, "f47eb52fa044")
         self.assertEqual(script.get_revision("f47eb52fa044").down_revision, "f36da41e9f33")
 
     def test_native_imports_confined_to_adapters(self):

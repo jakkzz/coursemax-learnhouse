@@ -81,20 +81,19 @@ class ScanCode(BaseModel):
 
 
 def session_dto(row):
-    return {k: getattr(row, k) for k in ('id', 'class_id', 'title', 'starts_at', 'ends_at', 'timezone', 'grace_minutes', 'late_threshold_minutes', 'state', 'version')}
+    return {k: getattr(row, k) for k in ('id', 'class_id', 'title', 'starts_at', 'ends_at', 'timezone', 'grace_minutes', 'late_threshold_minutes', 'state', 'version',
+                                         'calendar_kind', 'academic_week', 'slot_key', 'nominal_on', 'replaces_session_id', 'mode', 'location', 'note')}
 
 
 @router.get('/classes/{class_id}/sessions')
-async def sessions(class_id: int, request: Request, response: Response, db: AsyncSession = Depends(get_db_session)):
+async def sessions(class_id: int, request: Request, response: Response, session: int | None = None,
+                   db: AsyncSession = Depends(get_db_session)):
     private(response)
     actor, config, _ = await context(request, db)
     cls = await db.get(AcademicClass, class_id)
     if cls is None:
         raise HTTPException(404, 'Class not found')
-    from src.route66_ext.adapters.db_courses_courses import Course
-    course = await db.get(Course, cls.course_id)
-    if not course or course.org_id != config.org_id:
-        raise HTTPException(404, 'Class not found')
+    course = await roster.class_course(db, cls, config.org_id)
     manageable = True
     try:
         await roster.can_manage(db, actor, cls, config.org_id)
@@ -104,7 +103,13 @@ async def sessions(class_id: int, request: Request, response: Response, db: Asyn
         manageable = False
         await service.member(db, cls, actor)
     rows = (await db.exec(select(AttendanceSession).where(AttendanceSession.class_id == class_id).order_by(AttendanceSession.starts_at.desc()).limit(200))).all()
-    return {'class_id': cls.id, 'course_name': course.name, 'section': cls.section, 'manageable': manageable, 'sessions': [session_dto(r) for r in rows]}
+    if session is not None and session not in {r.id for r in rows}:
+        # A linked session beyond the recent page stays reachable under the same class authority.
+        selected = await db.get(AttendanceSession, session)
+        if selected is None or selected.class_id != class_id:
+            raise HTTPException(404, 'Attendance session not found')
+        rows = [*rows, selected]
+    return {'class_id': cls.id, 'course_name': course.name if course else cls.registry_title or cls.registry_course_code, 'section': cls.section, 'manageable': manageable, 'sessions': [session_dto(r) for r in rows]}
 
 
 @router.post('/classes/{class_id}/sessions')

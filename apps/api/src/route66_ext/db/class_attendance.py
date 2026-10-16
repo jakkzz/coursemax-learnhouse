@@ -1,6 +1,6 @@
 """Class-owned session schedules and immutable QR scan receipts/events."""
-from datetime import datetime, timezone
-from sqlalchemy import Column, DateTime, CheckConstraint, UniqueConstraint, DDL, event
+from datetime import date, datetime, timezone
+from sqlalchemy import Column, Date, DateTime, CheckConstraint, ForeignKey, Index, Integer, SmallInteger, UniqueConstraint, DDL, event, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import SQLModel, Field
 
@@ -10,7 +10,13 @@ def now():
 
 
 class AttendanceSession(SQLModel, table=True):
-    __table_args__ = (CheckConstraint("ends_at > starts_at AND grace_minutes >= 0 AND late_threshold_minutes >= grace_minutes AND state IN ('scheduled','no_class') AND version >= 0", name='ck_attendance_session'),)
+    __table_args__ = (CheckConstraint("ends_at > starts_at AND grace_minutes >= 0 AND late_threshold_minutes >= grace_minutes AND state IN ('scheduled','no_class') AND version >= 0", name='ck_attendance_session'),
+        # Calendar meetings: one root per (week, slot, kind); each version has one successor.
+        CheckConstraint("calendar_kind IS NULL OR (calendar_kind IN ('regular','makeup') AND academic_week IS NOT NULL AND slot_key IS NOT NULL AND nominal_on IS NOT NULL)", name='ck_attendance_calendar_meeting'),
+        Index('uq_attendance_calendar_root', 'class_id', 'academic_week', 'slot_key', 'calendar_kind', unique=True,
+              postgresql_where=text('calendar_kind IS NOT NULL AND replaces_session_id IS NULL')),
+        Index('uq_attendance_replacement', 'replaces_session_id', unique=True,
+              postgresql_where=text('replaces_session_id IS NOT NULL')),)
     id: int | None = Field(default=None, primary_key=True)
     class_id: int = Field(foreign_key='academicclass.id', index=True)
     title: str = Field(max_length=160)
@@ -22,6 +28,16 @@ class AttendanceSession(SQLModel, table=True):
     state: str = 'scheduled'
     version: int = 0
     created_by: int = Field(foreign_key='user.id')
+    # Insert-only calendar provenance (NULL for manually created sessions).
+    calendar_kind: str | None = Field(default=None, max_length=20)
+    academic_week: int | None = Field(default=None, sa_column=Column(SmallInteger))
+    slot_key: str | None = Field(default=None, max_length=40)
+    nominal_on: date | None = Field(default=None, sa_column=Column(Date))
+    replaces_session_id: int | None = Field(default=None, sa_column=Column(Integer, ForeignKey('attendancesession.id')))
+    rotation: str | None = Field(default=None, max_length=20)
+    mode: str | None = Field(default=None, max_length=20)
+    location: str | None = Field(default=None, max_length=1000)
+    note: str | None = Field(default=None, max_length=500)
 
 
 class AttendanceChallenge(SQLModel, table=True):
@@ -60,14 +76,17 @@ class AttendanceEvent(SQLModel, table=True):
     created_at: datetime = Field(default_factory=now, sa_column=Column(DateTime(timezone=True), nullable=False))
 
 
+CALENDAR_COLUMNS = ('calendar_kind', 'academic_week', 'slot_key', 'nominal_on', 'replaces_session_id', 'rotation', 'mode', 'location', 'note')
 ATTENDANCE_TABLES = tuple(m.__table__ for m in (AttendanceSession, AttendanceChallenge, AttendanceScan, AttendanceEvent))
 IMMUTABLE_FUNCTION = """CREATE OR REPLACE FUNCTION lh_attendance_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN RAISE EXCEPTION 'Attendance evidence is immutable'; END; $$"""
 SESSION_FUNCTION = """CREATE OR REPLACE FUNCTION lh_attendance_schedule_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
  IF TG_OP = 'DELETE' THEN RAISE EXCEPTION 'Attendance sessions must be retained'; END IF;
- IF ROW(NEW.class_id,NEW.title,NEW.starts_at,NEW.ends_at,NEW.timezone,NEW.grace_minutes,NEW.late_threshold_minutes,NEW.created_by)
- IS DISTINCT FROM ROW(OLD.class_id,OLD.title,OLD.starts_at,OLD.ends_at,OLD.timezone,OLD.grace_minutes,OLD.late_threshold_minutes,OLD.created_by)
+ IF ROW(NEW.class_id,NEW.title,NEW.starts_at,NEW.ends_at,NEW.timezone,NEW.grace_minutes,NEW.late_threshold_minutes,NEW.created_by,
+ NEW.calendar_kind,NEW.academic_week,NEW.slot_key,NEW.nominal_on,NEW.replaces_session_id,NEW.rotation,NEW.mode,NEW.location,NEW.note)
+ IS DISTINCT FROM ROW(OLD.class_id,OLD.title,OLD.starts_at,OLD.ends_at,OLD.timezone,OLD.grace_minutes,OLD.late_threshold_minutes,OLD.created_by,
+ OLD.calendar_kind,OLD.academic_week,OLD.slot_key,OLD.nominal_on,OLD.replaces_session_id,OLD.rotation,OLD.mode,OLD.location,OLD.note)
  THEN RAISE EXCEPTION 'Attendance schedule cannot be rewritten'; END IF;
  RETURN NEW;
 END; $$"""

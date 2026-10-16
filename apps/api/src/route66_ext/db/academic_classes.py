@@ -4,7 +4,7 @@ These records never change native roles, content authorship or historical work.
 All mutations append AcademicClassEvent in the same transaction; no delete API.
 """
 from datetime import datetime, timezone
-from sqlalchemy import Column, DateTime, UniqueConstraint, CheckConstraint
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, UniqueConstraint, CheckConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import SQLModel, Field
 
@@ -29,7 +29,12 @@ class AcademicClass(SQLModel, table=True):
         UniqueConstraint('registry_course_id','academic_year','semester','section',name='uq_official_course_section_term'),
         CheckConstraint('semester BETWEEN 1 AND 3 AND academic_year BETWEEN 2500 AND 2700',name='ck_class_term'),)
     id: int | None = Field(default=None, primary_key=True)
-    course_id: int = Field(foreign_key='course.id', index=True)
+    # Organization owns the school class; a native course is an optional match.
+    # Database trigger derives/validates org_id from course_id for legacy callers.
+    org_id: int | None = Field(default=None, sa_column=Column(Integer, ForeignKey('organization.id'), nullable=False, index=True))
+    course_id: int | None = Field(default=None, foreign_key='course.id', index=True)
+    teacher_user_id: int | None = Field(default=None, foreign_key='user.id')
+    registry_title: str | None = Field(default=None, max_length=300)
     academic_year: int
     semester: int
     section: str = Field(max_length=40)
@@ -83,6 +88,25 @@ BEGIN RAISE EXCEPTION 'Academic class events are append-only'; END; $$"""
 EVENT_TRIGGER = 'CREATE TRIGGER lh_academic_event_immutable BEFORE UPDATE OR DELETE ON academicclassevent FOR EACH ROW EXECUTE FUNCTION lh_academic_event_immutable()'
 for statement in (EVENT_FUNCTION, EVENT_TRIGGER):
     event.listen(AcademicClassEvent.__table__, 'after_create', DDL(statement).execute_if(dialect='postgresql'))
+# School-class organization is fixed; a native course match may be attached once
+# (NULL -> course in the same organization) but never moved to another course.
+CLASS_ORG_FUNCTION = """CREATE OR REPLACE FUNCTION lh_academic_class_org() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE course_org integer;
+BEGIN
+ IF NEW.course_id IS NOT NULL THEN
+  SELECT org_id INTO course_org FROM course WHERE id=NEW.course_id;
+  IF NEW.org_id IS NULL THEN NEW.org_id := course_org; END IF;
+  IF course_org IS DISTINCT FROM NEW.org_id THEN RAISE EXCEPTION 'Class course belongs to another organization'; END IF;
+ END IF;
+ IF TG_OP = 'UPDATE' THEN
+  IF NEW.org_id IS DISTINCT FROM OLD.org_id THEN RAISE EXCEPTION 'Class organization cannot change'; END IF;
+  IF OLD.course_id IS NOT NULL AND NEW.course_id IS DISTINCT FROM OLD.course_id THEN RAISE EXCEPTION 'Class course match cannot be reassigned'; END IF;
+ END IF;
+ RETURN NEW;
+END; $$"""
+CLASS_ORG_TRIGGER = 'CREATE TRIGGER lh_academic_class_org BEFORE INSERT OR UPDATE ON academicclass FOR EACH ROW EXECUTE FUNCTION lh_academic_class_org()'
+for statement in (CLASS_ORG_FUNCTION, CLASS_ORG_TRIGGER):
+    event.listen(AcademicClass.__table__, 'after_create', DDL(statement).execute_if(dialect='postgresql'))
 
 # Preserve private helper names through legacy compatibility imports.
 __all__ = [name for name in globals() if not name.startswith("__")]

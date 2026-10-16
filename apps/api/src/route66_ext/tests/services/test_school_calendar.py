@@ -1,0 +1,606 @@
+"""Shared calendars, school-class schedules and attendance on isolated PostgreSQL; synthetic only."""
+import asyncio
+from contextlib import asynccontextmanager
+from dataclasses import replace
+from datetime import date, datetime, timedelta, timezone
+from hashlib import sha256
+from io import BytesIO
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
+import httpx
+from fastapi import FastAPI, HTTPException
+from sqlalchemy import text
+from sqlmodel import select
+from src.route66_ext.tests.services.test_academic_rosters import AcademicRosterTests
+from src.route66_ext.db.academic_classes import AcademicClass, AcademicRosterEntry, TeachingAssignment
+from src.route66_ext.db.class_attendance import AttendanceSession, AttendanceChallenge
+from src.route66_ext.db.school_calendar import CALENDAR_TABLES, SchoolCalendarSource
+from src.route66_ext.db.school_identity import SchoolGoogleEvidence, NrruTeacherIdentity
+from src.db.users import User
+from src.db.user_organizations import UserOrganization
+from src.route66_ext.routers import school_calendars as api, class_connections as connections, class_attendance as attendance_api
+from src.route66_ext.services import academic_rosters as roster, learning_access as access
+
+ORIGIN = 'https://learn.example.com'
+
+
+def blank_pdf():
+    from pypdf import PdfWriter
+    writer, out = PdfWriter(), BytesIO()
+    writer.add_blank_page(width=200, height=200)
+    writer.write(out)
+    return out.getvalue()
+
+
+def monday(offset_weeks):
+    today = date.today()
+    return today - timedelta(days=today.weekday()) + timedelta(weeks=offset_weeks)
+
+
+def week(n, start, rotation='teaching', teaching=True):
+    return {'number': n, 'starts_on': start.isoformat(), 'ends_on': (start + timedelta(days=6)).isoformat(),
+            'rotation': rotation, 'teaching': teaching, 'page': 1}
+
+
+def calendar_payload(first, count=4, closures=()):
+    weeks = [week(i + 1, first + timedelta(weeks=i)) for i in range(count)]
+    return {'timezone': 'Asia/Bangkok', 'terms': [{'semester': 1, 'starts_on': first.isoformat(),
+        'ends_on': (first + timedelta(weeks=count) - timedelta(days=1)).isoformat(), 'weeks': weeks,
+        'closures': list(closures)}]}
+
+
+MEETINGS = [{'day': 'จันทร์', 'start_time': '9:00', 'end_time': '12:00', 'details': 'ROOM-1'},
+            {'day': 'พฤหัสบดี', 'start_time': '13:00', 'end_time': '15:00', 'details': 'LAB-2'}]
+
+
+class SchoolCalendarTests(AcademicRosterTests):
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        async with self.engine.begin() as conn:
+            for table in CALENDAR_TABLES:
+                await conn.run_sync(table.create)
+        self.actor = 1
+        self.config = SimpleNamespace(org_id=1, deployment='fixture', handoff=SimpleNamespace(client=SimpleNamespace(public_origin=ORIGIN)))
+        self.timetable = {}
+        app = FastAPI()
+        app.include_router(api.router, prefix='/api/v1/school-calendars')
+        app.include_router(attendance_api.router, prefix='/api/v1/attendance')
+
+        async def database():
+            async with self.sessions() as db:
+                yield db
+
+        async def context(request, db):
+            user = await db.get(User, self.actor)
+            evidence = (await db.exec(select(SchoolGoogleEvidence).where(SchoolGoogleEvidence.user_id == self.actor))).first()
+            return user, self.config, evidence
+
+        async def verified(db, user, config, evidence, body, request, meetings=False):
+            facts = self.timetable.get((user.id, body.registry_course_id, body.section))
+            if facts is None:
+                raise HTTPException(409, 'Select one exact section from your current registrar timetable')
+            data = {'registry_course_id': body.registry_course_id, 'academic_year': body.academic_year,
+                    'semester': body.semester, 'section': body.section, **facts, 'org_id': 1, 'teacher_id': user.id}
+            if not meetings:
+                data.pop('meetings')
+            return data
+
+        app.dependency_overrides[api.get_db_session] = database
+        app.dependency_overrides[attendance_api.get_db_session] = database
+        self.calendar_patches = [patch.object(api, 'context', context), patch.object(attendance_api, 'context', context),
+                                 patch.object(api, 'verified_section', verified), patch.object(connections, 'verified_section', verified),
+                                 patch.object(connections, 'context', context), patch.object(connections, 'boundary', lambda *a: None)]
+        for p in self.calendar_patches:
+            p.start()
+        self.client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN, headers={'Origin': ORIGIN})
+
+    async def asyncTearDown(self):
+        await self.client.aclose()
+        for p in reversed(self.calendar_patches):
+            p.stop()
+        await super().asyncTearDown()
+
+    async def make_admin(self, user=1):
+        async with self.sessions.begin() as db:
+            row = await db.get(User, user); row.is_superadmin = True; db.add(row)
+
+    async def teacher(self, user=3):
+        proof = replace(self.google, subject='teacher-' + str(user), verified_email=f'fixture.teacher{"abc"[user - 1]}@nrru.ac.th', hosted_domain='nrru.ac.th')
+        from src.route66_ext.services.auth.google_handoff import VerifiedGoogleHandoff
+        from src.route66_ext.services.auth.oauth_transactions import LinkActor
+        from src.route66_ext.services.auth.native_google import complete_native_google
+        async with self.sessions.begin() as db:
+            native = await db.get(User, user); native.email_verified = True; db.add(native); await db.flush()
+            await complete_native_google(db, VerifiedGoogleHandoff(proof, 'link', '/classes', LinkActor(user, 'a' * 64)), org_id=1)
+        async with self.sessions.begin() as db:
+            evidence = (await db.exec(select(SchoolGoogleEvidence).where(SchoolGoogleEvidence.user_id == user))).one()
+            db.add(NrruTeacherIdentity(user_id=user, identity_id=evidence.identity_id, officer_id=str(90000 + user),
+                                       officer_code=str(80000 + user), name_th='ผู้สอนทดสอบ', name_en='Synthetic teacher'))
+
+    async def published(self, payload, track='ภาคปกติ'):
+        self.actor = 1
+        data = blank_pdf()
+        created = await self.client.post('/api/v1/school-calendars', data={'name': 'ปฏิทินทดสอบ', 'academic_year': '2569', 'track': track},
+                                         files={'file': ('calendar.pdf', data, 'application/pdf')})
+        self.assertEqual(created.status_code, 200, created.text)
+        revision = created.json()
+        saved = await self.client.put(f"/api/v1/school-calendars/revisions/{revision['id']}", json={'expected_version': 0, 'payload': payload})
+        self.assertEqual(saved.status_code, 200, saved.text)
+        done = await self.client.post(f"/api/v1/school-calendars/revisions/{revision['id']}/publish", json={'expected_version': 1, 'reviewed': True})
+        self.assertEqual(done.status_code, 200, done.text)
+        return done.json()
+
+    def section(self, section='P9', course='100'):
+        return {'registry_course_id': course, 'academic_year': 2569, 'semester': 1, 'section': section}
+
+    async def preview(self, revision_id, section, pattern='onsite'):
+        response = await self.client.post('/api/v1/school-calendars/schedules/preview',
+                                          json={'section': section, 'revision_id': revision_id, 'pattern': pattern})
+        self.assertEqual(response.status_code, 200, response.text)
+        return response.json()
+
+    async def apply(self, revision_id, section, preview, pattern='onsite'):
+        return await self.client.post('/api/v1/school-calendars/schedules/apply', json={
+            'section': section, 'revision_id': revision_id, 'pattern': pattern,
+            'expected_version': preview['version'], 'fingerprint': preview['fingerprint'], 'reviewed': True})
+
+    async def test_source_crud_review_publish_and_administrator_authority(self):
+        await self.make_admin()
+        self.actor = 3
+        denied = await self.client.post('/api/v1/school-calendars', data={'name': 'x', 'academic_year': '2569', 'track': 'regular'},
+                                        files={'file': ('c.pdf', blank_pdf(), 'application/pdf')})
+        self.assertEqual(denied.status_code, 403)
+        self.actor = 1
+        data = blank_pdf()
+        bad = await self.client.post('/api/v1/school-calendars', data={'name': 'x', 'academic_year': '2569', 'track': 'regular'},
+                                     files={'file': ('c.pdf', b'not a pdf', 'application/pdf')})
+        self.assertEqual(bad.status_code, 422)
+        created = (await self.client.post('/api/v1/school-calendars', data={'name': 'ปฏิทิน 2569', 'academic_year': '2569', 'track': 'regular'},
+                                          files={'file': ('ปฏิทิน.pdf', data, 'application/pdf')})).json()
+        self.assertEqual((created['state'], created['version'], created['source_hash']), ('draft', 0, sha256(data).hexdigest()))
+        self.assertIn('manually', created['parse_note'])
+        rid = created['id']
+        source = await self.client.get(f'/api/v1/school-calendars/revisions/{rid}/source')
+        self.assertEqual((source.status_code, source.content, source.headers['content-type']), (200, data, 'application/pdf'))
+        self.assertIn('no-store', source.headers['cache-control'])
+        parse = await self.client.post(f'/api/v1/school-calendars/revisions/{rid}/parse', json={'expected_version': 0})
+        self.assertEqual((parse.status_code, parse.json()['detail']['code']), (422, 'no_text'))
+        invalid = await self.client.put(f'/api/v1/school-calendars/revisions/{rid}', json={'expected_version': 0, 'payload': {'terms': 'x'}})
+        self.assertEqual(invalid.status_code, 422)
+        empty = await self.client.post(f'/api/v1/school-calendars/revisions/{rid}/publish', json={'expected_version': 0, 'reviewed': True})
+        self.assertEqual(empty.status_code, 422)
+        payload = calendar_payload(monday(2))
+        payload['unresolved'] = ['Week 4 end date unclear']
+        saved = (await self.client.put(f'/api/v1/school-calendars/revisions/{rid}', json={'expected_version': 0, 'payload': payload})).json()
+        self.assertEqual(saved['version'], 1)
+        self.assertEqual(saved['payload']['unresolved'], ['Week 4 end date unclear'])
+        self.assertEqual(saved['payload']['terms'][0]['weeks'][0]['page'], 1)
+        stale = await self.client.put(f'/api/v1/school-calendars/revisions/{rid}', json={'expected_version': 0, 'payload': payload})
+        self.assertEqual(stale.status_code, 409)
+        unresolved = await self.client.post(f'/api/v1/school-calendars/revisions/{rid}/publish', json={'expected_version': 1, 'reviewed': True})
+        self.assertEqual(unresolved.status_code, 422)
+        payload['unresolved'] = []
+        await self.client.put(f'/api/v1/school-calendars/revisions/{rid}', json={'expected_version': 1, 'payload': payload})
+        self.actor = 3
+        self.assertEqual((await self.client.get(f'/api/v1/school-calendars/revisions/{rid}')).status_code, 404)
+        self.assertEqual((await self.client.get('/api/v1/school-calendars')).json(), {'can_edit': False, 'calendars': []})
+        self.assertEqual((await self.client.post(f'/api/v1/school-calendars/revisions/{rid}/publish', json={'expected_version': 2, 'reviewed': True})).status_code, 403)
+        self.actor = 1
+        self.assertEqual((await self.client.post(f'/api/v1/school-calendars/revisions/{rid}/publish', json={'expected_version': 2, 'reviewed': False})).status_code, 400)
+        published = (await self.client.post(f'/api/v1/school-calendars/revisions/{rid}/publish', json={'expected_version': 2, 'reviewed': True})).json()
+        self.assertEqual((published['state'], published['calendar']['published_revision_id']), ('published', rid))
+        self.assertEqual((await self.client.put(f'/api/v1/school-calendars/revisions/{rid}', json={'expected_version': 3, 'payload': payload})).status_code, 409)
+        with self.assertRaises(Exception):
+            async with self.sessions.begin() as db:
+                await db.execute(text("UPDATE schoolcalendarrevision SET payload='{}'::jsonb"))
+        with self.assertRaises(Exception):
+            async with self.sessions.begin() as db:
+                await db.execute(text("UPDATE schoolcalendarsource SET filename='changed.pdf'"))
+        draft = (await self.client.post(f"/api/v1/school-calendars/{published['calendar_id']}/draft", json={'from_revision_id': rid})).json()
+        self.assertEqual((draft['state'], draft['number'], draft['source_hash'], draft['payload']), ('draft', 2, published['source_hash'], published['payload']))
+        again = (await self.client.post('/api/v1/school-calendars', data={'name': 'renamed', 'academic_year': '2569', 'track': 'regular'},
+                                        files={'file': ('copy.pdf', data, 'application/pdf')})).json()
+        self.assertEqual((again['calendar_id'], again['source_id']), (published['calendar_id'], published['source_id']))
+        async with self.sessions() as db:
+            self.assertEqual(len((await db.exec(select(SchoolCalendarSource))).all()), 1)
+        self.actor = 3
+        listing = (await self.client.get('/api/v1/school-calendars?year=2569')).json()
+        self.assertEqual([(c['published_revision_id'], c['latest_revision_id']) for c in listing['calendars']], [(rid, again['id'])])
+        self.assertEqual((await self.client.get(f'/api/v1/school-calendars/revisions/{rid}')).status_code, 200)
+
+    async def text_draft(self):
+        """Upload with mocked native text extraction; the PDF bytes are still stored as-is."""
+        await self.make_admin(); self.actor = 1
+        data = blank_pdf()
+        from src.route66_ext.adapters import services_ai_rag_formats as formats
+        with patch.object(formats, 'pdf_pages', lambda *a, **k: [(1, 'ปฏิทินการศึกษา ภาคเรียนที่ 1/2569 สัปดาห์ที่ 1 ...')]):
+            created = await self.client.post('/api/v1/school-calendars', data={'name': 'ปฏิทิน', 'academic_year': '2569', 'track': 'ภาคปกติ'},
+                                             files={'file': ('calendar.pdf', data, 'application/pdf')})
+        self.assertEqual(created.status_code, 200, created.text)
+        return created.json(), data
+
+    def ai(self, generate):
+        from src.route66_ext.adapters import security_features_utils_usage as usage, services_security_rate_limiting as rate
+        from src.route66_ext.adapters import security_org_auth as mfa, services_ai_llm as llm
+        from unittest.mock import Mock
+        self.reserve, self.refund, self.limit, self.mfa = AsyncMock(return_value=1), Mock(), Mock(), AsyncMock()
+        self.model, self.generate = AsyncMock(return_value='fixture-model'), generate
+        self.ai_patches = [patch.object(target, name, value) for target, name, value in (
+            (usage, 'reserve_ai_credit', self.reserve), (usage, 'refund_ai_credit', self.refund),
+            (rate, 'enforce_ai_rate_limit', self.limit), (mfa, 'enforce_org_mfa', self.mfa),
+            (llm, 'resolve_model_for_org', self.model), (llm, 'generate', generate))]
+        for item in self.ai_patches:
+            item.start()
+
+    def stop_ai(self):
+        for item in reversed(self.ai_patches):
+            item.stop()
+
+    async def test_typed_ai_parse_saves_uncertain_draft_for_review_through_native_gate(self):
+        draft, data = await self.text_draft()
+        self.assertEqual(draft['source_pages'][0]['page'], 1)
+        from src.route66_ext.services.calendar_plan import Payload
+        start = monday(2)
+        parsed = Payload.model_validate({'terms': [{'semester': 1, 'starts_on': start.isoformat(),
+            'ends_on': (start + timedelta(days=13)).isoformat(), 'page': 1,
+            'weeks': [week(1, start), {**week(2, start + timedelta(days=7), 'midterm'), 'uncertain': True}],
+            'closures': [{'affected_on': start.isoformat(), 'makeup_on': None, 'note': 'วันหยุด', 'page': 1}]}],
+            'unresolved': ['สัปดาห์สอบกลางภาค: มีการเรียนปกติหรือไม่']})
+        self.ai(AsyncMock(return_value=parsed))
+        try:
+            response = await self.client.post(f"/api/v1/school-calendars/revisions/{draft['id']}/parse", json={'expected_version': 0})
+        finally:
+            self.stop_ai()
+        self.assertEqual(response.status_code, 200, response.text)
+        saved = response.json()
+        self.mfa.assert_awaited_once(); self.limit.assert_called_once_with(1, 1)
+        self.assertEqual(self.reserve.await_args.args[0], 1); self.assertEqual(self.reserve.await_args.kwargs, {'amount': 1})
+        self.assertEqual(self.model.await_args.kwargs, {'purpose': 'planning'})
+        kwargs = self.generate.await_args.kwargs
+        self.assertEqual((kwargs['model_name'], kwargs['output_type']), ('fixture-model', Payload))
+        self.assertIn('--- Page 1 ---', kwargs['user_prompt'])
+        self.refund.assert_not_called()
+        self.assertEqual((saved['state'], saved['version'], saved['source_hash']), ('draft', 1, sha256(data).hexdigest()))
+        self.assertEqual(saved['payload']['unresolved'], ['สัปดาห์สอบกลางภาค: มีการเรียนปกติหรือไม่'])
+        weeks = saved['payload']['terms'][0]['weeks']
+        self.assertEqual([(w['rotation'], w['teaching'], w['uncertain']) for w in weeks], [('teaching', True, False), ('midterm', True, True)])
+        self.assertTrue(any('Unresolved' in i for i in saved['issues']) and any('uncertain' in i for i in saved['issues']))
+        self.assertIn('Check every date', saved['parse_note'])
+        refused = await self.client.post(f"/api/v1/school-calendars/revisions/{draft['id']}/publish", json={'expected_version': 1, 'reviewed': True})
+        self.assertEqual(refused.status_code, 422)  # a human must resolve the review items first
+        reloaded = (await self.client.get(f"/api/v1/school-calendars/revisions/{draft['id']}")).json()
+        self.assertEqual((reloaded['state'], reloaded['payload']), ('draft', saved['payload']))
+
+    async def test_ai_provider_failures_keep_source_and_draft_and_refund_credit(self):
+        draft, data = await self.text_draft()
+        AINotConfiguredError = type('AINotConfiguredError', (Exception,), {})
+        for error, status, code in ((AINotConfiguredError('no provider key'), 403, 'ai_unavailable'),
+                                    (RuntimeError('provider timeout'), 502, 'parse_failed')):
+            self.ai(AsyncMock(side_effect=error))
+            try:
+                response = await self.client.post(f"/api/v1/school-calendars/revisions/{draft['id']}/parse", json={'expected_version': 0})
+            finally:
+                self.stop_ai()
+            self.assertEqual((response.status_code, response.json()['detail']['code']), (status, code))
+            self.assertIn('manually', response.json()['detail']['message'])
+            self.refund.assert_called_once_with(1, 1)
+            after = (await self.client.get(f"/api/v1/school-calendars/revisions/{draft['id']}")).json()
+            self.assertEqual((after['version'], after['payload'], after['parse_note']), (0, draft['payload'], draft['parse_note']))
+            self.assertEqual((await self.client.get(f"/api/v1/school-calendars/revisions/{draft['id']}/source")).content, data)
+        # A disabled/over-quota native AI gate is reported precisely, before any model call.
+        from fastapi import HTTPException as Denied
+        self.ai(AsyncMock())
+        self.reserve.side_effect = Denied(403, 'AI is not enabled for this organization')
+        try:
+            response = await self.client.post(f"/api/v1/school-calendars/revisions/{draft['id']}/parse", json={'expected_version': 0})
+        finally:
+            self.stop_ai()
+        self.assertEqual((response.status_code, response.json()['detail']['code']), (403, 'ai_unavailable'))
+        self.assertIn('AI is not enabled', response.json()['detail']['message'])
+        self.generate.assert_not_awaited(); self.model.assert_not_awaited()
+        manual = await self.client.put(f"/api/v1/school-calendars/revisions/{draft['id']}",
+                                       json={'expected_version': 0, 'payload': calendar_payload(monday(2))})
+        self.assertEqual(manual.status_code, 200, manual.text)  # manual completion always remains available
+
+    async def test_unmatched_school_class_apply_is_atomic_idempotent_and_grants_nothing(self):
+        await self.make_admin()
+        revision = await self.published(calendar_payload(monday(1), closures=[
+            {'affected_on': monday(2).isoformat(), 'makeup_on': (monday(2) + timedelta(days=5)).isoformat(), 'note': 'วันหยุดราชการ'},
+            {'affected_on': (monday(3) + timedelta(days=3)).isoformat(), 'makeup_on': None, 'note': 'ปิดเรียน'}]))
+        await self.teacher(3)
+        self.actor = 3
+        self.timetable[(3, '100', 'P9')] = {'course_code': '990001', 'title': 'วิชาตัวอย่าง', 'meetings': MEETINGS}
+        section = self.section()
+        async with self.sessions() as db:
+            before = ((await db.exec(select(TeachingAssignment))).all(), (await db.exec(select(UserOrganization))).all())
+        empty = (await self.client.get('/api/v1/school-calendars/schedules', params=section)).json()
+        self.assertEqual((empty['class_id'], empty['sessions']), (None, []))
+        preview = await self.preview(revision['id'], section)
+        self.assertEqual(preview['changes']['added'], 9)  # 8 regular (two closed) + 1 make-up
+        self.assertTrue(any('weekend' in w for w in preview['warnings']))
+        async with self.sessions() as db:
+            self.assertEqual(len((await db.exec(select(AcademicClass))).all()), 1)  # preview never persists a class
+        wrong = await self.client.post('/api/v1/school-calendars/schedules/apply', json={'section': section, 'revision_id': revision['id'],
+            'pattern': 'onsite', 'expected_version': 0, 'fingerprint': '0' * 64, 'reviewed': True})
+        self.assertEqual(wrong.status_code, 409)
+        async with self.sessions() as db:
+            self.assertEqual(len((await db.exec(select(AcademicClass))).all()), 1)
+            self.assertEqual((await db.exec(select(AttendanceSession))).all(), [])
+        saved = await self.apply(revision['id'], section, preview)
+        self.assertEqual(saved.status_code, 200, saved.text)
+        schedule = saved.json()
+        self.assertEqual((schedule['version'], schedule['revision_id'], schedule['pattern']), (1, revision['id'], 'onsite'))
+        states = [(s['week_number'], s['state'], s['makeup_for']) for s in schedule['sessions']]
+        self.assertIn((2, 'no_class', None), states)
+        self.assertIn((2, 'scheduled', monday(2).isoformat()), states)
+        self.assertTrue(all(s['attendance_url'].startswith(f"/attendance?class={schedule['class_id']}&session=") for s in schedule['sessions']))
+        repeat = await self.apply(revision['id'], section, preview)
+        self.assertEqual((repeat.status_code, len(repeat.json()['sessions'])), (200, 9))
+        async with self.sessions() as db:
+            cls = await db.get(AcademicClass, schedule['class_id'])
+            self.assertEqual((cls.course_id, cls.org_id, cls.teacher_user_id, cls.registry_title), (None, 1, 3, 'วิชาตัวอย่าง'))
+            after = ((await db.exec(select(TeachingAssignment))).all(), (await db.exec(select(UserOrganization))).all())
+            self.assertEqual([a.model_dump() for a in before[0]], [a.model_dump() for a in after[0]])
+            self.assertEqual([m.model_dump() for m in before[1]], [m.model_dump() for m in after[1]])
+            self.assertIsNone(await access.refresh_course(db, 3, cls.course_id))
+            from src.route66_ext.services.academic_projection import project
+            evidence = (await db.exec(select(SchoolGoogleEvidence).where(SchoolGoogleEvidence.user_id == 3))).one()
+            listed = (await project(db, await db.get(User, 3), 1, evidence))['classes']
+            self.assertEqual([(c['id'], c['course_id'], c['course_uuid'], c['course_name']) for c in listed],
+                             [(cls.id, None, '', 'วิชาตัวอย่าง')])
+        for statement in ("UPDATE attendancesession SET starts_at=starts_at+interval '1 hour'",
+                          'UPDATE attendancesession SET academic_week=academic_week+1',
+                          'UPDATE attendancesession SET replaces_session_id=id', 'DELETE FROM attendancesession'):
+            with self.assertRaises(Exception):
+                async with self.sessions.begin() as db:
+                    await db.execute(text(statement))
+        self.actor = 2  # assigned elsewhere, not this school class's owner
+        self.assertEqual((await self.client.get(f"/api/v1/school-calendars/schedules/by-class/{schedule['class_id']}")).status_code, 403)
+        self.assertEqual((await self.client.get(f"/api/v1/attendance/classes/{schedule['class_id']}/sessions")).status_code, 403)
+
+    def gapped(self, closures=()):
+        """Week 1 is last week (past); weeks 2-4 are upcoming."""
+        starts = [monday(-1), monday(1), monday(2), monday(3)]
+        return {'timezone': 'Asia/Bangkok', 'terms': [{'semester': 1, 'starts_on': starts[0].isoformat(),
+            'ends_on': (starts[-1] + timedelta(days=6)).isoformat(),
+            'weeks': [week(i + 1, d) for i, d in enumerate(starts)], 'closures': list(closures)}]}
+
+    async def republish(self, calendar_id, from_id, payload):
+        self.actor = 1
+        draft = (await self.client.post(f"/api/v1/school-calendars/{calendar_id}/draft", json={'from_revision_id': from_id})).json()
+        saved = await self.client.put(f"/api/v1/school-calendars/revisions/{draft['id']}", json={'expected_version': 0, 'payload': payload})
+        self.assertEqual(saved.status_code, 200, saved.text)
+        done = await self.client.post(f"/api/v1/school-calendars/revisions/{draft['id']}/publish", json={'expected_version': 1, 'reviewed': True})
+        self.assertEqual(done.status_code, 200, done.text)
+        self.actor = 3
+        return done.json()
+
+    async def test_revision_change_protects_past_and_evidence_and_links_future_replacements(self):
+        await self.make_admin()
+        base = await self.published(self.gapped())
+        await self.teacher(3)
+        self.actor = 3
+        self.timetable[(3, '100', 'P9')] = {'course_code': '990001', 'title': 'วิชาตัวอย่าง', 'meetings': MEETINGS[:1]}
+        section = self.section()
+        preview = await self.preview(base['id'], section)
+        self.assertEqual((preview['changes']['added'], preview['changes']['skipped_past']), (3, 1))
+        self.assertEqual([s['action'] for s in preview['sessions']], ['skipped_past', 'added', 'added', 'added'])
+        schedule = (await self.apply(base['id'], section, preview)).json()
+        by_week = {s['week_number']: s for s in schedule['sessions']}
+        self.assertEqual(sorted(by_week), [2, 3, 4])
+        async with self.sessions.begin() as db:
+            # Synthetic evidence on week 2, and a week 1 meeting saved earlier that is now in the past.
+            now = datetime.now(timezone.utc)
+            db.add(AttendanceChallenge(session_id=by_week[2]['id'], token_hash='e' * 64, session_version=0, kind='entry',
+                created_at=now, expires_at=now + timedelta(minutes=1), created_by=3))
+            past = now - timedelta(days=2)
+            db.add(AttendanceSession(class_id=schedule['class_id'], title='past', starts_at=past, ends_at=past + timedelta(hours=3),
+                created_by=3, calendar_kind='regular', academic_week=1, slot_key='mon-0900-1200', nominal_on=monday(-1)))
+        newer = await self.republish(base['calendar_id'], base['id'], self.gapped([
+            {'affected_on': monday(-1).isoformat(), 'makeup_on': None, 'note': 'past closure'},
+            {'affected_on': monday(1).isoformat(), 'makeup_on': None, 'note': 'evidence week'},
+            {'affected_on': monday(2).isoformat(), 'makeup_on': (monday(2) + timedelta(days=2)).isoformat(), 'note': 'moved'}]))
+        current = (await self.client.get(f"/api/v1/school-calendars/schedules/by-class/{schedule['class_id']}")).json()
+        self.assertEqual((current['revision_id'], current['newer_revision_id']), (base['id'], newer['id']))
+        review = await self.preview(newer['id'], section)
+        self.assertEqual(review['protected_count'], 2)
+        self.assertEqual((review['changes']['added'], review['changes']['replaced']), (1, 1))
+        kept = [s for s in review['sessions'] if s['action'] == 'protected']
+        self.assertEqual(sorted((s['week_number'], s['state']) for s in kept), [(1, 'scheduled'), (2, 'scheduled')])
+        stale = await self.client.post('/api/v1/school-calendars/schedules/apply', json={'section': section, 'revision_id': newer['id'],
+            'pattern': 'onsite', 'expected_version': 0, 'fingerprint': review['fingerprint'], 'reviewed': True})
+        self.assertEqual(stale.status_code, 409)
+        updated = (await self.apply(newer['id'], section, review)).json()
+        self.assertEqual(updated['version'], 2)
+        async with self.sessions() as db:
+            rows = {r.id: r for r in (await db.exec(select(AttendanceSession))).all()}
+        self.assertEqual(rows[by_week[2]['id']].state, 'scheduled')  # evidence-bearing: unchanged
+        self.assertEqual(next(r for r in rows.values() if r.title == 'past').state, 'scheduled')  # past: unchanged
+        self.assertEqual((rows[by_week[3]['id']].state, rows[by_week[3]['id']].version), ('no_class', 1))
+        makeup = [r for r in rows.values() if r.calendar_kind == 'makeup']
+        self.assertEqual([(m.academic_week, m.nominal_on, m.starts_at.astimezone(timezone(timedelta(hours=7))).date()) for m in makeup],
+                         [(3, monday(2), monday(2) + timedelta(days=2))])
+        # Move the make-up again: the old make-up is kept as superseded history, linked to its replacement.
+        third = await self.republish(base['calendar_id'], newer['id'], self.gapped([
+            {'affected_on': monday(2).isoformat(), 'makeup_on': (monday(2) + timedelta(days=3)).isoformat(), 'note': 'moved'}]))
+        review = await self.preview(third['id'], section)
+        final = (await self.apply(third['id'], section, review)).json()
+        makeups = [s for s in final['sessions'] if s['calendar_kind'] == 'makeup']
+        self.assertEqual([(s['state'], s['superseded']) for s in makeups], [('no_class', True), ('scheduled', False)])
+        async with self.sessions() as db:
+            latest = await db.get(AttendanceSession, makeups[1]['id'])
+            self.assertEqual(latest.replaces_session_id, makeups[0]['id'])
+
+    async def test_preview_warns_about_overlap_with_saved_manual_sessions_without_changing_them(self):
+        await self.make_admin()
+        revision = await self.published(calendar_payload(monday(1), count=2))
+        self.actor = 2
+        await self.teacher(2)
+        self.timetable[(2, '100', 'P1')] = {'course_code': '990001', 'title': 'วิชาตัวอย่าง', 'meetings': MEETINGS[:1]}
+        from zoneinfo import ZoneInfo
+        start = datetime.combine(monday(1), datetime.min.time().replace(hour=10), ZoneInfo('Asia/Bangkok'))
+        async with self.sessions.begin() as db:
+            manual = AttendanceSession(class_id=20, title='Manual lab', starts_at=start, ends_at=start + timedelta(hours=1), created_by=2)
+            db.add(manual); await db.flush(); manual_id = manual.id
+        preview = await self.preview(revision['id'], self.section('P1'))
+        self.assertIn(f'Week 1 meeting overlaps saved session #{manual_id} "Manual lab"', preview['warnings'])
+        self.assertFalse(any('Week 2' in w for w in preview['warnings']))
+        self.assertEqual(preview['changes']['added'], 2)
+        async with self.sessions() as db:
+            row = await db.get(AttendanceSession, manual_id)
+            self.assertEqual((row.calendar_kind, row.state, row.version, row.replaces_session_id), (None, 'scheduled', 0, None))
+
+    async def test_matched_class_uses_teaching_assignment_and_unmatched_class_attaches_in_place(self):
+        await self.make_admin()
+        revision = await self.published(calendar_payload(monday(1), count=2))
+        self.actor = 2  # assigned native teacher of class 20 (100/P1)
+        await self.teacher(2)
+        self.timetable[(2, '100', 'P1')] = {'course_code': '990001', 'title': 'วิชาตัวอย่าง', 'meetings': MEETINGS[:1]}
+        preview = await self.preview(revision['id'], self.section('P1'))
+        saved = (await self.apply(revision['id'], self.section('P1'), preview)).json()
+        self.assertEqual(saved['class_id'], 20)
+        await self.teacher(3)
+        self.actor = 3
+        self.timetable[(3, '100', 'P9')] = {'course_code': '990001', 'title': 'วิชาตัวอย่าง', 'meetings': MEETINGS[:1]}
+        preview = await self.preview(revision['id'], self.section())
+        school = (await self.apply(revision['id'], self.section(), preview)).json()
+        session_ids = [s['id'] for s in school['sessions']]
+        # Another assigned teacher cannot attach someone else's school class.
+        async with self.sessions.begin() as db:
+            db.add(TeachingAssignment(course_id=10, user_id=3))
+        from contextlib import ExitStack
+        async with self.sessions() as db:
+            with ExitStack() as stack:
+                for p in await self.endpoint_context(db, 2):
+                    stack.enter_context(p)
+                stack.enter_context(patch.object(connections, 'resources', self._resources))
+                self.actor = 2
+                self.timetable[(2, '100', 'P9')] = self.timetable[(3, '100', 'P9')]
+                with self.assertRaises(HTTPException) as denied:
+                    await connections.setup_section(connections.Setup(**self.section(), course_id=10), None, SimpleNamespace(headers={}), db)
+                self.assertEqual(denied.exception.status_code, 409)
+        async with self.sessions() as db:
+            self.actor = 3
+            result = await connections.setup_section(connections.Setup(**self.section(), course_id=10), None, SimpleNamespace(headers={}), db)
+        self.assertEqual((result['class_id'], result['matched_school_class']), (school['class_id'], True))
+        async with self.sessions() as db:
+            cls = await db.get(AcademicClass, school['class_id'])
+            self.assertEqual(cls.course_id, 10)
+            self.assertEqual(sorted((await db.exec(select(AttendanceSession.id).where(AttendanceSession.class_id == cls.id))).all()), sorted(session_ids))
+        with self.assertRaises(Exception):
+            async with self.sessions.begin() as db:
+                await db.execute(text(f"UPDATE academicclass SET course_id=11 WHERE id={school['class_id']}"))
+        with self.assertRaises(Exception):
+            async with self.sessions.begin() as db:
+                await db.execute(text("UPDATE academicclass SET org_id=2 WHERE id=20"))
+
+    @asynccontextmanager
+    async def _resources(self, *args):
+        yield None, None
+
+    async def test_student_reads_unmatched_schedule_and_checks_in_by_roster(self):
+        await self.make_admin()
+        revision = await self.published(calendar_payload(monday(1), count=2))
+        await self.teacher(3)
+        self.actor = 3
+        self.timetable[(3, '100', 'P9')] = {'course_code': '990001', 'title': 'วิชาตัวอย่าง', 'meetings': MEETINGS[:1]}
+        preview = await self.preview(revision['id'], self.section())
+        schedule = (await self.apply(revision['id'], self.section(), preview)).json()
+        await self.claim()
+        async with self.sessions.begin() as db:
+            await roster.serialize(db)
+            await roster.apply_roster(db, await db.get(AcademicClass, schedule['class_id']), self.rows('6900000001'), 'c' * 64, 3)
+        self.actor = 1
+        async with self.sessions.begin() as db:
+            row = await db.get(User, 1); row.is_superadmin = False; db.add(row)
+        own = await self.client.get(f"/api/v1/school-calendars/schedules/by-class/{schedule['class_id']}")
+        self.assertEqual((own.status_code, own.json()['manageable'], len(own.json()['sessions'])), (200, False, 2))
+        listed = await self.client.get(f"/api/v1/attendance/classes/{schedule['class_id']}/sessions")
+        self.assertEqual((listed.status_code, listed.json()['course_name']), (200, 'วิชาตัวอย่าง'))
+        async with self.sessions() as db:
+            self.assertEqual(len((await db.exec(select(AcademicRosterEntry))).all()), 1)
+        # Same roster student, another organization context: class is not found, nothing leaks.
+        self.config = SimpleNamespace(**{**vars(self.config), 'org_id': 2})
+        for url in (f"/api/v1/school-calendars/schedules/by-class/{schedule['class_id']}",
+                    f"/api/v1/attendance/classes/{schedule['class_id']}/sessions"):
+            self.assertEqual((await self.client.get(url)).status_code, 404)
+
+    async def test_migration_backfills_existing_classes_and_named_runner_refuses_versioned_schema(self):
+        from alembic.migration import MigrationContext
+        from alembic.operations import Operations
+        import importlib.util, os
+        import sqlalchemy as sa
+        from src.route66_ext.migrations.versions import b3e9c4d1a702_school_calendar as migration
+        await self.legacy_schema()
+
+        def upgrade(sync):
+            with Operations.context(MigrationContext.configure(sync)):
+                migration.upgrade()
+            for table in (AcademicClass.__table__, AttendanceSession.__table__, *CALENDAR_TABLES):
+                self.assertEqual({c['name'] for c in sa.inspect(sync).get_columns(table.name)}, set(table.columns.keys()))
+            with Operations.context(MigrationContext.configure(sync)):
+                with self.assertRaises(RuntimeError):
+                    migration.downgrade()
+        async with self.engine.begin() as conn:
+            await conn.run_sync(upgrade)
+            self.assertEqual((await conn.execute(text('SELECT id, org_id, course_id FROM academicclass'))).all(), [(20, 1, 10)])
+            # Repeat run below is a no-op over the already-migrated schema.
+        async with self.engine.begin() as conn:
+            def again(sync):
+                with Operations.context(MigrationContext.configure(sync)):
+                    migration.upgrade()
+            await conn.run_sync(again)
+        with self.assertRaises(Exception):
+            async with self.sessions.begin() as db:
+                await db.execute(text("UPDATE attendancesession SET slot_key='x'"))
+        await self.legacy_schema()
+        spec = importlib.util.spec_from_file_location('named_calendar_migration', Path('/deployment/apply_school_calendar_migration.py'))
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        url = 'postgresql://fixture@/fixture?host=/scratch&options=-csearch_path%3D' + self.schema
+        with patch.dict(os.environ, {'LEARNHOUSE_SQL_CONNECTION_STRING': url}):
+            await asyncio.to_thread(module.main)
+            async with self.engine.begin() as conn:
+                self.assertEqual((await conn.execute(text('SELECT org_id FROM academicclass'))).scalars().all(), [1])
+                await conn.execute(text('CREATE TABLE alembic_version (version_num varchar(32))'))
+            with self.assertRaisesRegex(RuntimeError, 'Versioned database'):
+                await asyncio.to_thread(module.main)
+
+    async def legacy_schema(self):
+        """Pre-calendar deployed shape, with one existing class and session."""
+        async with self.engine.begin() as conn:
+            for table in reversed(CALENDAR_TABLES):
+                await conn.run_sync(lambda sync, t=table: t.drop(sync, checkfirst=True))
+            await conn.execute(text('DROP TRIGGER IF EXISTS lh_academic_class_org ON academicclass'))
+            for column in ('org_id', 'teacher_user_id', 'registry_title'):
+                await conn.execute(text(f'ALTER TABLE academicclass DROP COLUMN IF EXISTS {column}'))
+            await conn.execute(text('ALTER TABLE academicclass ALTER COLUMN course_id SET NOT NULL'))
+            for column in ('calendar_kind', 'academic_week', 'slot_key', 'nominal_on', 'replaces_session_id', 'rotation', 'mode', 'location', 'note'):
+                await conn.execute(text(f'ALTER TABLE attendancesession DROP COLUMN IF EXISTS {column}'))
+            await conn.execute(text("""CREATE OR REPLACE FUNCTION lh_attendance_schedule_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF TG_OP = 'DELETE' THEN RAISE EXCEPTION 'Attendance sessions must be retained'; END IF;
+ IF ROW(NEW.class_id,NEW.title,NEW.starts_at,NEW.ends_at,NEW.timezone,NEW.grace_minutes,NEW.late_threshold_minutes,NEW.created_by)
+ IS DISTINCT FROM ROW(OLD.class_id,OLD.title,OLD.starts_at,OLD.ends_at,OLD.timezone,OLD.grace_minutes,OLD.late_threshold_minutes,OLD.created_by)
+ THEN RAISE EXCEPTION 'Attendance schedule cannot be rewritten'; END IF;
+ RETURN NEW;
+END; $$"""))
+            if not (await conn.execute(text('SELECT 1 FROM attendancesession LIMIT 1'))).first():
+                now = datetime.now(timezone.utc)
+                await conn.execute(text("INSERT INTO attendancesession (class_id,title,starts_at,ends_at,timezone,grace_minutes,late_threshold_minutes,state,version,created_by) VALUES (20,'legacy',:s,:e,'Asia/Bangkok',10,20,'scheduled',0,2)"),
+                                   {'s': now, 'e': now + timedelta(hours=1)})
+
+
+def static_scope():
+    """The calendar feature does not import native assignment/grading modules."""
+    root = Path(__file__).resolve().parents[2]
+    files = [root / 'routers/school_calendars.py', root / 'services/school_calendar.py', root / 'services/calendar_plan.py']
+    return [f for f in files if 'assignment' in f.read_text().replace('TeachingAssignment', '')]
+
+
+class ScopeTests(__import__('unittest').TestCase):
+    def test_no_native_assignment_integration(self):
+        self.assertEqual(static_scope(), [])
+
+
+__all__ = [name for name in globals() if not name.startswith("__")]

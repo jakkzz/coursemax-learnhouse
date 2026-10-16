@@ -261,6 +261,9 @@ async def apply(db, actor_id, cls, org_id, *, group_id=None, enabled=True, expec
 
 async def refresh_course(db, actor_id, course_id):
     """Caller already holds roster serialization; preserve its outer transaction."""
+    if course_id is None:
+        # Unmatched school classes have no native course bridge or grants.
+        return None
     from src.route66_ext.services.learning_access_recovery import reconcile
     return await reconcile(db, actor_id, course_id)
 
@@ -276,5 +279,5 @@ async def refresh_user(db, user_id):
         SchoolStudent.user_id == user_id,
         SchoolStudent.student_number.in_(numbers or {""}))))).all())
     courses.update((await db.exec(select(TeachingAssignment.course_id).where(TeachingAssignment.user_id == user_id))).all())
-    for course_id in sorted(courses):
+    for course_id in sorted(courses - {None}):  # unmatched school classes have no bridge
         await refresh_course(db, user_id, course_id)

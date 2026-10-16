@@ -1,17 +1,19 @@
-# Shared school academic calendar — research and proposed implementation
+# Shared school academic calendar
 
-Status: proposal, 2026-10-16. No schema, API, UI or runtime changes implemented by
-this research. Requested independent Claude brainstorming is pending its workspace
-trust prompt in the separate `school-calendar` Herdr session; it has not reviewed
-this proposal. The requested `claude-opus-5-5` model is not yet verified.
+Status: source implementation validated, 2026-10-16; not deployed or institutionally accepted.
+Placement is approved; assignment work is explicitly excluded. Claude Code's
+Opus 5.5 was verified in the separate `school-calendar` Herdr session and completed
+the backend. The connected frontend library/review and class table/calendar flows
+pass isolated compiled desktop/mobile tasks. Shared migration and deployment still
+require practical backup/restore and calendar-compatible rollback verification.
 
 ## Product outcome
 
 Upload the school's academic-calendar PDF once, review it, and publish a reusable
 school/year calendar. Each authorized class selects a term/calendar, combines it
 with its official meeting times, and reviews a dated schedule. Table, month calendar,
-class-session detail and attendance consume the same sessions. Native LearnHouse
-assignments can be explicitly linked without transferring content or grading ownership.
+class-session detail and attendance consume the same sessions. Assignment links,
+deadlines, submissions and grading integration are outside this delivery.
 A school class must not need a native course match just to construct its schedule.
 
 ## Research findings
@@ -36,18 +38,8 @@ section/session; that shortcut must not be ported.
 
 ### Existing LearnHouse capabilities and constraints
 
-- Native `src/db/courses/assignments.py`: an assignment belongs to one organization,
-  course, chapter and activity. It has one `due_date`, not a section-specific deadline.
-  Submission uniqueness is `(user_id, assignment_id)` and task submission uniqueness
-  is `(user_id, assignment_task_id)`. Reusing the same assignment across years does
-  not give a returning student a fresh independent submission.
-- Native assignment service `authorize_assignment_access(..., activity_id=...)`
-  applies course access plus activity publication/paywall/lock gates. Retain it.
-  Native create/update commit internally: do not invoke them mid-way through an
-  extension transaction and assume rollback is still atomic.
-- Native deadline parsing accepts date-only/naive/offset strings with existing
-  server-time semantics. A calendar must not invent an independent Bangkok deadline
-  or claim a timezone fix that the submission endpoint does not enforce.
+- Native assignment behavior was researched but is not part of this feature.
+  Calendar operations must not mutate assignments, deadlines, submissions or grades.
 - Native AI already provides provider-neutral `generate(output_type=...)`, model
   selection and existing organization feature/usage rules. `pypdf` and numbered-page
   text extraction are installed. Reuse these through a typed adapter instead of
@@ -69,8 +61,10 @@ section/session; that shortcut must not be ported.
 1. **Calendar library:** organization-scoped school key, academic year and calendar
    group/track (regular/weekend/etc.). A year can contain several terms; do not
    silently apply a regular-program calendar to every institutional class.
-2. **Source documents:** original PDFs, checksum, extraction method and page evidence.
-   Support a supplementary announcement without replacing the earlier source.
+2. **Source documents:** private original PDF bytes, checksum and page evidence.
+   Uploading another PDF for the same school/year/group creates another draft and
+   preserves earlier sources; identical bytes reuse the stored source. Draft clones
+   retain their source. Multiple-source announcement merging is not claimed.
 3. **Calendar revisions:** editable draft → reviewed published revision. A typed
    revision payload can hold terms, explicit week ranges/rotation, exam periods and
    dated closures/makeup mappings without a table per PDF field. Unknown fields stay
@@ -91,39 +85,23 @@ section/session; that shortcut must not be ported.
    Later changes preserve originals, mark explicitly replaced future sessions no-class
    through the audited path, and create replacements. Past/evidence-bearing sessions
    are protected from automatic regeneration. Repeat apply must not duplicate sessions.
-7. **Native assignment link:** explicit session ↔ native assignment/activity references,
-   checked against the matched native course and the reader's current access. Core
-   owns instructions, publication, submission, grading, solutions and the actual
-   deadline. A session move must not move an assignment's deadline automatically.
-   Restricted/deleted assignment references must not leak cached instructions/answers.
+### Agreed structural direction
 
-### Structural decision to settle with the backend reviewer
-
-Prefer extending the existing school-class aggregate rather than building a second
-roster/session authority, but compare these concrete options before migration:
-
-- Give `AcademicClass` explicit organization ownership and an optional native-course
-  match, preserving existing rows/IDs and auditing every affected authorization,
-  connection, roster and learning-access path.
-- Persist only an official-tuple schedule association until matching, then attach it
-  to the existing class. This is less invasive initially but must not turn planning
-  and attendance into two competing class/session models or quietly gate attendance
-  on a content match.
+Extend `AcademicClass` with explicit organization ownership and an optional native
+course match. Preserve IDs when matching later, including roster/session history.
+The first reviewed schedule save creates an unmatched school class; GET and preview
+must not create records. Existing assigned-teacher authority remains valid; new
+unmatched classes require the confirmed identity's exact official section evidence.
+No second class, roster or attendance-session authority is introduced.
 
 A missing native match never grants content access. Existing manually authorized
 staff/classes must retain their current authority; do not force them through a new
 school identity ceremony as a side effect of this feature.
 
-### Assignment scope decision
+### Explicitly excluded
 
-The smallest useful integration is a link to an existing native assignment, with its
-actual native deadline and submission behavior clearly preserved. This satisfies
-"connect to the core assignment object" but **not independent section/year attempts**.
-If independent class deadlines/submissions are required now, design that explicitly:
-core occurrence/context support, or genuinely isolated native assignment instances
-with enforceable visibility. Merely duplicating activities inside one shared course
-would still expose them to other course members. Do not introduce a shadow extension
-deadline or second grading/submission engine to hide this gap.
+No assignment links, class-specific assignment deadlines, independent attempts,
+submission/grading changes, or migration of historical institutional data.
 
 ## Impeccable surface proposal — Operate mode
 
@@ -140,23 +118,24 @@ that unrelated drift in this feature.
   available terms, source and published/draft state. Authorized publisher gets one
   primary action: **Upload academic calendar**. Reuse existing bounded native admin
   authority for shared publishing; a staff email domain is not publishing authority.
-- **Upload/review:** source PDF beside four concise sections: term dates, teaching
-  weeks, holidays/makeups, other dated events. Prioritize missing/ambiguous dates.
-  Each extracted fact can reveal its page/quote. Parsing failure preserves the PDF
-  and draft for retry/manual completion; it does not clear the current calendar.
+- **Upload/review:** term dates, a focused teaching-week editor, and holidays/makeups.
+  Prioritize unresolved dates and show retained page text beside editing. The private
+  original PDF opens in a new tab: native DENY/frame-ancestors headers remain intact,
+  so an embedded viewer is not offered. Original PDF, not extracted text, is authoritative.
+  Source pages and uncertainty can be corrected explicitly. Parsing failure preserves
+  the PDF and draft for retry/manual completion; it never clears a published calendar.
 - **Class → Schedule:** replace the weekly-only destination with **Table / Calendar**
   views plus a compact recurring-times summary. First use: choose the published
   calendar/term → inspect resulting meetings and exceptions → **Create schedule**.
   Native matching stays separate. Later: **Review calendar changes**, not an
   unexplained automatic rewrite.
 - **Session detail:** actual date/time, original teaching week, room/mode, any
-  "make-up for …" relationship, linked native assignments and **Open attendance**.
+  "make-up for …" relationship and **Open attendance**.
   Keep check-in/attendance controls here rather than a disconnected calendar copy.
 
 ### Layout and behavior
 
-Desktop table: date/time, academic week, meeting/room, status/reason, linked work,
-next action. Calendar: month controls and selected-day agenda; both select the same
+Desktop table: date/time, academic week, meeting/room, status/reason and next action. Calendar: month controls and selected-day agenda; both select the same
 session and retain the viewed period. Mobile defaults to compact chronological
 records; calendar month cells stay short and the chosen day's agenda carries detail.
 A month view is not an unreadable seven-column schedule table squeezed into a phone.
@@ -179,16 +158,83 @@ publishing a shared calendar is distinct from applying it to any class.
   meetings reject check-in; the replacement accepts it under existing roster rules.
 - Revised calendar preserves past/evidence-bearing sessions and original receipts;
   reviewed future replacements do not duplicate or erase history.
-- Native assignment link respects course/activity gates, independent READ/UPDATE,
-  answer hiding, deletion and current deadline. No implicit native role, enrollment,
-  progress or grading mutation.
+- No assignment mutation or link. No implicit native role, enrollment, progress or
+  grading mutation. An unmatched class cannot obtain native learning grants.
 - Register owned models/router/migration through existing bootstrap/composed graph;
   isolated existing/fresh schema tests before any shared-data operation.
 - Desktop/mobile teacher and student tasks in Thai/English, bounded visual review.
 
-## Open confirmation
+## Implemented API and ownership
 
-Confirm the proposed shared-library / class-schedule placement, and whether native
-assignment links are sufficient initially or independent per-class deadlines and
-submission attempts are required in this delivery. Claude's recommendation remains
-pending; this document is not an accepted backend design or a completed feature.
+All routes are composed through `src.route66_ext.bootstrap`, under
+`/api/v1/school-calendars`; native files are unchanged.
+
+- `GET ''`: published library (plus drafts for platform superadmins), `can_edit`.
+- Multipart `POST ''`: `name`, Buddhist `academic_year`, natural-language `track`,
+  `file`; retain a valid PDF up to 10 MB before any optional AI call.
+- `GET /revisions/{id}` and private `GET /revisions/{id}/source`.
+- `PUT /revisions/{id}`: `{expected_version,payload}`; editable drafts only.
+- `POST /revisions/{id}/parse`: `{expected_version}`; native AI feature/plan/credit,
+  rate, model-selection and MFA gates. Failure leaves the source and draft intact.
+- `POST /revisions/{id}/publish`: `{expected_version,reviewed:true}`; unresolved or
+  uncertain facts prevent publication. Published JSON and source bytes are immutable.
+- `POST /{calendar_id}/draft`: `{from_revision_id}`; source-retaining draft clone.
+- `GET /schedules`: exact `registry_course_id,academic_year,semester,section` query.
+- `GET /schedules/by-class/{class_id}`: organization-bound teacher or active member.
+- `POST /schedules/preview`: `{section,revision_id,pattern,expected_version?}`.
+- `POST /schedules/apply`: same plus `{expected_version,fingerprint,reviewed:true}`.
+
+Shared writes use the existing platform-superadmin check. An unmatched class's
+first reviewed apply requires the teacher's confirmed identity and exact own official
+section. It creates the existing `AcademicClass` aggregate, not another class system.
+Matching later retains its class/roster/session IDs; unmatched classes cannot acquire
+native learning grants. Students can read their own schedule both before and after
+native matching, without gaining native content access.
+
+Payload: `timezone:'Asia/Bangkok'`, up to three terms, explicit numbered week ranges,
+rotation and `teaching` boolean, dated closures with nullable make-ups, optional page/
+uncertainty and `unresolved` questions. Unknown keys are rejected. Teaching ranges
+longer than seven days must be split. Exam labels alone never suppress meetings.
+Patterns: `onsite`, `online`, `even_onsite`; no inferred parity. Recognized official
+`W:(start-end)` restrictions apply to original academic weeks, including make-ups;
+unsupported syntax is not silently treated as unrestricted.
+
+Revision DTO also returns source-page count/text, truncation and validation issues.
+Preview includes errors, warnings, action labels and added/replaced/cancelled/
+unchanged/skipped-past counts. Protected rows show their actual unchanged result.
+Superseded saved sessions remain visible in retained history. Attendance links use
+`/attendance?class=X&session=Y`; the class-list request forwards the selected ID so
+an authorized older session is still reachable outside its recent-200 list.
+
+## Validation and deployment boundary
+
+Implementation uses four new owned tables (19 total), organization ownership and an
+optional course on `AcademicClass`, and additive attendance provenance. Named migration
+`b3e9c4d1a702` extends `f47eb52fa044`. The checked runner is
+`deploy/staging/apply_school_calendar_migration.py`; it refuses versioned databases
+and never guesses or stamps an Alembic head. Run it from a verified candidate **before**
+starting the new app, after the relevant backup/restore checks. Startup table creation
+alone cannot add the necessary class/session columns.
+
+Isolated proof: 113 affected PostgreSQL/native/boundary tests passed after correcting
+two legacy-fixture assertions from an earlier 235-test run; frozen historical SQL and
+migrations were not rewritten. Eight calendar PostgreSQL tests include mocked typed-AI
+success/failure and preserved source/draft state; 13 final pure planner cases include
+strict official week ranges. No real provider/model call or institutional PDF acceptance
+is claimed. Two final focused PG tests verify warnings for overlapping manual meetings
+without modifying them and preserve unmatched apply. Counts overlap; do not add them.
+Frontend: 67 checks pass; full isolated Next bundle/TypeScript passes at
+`school-calendar-web-release-20261016`. Five compiled teacher/student EN1440/TH390
+journeys cover PDF/manual repair/publication, unmatched apply, identical table/calendar/
+attendance IDs, matched/unmatched student reading, and publish-return refresh without
+reload. No page errors, horizontal overflow, assignment writes or student academic
+writes were observed in these fixtures. Boundary, diff and 25 tooling checks pass.
+These checks do not claim a deployment or real provider/device acceptance.
+
+Known limits: first apply skips past dates rather than manufacturing historical
+absences; an unmatched class has one owning teacher. Official `W:` numbers must be
+confirmed against the reviewed academic week numbering on real NRRU material.
+Never roll back academic evidence to an older dump. The pre-calendar app is not a
+safe runtime fallback once unmatched classes exist: retain exact parent artifacts,
+but verify a calendar-compatible code rollback against new records before release.
+Synthetic fixtures and isolated tests are not institutional acceptance.

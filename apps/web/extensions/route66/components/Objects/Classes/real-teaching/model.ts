@@ -20,7 +20,7 @@ export function nativeCoursePath(uuid: string): string {
 
 // Navigation only. The destination's native REST authorization remains authoritative.
 export function linkedTeachingClass(context: RegistrarClassContext, classes: AcademicClassLink[]): AcademicClassLink | null {
-  const matches = classes.filter(c => typeof c.registry_course_id === 'string' && c.registry_course_id !== '' &&
+  const matches = classes.filter(c => Boolean(c.course_uuid) && typeof c.registry_course_id === 'string' && c.registry_course_id !== '' &&
     c.registry_course_id === context.classRow.registry_course_id && c.academic_year === context.academic_year &&
     c.semester === context.semester && c.section === context.classRow.section)
   const match = matches.length === 1 ? matches[0] : null

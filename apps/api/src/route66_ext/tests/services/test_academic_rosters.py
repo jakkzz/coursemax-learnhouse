@@ -125,7 +125,7 @@ class AcademicRosterTests(NativeGoogleTests):
             cls=await db.get(AcademicClass,20);self.assertEqual((await s.can_manage(db,await db.get(User,2),cls,1)).id,10)
             with self.assertRaises(HTTPException) as e:await s.can_manage(db,await db.get(User,3),cls,1)
             self.assertEqual(e.exception.status_code,403)
-            cls.course_id=11
+            db.expunge(cls);cls.course_id=11  # transient copy; the database forbids reassigning a class
             with self.assertRaises(HTTPException):await s.can_manage(db,await db.get(User,2),cls,1)
     async def test_class_registry_binding_cannot_be_taken_by_another_course(self):
         from sqlalchemy.exc import IntegrityError
@@ -188,6 +188,9 @@ class AcademicRosterTests(NativeGoogleTests):
         spec=importlib.util.spec_from_file_location('named_nrru_migration',path)
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
         async with self.engine.begin() as conn:
+            # This historical runner targets the pre-calendar class shape.
+            await conn.execute(text('DROP TRIGGER IF EXISTS lh_academic_class_org ON academicclass'))
+            await conn.execute(text('ALTER TABLE academicclass DROP COLUMN org_id, DROP COLUMN teacher_user_id, DROP COLUMN registry_title'))
             await conn.execute(text('ALTER TABLE academicclass DROP CONSTRAINT uq_official_course_section_term'))
             await conn.execute(text('ALTER TABLE academicclass ALTER COLUMN registry_class_id SET NOT NULL'))
         url='postgresql://fixture@/fixture?host=/scratch&options=-csearch_path%3D'+self.schema

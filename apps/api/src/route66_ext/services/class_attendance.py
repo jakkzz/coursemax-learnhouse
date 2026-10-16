@@ -11,7 +11,6 @@ from fastapi import HTTPException
 from sqlmodel import select
 from src.route66_ext.db.class_attendance import AttendanceSession, AttendanceChallenge, AttendanceScan, AttendanceEvent
 from src.route66_ext.db.academic_classes import AcademicClass, AcademicRosterEntry, SchoolStudent
-from src.route66_ext.adapters.db_courses_courses import Course
 from src.route66_ext.services import academic_rosters as roster
 from src.route66_ext.services.attendance_policy import SessionPolicy, decide_checkin, token_is_current, CHECKIN_TOKEN_TTL, missing_attendance_status
 
@@ -27,9 +26,12 @@ def audit(db, session, actor, kind, details):
 async def session_scope(db, session_id, org_id):
     session = await db.get(AttendanceSession, session_id)
     cls = await db.get(AcademicClass, session.class_id) if session else None
-    course = await db.get(Course, cls.course_id) if cls else None
-    if not course or course.org_id != org_id:
+    if cls is None:
         raise HTTPException(404, 'Attendance session not found')
+    try:
+        await roster.class_course(db, cls, org_id)
+    except HTTPException:
+        raise HTTPException(404, 'Attendance session not found') from None
     return session, cls
 
 

@@ -20,7 +20,7 @@ const context={academic_year:2569,semester:1,fetched_at:'2026-10-15T00:00:00Z',c
 const row={id:21,registry_course_id:'501',academic_year:2569,semester:1,section:'S1',manageable:true,course_uuid:'course_fixture',course_available:false}
 test('real workspace links only exact authorized course/year/term/section, never names or codes',()=>{
  assert.equal(linkedTeachingClass(context,[row]),row)
- for(const patch of [{registry_course_id:'502'},{registry_course_id:null},{academic_year:2570},{semester:2},{section:'S2'},{manageable:false},{manageable:'true'},{id:0},{id:1.5}])assert.equal(linkedTeachingClass(context,[{...row,...patch}]),null)
+ for(const patch of [{registry_course_id:'502'},{registry_course_id:null},{academic_year:2570},{semester:2},{section:'S2'},{manageable:false},{manageable:'true'},{course_uuid:''},{id:0},{id:1.5}])assert.equal(linkedTeachingClass(context,[{...row,...patch}]),null)
  assert.equal(linkedTeachingClass(context,[]),null)
  assert.equal(linkedTeachingClass(context,[row,{...row,id:22}]),null)
  assert.equal(linkedTeachingClass(context,[row,{...row,id:22,manageable:false}]),null)
@@ -37,14 +37,15 @@ test('active classes use actual timetable context, with no fictional preview ent
  assert.doesNotMatch(source,/teaching-preview|TeacherPlanningPreview|planningPreview|canPreviewTeaching|teaching-preview-entry|fictional/)
  assert.match(source,/RealTeachingWorkspace/)
  assert.match(source,/onOpenClass=\{setWorkspaceClass\}/)
- assert.match(source,/hidden=\{Boolean\(workspaceClass\)\}/)
+ assert.match(source,/hidden=\{Boolean\(workspaceClass\)\|\|Boolean\(studentClass\)\}/)
 })
 test('production demonstration data and its simulator have been removed, not relabelled',()=>{
  for(const file of ['TeacherPlanningPreview.tsx','model.ts','copy.ts','preview.module.css'])assert.equal(fs.existsSync(new URL('../components/Objects/Classes/teaching-preview/'+file,import.meta.url)),false)
  const source=fs.readFileSync(new URL('../components/Objects/Classes/real-teaching/RealTeachingWorkspace.tsx',import.meta.url),'utf8')
  assert.doesNotMatch(source,/\b(example|sample|fictional|demo|test)\b/i)
  assert.match(source,/overview: 'Details'/)
- assert.match(source,/timetable: 'Weekly schedule'/)
+ assert.match(source,/timetable: 'Schedule'/)
+ assert.match(source,/<ClassSchedule context=\{context\}/)
  assert.match(source,/roster: 'Official roster'/)
  assert.match(source,/<OfficialRoster key=/)
  assert.doesNotMatch(source,/Teaching plan|Saved class roster|Read-only|Opening this page|syllabus: 'Syllabus'/)

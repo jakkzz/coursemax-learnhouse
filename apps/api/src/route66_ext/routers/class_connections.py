@@ -67,7 +67,7 @@ async def completed(db, event):
     return next((r for r in rows if r.details.get("connection_request_id") == event.id), None)
 
 
-async def verified_section(db, user, config, evidence, body, request):
+async def verified_section(db, user, config, evidence, body, request, meetings=False):
     identity = await db.get(NrruTeacherIdentity, user.id)
     if not eligible(evidence) or identity is None or identity.identity_id != evidence.identity_id:
         raise HTTPException(403, "Confirm your own staff record and sign in with your verified institutional Google account")
@@ -80,9 +80,23 @@ async def verified_section(db, user, config, evidence, body, request):
     exact = [c for c in timetable["classes"] if (c["registry_course_id"], c["section"]) == (body.registry_course_id, body.section)]
     if len(exact) != 1 or (timetable["academic_year"], timetable["semester"]) != (body.academic_year, body.semester):
         raise HTTPException(409, "Select one exact section from your current registrar timetable")
-    return {**Section.model_validate(body.model_dump(include=set(Section.model_fields))).model_dump(),
-            "course_code": exact[0]["course_code"], "title": exact[0]["title"],
-            "org_id": config.org_id, "teacher_id": user.id}
+    facts = {**Section.model_validate(body.model_dump(include=set(Section.model_fields))).model_dump(),
+             "course_code": exact[0]["course_code"], "title": exact[0]["title"],
+             "org_id": config.org_id, "teacher_id": user.id}
+    if meetings:
+        facts["meetings"] = exact[0]["meetings"]
+    return facts
+
+
+def owned_school_class(cls, org_id, teacher_id):
+    """An unmatched school class this exact teacher created in this organization."""
+    return cls.course_id is None and cls.org_id == org_id and cls.teacher_user_id == teacher_id
+
+
+def match_course(db, actor_id, cls, course_id, source):
+    # Same stable class/roster/session IDs; the trigger forbids later reassignment.
+    cls.course_id = course_id; cls.version += 1; db.add(cls)
+    roster.event(db, actor_id, "class_course_matched", {"course_id": course_id, "source": source}, cls)
 
 
 async def assigned_courses(db, user_id, org_id, registry_course_id):
@@ -117,11 +131,13 @@ async def section_status(request: Request, response: Response, body: SectionQuer
     candidates = await section_classes(db, body)
     course_ids = {c.id for c in courses}
     connected = candidates[0] if len(candidates) == 1 and candidates[0].course_id in course_ids else None
+    school = candidates[0] if len(candidates) == 1 and owned_school_class(candidates[0], config.org_id, user.id) else None
     event = await own_section_request(db, user.id, config.org_id, body)
     can_request = bool(eligible(evidence) and await db.get(NrruTeacherIdentity, user.id))
-    return {"status": "connected" if connected else "conflict" if candidates else
+    return {"status": "connected" if connected else "conflict" if candidates and not school else
             "ready" if courses else "requested" if event else "needs_course",
             "class_id": connected.id if connected else None,
+            "school_class_id": school.id if school else None,
             "request_id": event.id if event else None, "can_request": can_request,
             "courses": [{"id": c.id, "name": c.name} for c in courses]}
 
@@ -161,11 +177,26 @@ async def setup_section(body: Setup, request: Request, response: Response,
     if binding.course_code != facts["course_code"]:
         raise HTTPException(409, "The official course code changed. Review its course mapping")
     candidates = await section_classes(db, body)
-    if len(candidates) > 1 or (candidates and candidates[0].course_id != body.course_id):
+    school = candidates[0] if len(candidates) == 1 and owned_school_class(candidates[0], config.org_id, user.id) else None
+    if len(candidates) > 1 or (candidates and not school and candidates[0].course_id != body.course_id):
         raise HTTPException(409, "This section is already connected elsewhere. Refresh its status")
+    if school:
+        # Attach the existing school class: roster, schedule and attendance keep their IDs.
+        match_course(db, user.id, school, body.course_id, "assigned_teacher")
+        await db.flush()
+        await access.refresh_course(db, user.id, body.course_id)
+        event = await own_section_request(db, user.id, config.org_id, body)
+        if event and not await completed(db, event):
+            roster.event(db, user.id, _CONNECTED, {"connection_request_id": event.id,
+                "course_id": body.course_id, "teacher_id": user.id, "official": facts,
+                "setup": "assigned_teacher_school_class"}, school)
+        from src.route66_ext.routers.academic_classes import commit
+        await commit(db)
+        return {"status": "connected", "class_id": school.id, "matched_school_class": True}
     if candidates:
         return {"status": "connected", "class_id": candidates[0].id}
-    cls = AcademicClass(course_id=body.course_id, registry_course_id=body.registry_course_id,
+    cls = AcademicClass(org_id=config.org_id, course_id=body.course_id, registry_title=facts["title"],
+        registry_course_id=body.registry_course_id,
         registry_course_code=binding.course_code, academic_year=body.academic_year,
         semester=body.semester, section=body.section, registry_class_id=None)
     try:
@@ -252,7 +283,8 @@ async def proposal(db, actor, org_id, event, body):
         AcademicClass.registry_course_id == d["registry_course_id"], AcademicClass.academic_year == d["academic_year"],
         AcademicClass.semester == d["semester"], AcademicClass.section == d["section"]))).all()
     candidate_count = len(all_candidates)
-    candidates = [candidate for candidate in all_candidates if candidate.course_id == course.id]
+    candidates = [candidate for candidate in all_candidates if candidate.course_id == course.id
+                  or owned_school_class(candidate, org_id, event.actor_user_id)]
     if candidate_count > 1 or (all_candidates and not candidates):
         raise HTTPException(409, "An existing class owns this official section. No class or work can be reassigned")
     if len(candidates) > 1:
@@ -341,9 +373,12 @@ async def connect(connection_id: int, body: Connect, request: Request, response:
             TeachingAssignment.user_id == event.actor_user_id))).one_or_none()
         if assignment is None: assignment = TeachingAssignment(course_id=body.course_id, user_id=event.actor_user_id)
         assignment.active = True; db.add(assignment)
-        cls = candidates[0] if candidates else AcademicClass(course_id=body.course_id,
+        cls = candidates[0] if candidates else AcademicClass(org_id=config.org_id, course_id=body.course_id,
+            registry_title=d.get("title"),
             academic_year=d["academic_year"], semester=d["semester"], section=d["section"],
             registry_course_id=d["registry_course_id"], registry_class_id=p["registry_class_id"], registry_course_code=d["course_code"])
+        if cls.id is not None and cls.course_id is None:
+            match_course(db, user.id, cls, body.course_id, "administrator_review")
         db.add(cls); await db.flush()
         reviewed = await access.preview(db, user.id, cls, config.org_id)
         await access.apply(db, user.id, cls, config.org_id, expected_fingerprint=reviewed["expected_fingerprint"],

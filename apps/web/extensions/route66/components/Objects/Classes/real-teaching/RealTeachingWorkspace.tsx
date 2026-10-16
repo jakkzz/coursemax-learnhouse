@@ -7,15 +7,16 @@ import { Button } from '@/extensions/route66/adapters/ui'
 import { nativeCoursePath, type AcademicClassLink, type RegistrarClassContext } from './model'
 import { SectionConnection } from '../ClassConnections'
 import OfficialRoster from './OfficialRoster'
+import ClassSchedule from '../calendar/ClassSchedule'
 import { weekdayKey } from '../../Account/subpages/timetable-colors'
 import colors from '../../Account/subpages/timetable-colors.module.css'
 import styles from './workspace.module.css'
 import palette from '../class-colors.module.css'
 
 type View = 'overview' | 'timetable' | 'roster'
-export default function RealTeachingWorkspace({ context, linked, linksKnown, th, onClose, onOpenRoster, onChanged }: {
+export default function RealTeachingWorkspace({ context, linked, linksKnown, th, onClose, onOpenRoster, onChanged, onOpenCalendars, calendarRefresh }: {
   context: RegistrarClassContext; linked: AcademicClassLink | null; linksKnown: boolean; th: boolean
-  onClose: () => void; onOpenRoster: () => void; onChanged?: () => void
+  onClose: () => void; onOpenRoster: () => void; onChanged?: () => void; onOpenCalendars?: () => void; calendarRefresh?: number
 }) {
   const [view, setView] = useState<View>('overview'), [connecting, setConnecting] = useState(false), heading = useRef<HTMLHeadingElement>(null)
   useEffect(() => { window.scrollTo(0, 0); heading.current?.focus({ preventScroll: true }) }, [])
@@ -27,7 +28,7 @@ export default function RealTeachingWorkspace({ context, linked, linksKnown, th,
     learning: 'ชั้นเรียน LearnHouse', matched: 'เชื่อมกับชั้นเรียน LearnHouse แล้ว', separate: 'ยังไม่เชื่อมกับ LearnHouse', separateHelp: 'ดูรายละเอียด ตารางเรียน และรายชื่อจากทะเบียนได้โดยไม่ต้องเชื่อมชั้นเรียน',
     connect: 'เชื่อมกับ LearnHouse', openRoster: 'จัดการสมาชิก LearnHouse', openSchedule: 'เปิดวันเรียนและเช็กชื่อ', openCourse: 'เปิดเนื้อหารายวิชา', loading: 'ยังตรวจสอบการเชื่อมกับ LearnHouse ไม่ได้', retry: 'ตรวจสอบอีกครั้ง',
   } : {
-    back: 'All NRRU classes', section: 'Section', tasks: 'Class information', overview: 'Details', timetable: 'Weekly schedule', roster: 'Official roster',
+    back: 'All NRRU classes', section: 'Section', tasks: 'Class information', overview: 'Details', timetable: 'Schedule', roster: 'Official roster',
     code: 'Course code', term: 'Semester / academic year', teacher: 'Teacher', school: 'NRRU', source: 'NRRU registrar data', updated: 'Fetched',
     weekly: 'Weekly meeting times', noMeetings: 'The registrar has not listed meeting times for this section.', scheduleHelp: 'Registrar days, times and rooms—not a dated calendar or make-up schedule.',
     learning: 'LearnHouse class', matched: 'Matched to a LearnHouse class', separate: 'Not matched to LearnHouse', separateHelp: 'Official details, weekly meetings and students are available without connecting a learning workspace.',
@@ -43,7 +44,7 @@ export default function RealTeachingWorkspace({ context, linked, linksKnown, th,
         {!linksKnown ? <><p role="status">{t.loading}</p><Button variant="outline" className="mt-3 min-h-11" onClick={onChanged}>{t.retry}</Button></> : linked ? <><p className={styles.matched}><CheckCircle2 size={16} aria-hidden="true" />{t.matched}</p><div className={styles.handoffs}><Button variant="outline" className="min-h-11" onClick={onOpenRoster}>{t.openRoster}</Button><Link className={styles.action} href={`/attendance?class=${linked.id}`}>{t.openSchedule}</Link>{linked.course_available && <Link className={styles.action} href={nativeCoursePath(linked.course_uuid)}>{t.openCourse}</Link>}</div></> : <><p>{t.separate}</p><p>{t.separateHelp}</p><details onToggle={e => setConnecting(e.currentTarget.open)}><summary>{t.connect}</summary>{connecting && <SectionConnection context={context} th={th} onChanged={onChanged ?? (() => {})} />}</details></>}
       </section>
     </div>}
-    {view === 'timetable' && <div className={styles.task} role="region" aria-label={t.timetable}><h2>{t.weekly}</h2><p>{t.scheduleHelp}</p>
+    {view === 'timetable' && <div className={styles.task} role="region" aria-label={t.timetable}><ClassSchedule context={context} th={th} onOpenCalendars={onOpenCalendars} refreshKey={calendarRefresh} onSaved={onChanged}/><h2 className="mt-8">{t.weekly}</h2><p>{t.scheduleHelp}</p>
       {c.meetings.length === 0 ? <p>{t.noMeetings}</p> : <ul className={styles.meetings}>{c.meetings.map((m, i) => <li key={i}><div className={styles.when}><span className={colors.day} data-weekday={weekdayKey(m.day)}><Clock3 size={14} aria-hidden="true" />{m.day}</span><strong>{m.start_time}–{m.end_time}</strong></div>{m.details && <p className={styles.details}><MapPin size={16} aria-hidden="true" /><span>{m.details}</span></p>}</li>)}</ul>}
     </div>}
     {view === 'roster' && <OfficialRoster key={`${c.registry_course_id}/${context.academic_year}/${context.semester}/${c.section}`} context={context} th={th} />}

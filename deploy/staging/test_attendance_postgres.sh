@@ -77,6 +77,10 @@ if not only:
     suite.addTests(a.AcademicRosterTests(name) for name in a.AcademicRosterTests.__dict__ if name.startswith("test_"))
     suite.addTests(loader.loadTestsFromTestCase(a.ParserTests))
     suite.addTests(b.AttendanceTests(name) for name in b.AttendanceTests.__dict__ if name.startswith("test_"))
+    from src.route66_ext.tests.services import test_school_calendar as c
+    suite.addTests(c.SchoolCalendarTests(name) for name in c.SchoolCalendarTests.__dict__ if name.startswith("test_"))
+    suite.addTests(loader.loadTestsFromNames(["src.route66_ext.tests.services.test_calendar_plan",
+        "src.route66_ext.tests.services.test_school_calendar.ScopeTests"]))
 if extra:
     from src.route66_ext.tests.services.test_learning_access import LearningAccessTests
     suite.addTests(LearningAccessTests(name) for name in LearningAccessTests.__dict__ if name.startswith("test_"))

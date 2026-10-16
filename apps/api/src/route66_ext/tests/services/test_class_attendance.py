@@ -192,6 +192,13 @@ class AttendanceTests(AcademicRosterTests):
             raw=await conn.get_raw_connection()
             await raw.driver_connection.execute(Path('/deployment/attendance-schema.sql').read_text())
         async with self.engine.begin() as conn:
+            # Frozen historical attendance DDL plus the owned calendar migration equals the models.
+            from alembic.migration import MigrationContext
+            from alembic.operations import Operations
+            from src.route66_ext.migrations.versions import b3e9c4d1a702_school_calendar as calendar
+            def upgrade(sync):
+                with Operations.context(MigrationContext.configure(sync)):calendar.upgrade()
+            await conn.run_sync(upgrade)
             def check(sync):
                 for table in ATTENDANCE_TABLES:self.assertEqual({c['name'] for c in sa.inspect(sync).get_columns(table.name)},set(table.columns.keys()))
             await conn.run_sync(check)

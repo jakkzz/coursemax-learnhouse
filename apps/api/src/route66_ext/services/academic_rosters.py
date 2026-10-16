@@ -84,12 +84,36 @@ async def own_student(db,user_id,evidence):
     if set(owners)!={user_id} or profile.user_id!=user_id:return None,'conflict'
     return profile,'matched'
 
-async def can_manage(db,user,cls,org_id):
-    course=await db.get(Course,cls.course_id)
-    if not course or course.org_id!=org_id:raise HTTPException(404,'Class not found')
-    assignment=(await db.exec(select(TeachingAssignment).where(TeachingAssignment.course_id==cls.course_id,TeachingAssignment.user_id==user.id,TeachingAssignment.active==True))).first()
-    if not user.is_superadmin and assignment is None:raise HTTPException(403,'This course is not assigned to you')
+async def class_course(db,cls,org_id):
+    """Organization-scoped class; returns its optional native course match."""
+    course=await db.get(Course,cls.course_id) if cls.course_id is not None else None
+    if cls.course_id is not None and (not course or course.org_id!=org_id):raise HTTPException(404,'Class not found')
+    if cls.org_id is not None and cls.org_id!=org_id:raise HTTPException(404,'Class not found')
+    if cls.course_id is None and cls.org_id is None:raise HTTPException(404,'Class not found')
     return course
+
+async def verified_owner(db,user,cls):
+    """School-class owner whose confirmed staff record still uses active Google evidence."""
+    if cls.teacher_user_id is None or cls.teacher_user_id!=user.id:return False
+    from src.route66_ext.db.school_identity import NrruTeacherIdentity
+    from src.route66_ext.services.nrru_directory import teacher_hint
+    identity=await db.get(NrruTeacherIdentity,user.id)
+    if identity is None:return False
+    evidence=(await db.exec(select(SchoolGoogleEvidence).join(ProviderIdentity,ProviderIdentity.id==SchoolGoogleEvidence.identity_id).where(
+        SchoolGoogleEvidence.identity_id==identity.identity_id,SchoolGoogleEvidence.user_id==user.id,ProviderIdentity.user_id==user.id,
+        ProviderIdentity.provider=='google',ProviderIdentity.retired_at.is_(None)))).first()
+    return bool(evidence and teacher_hint(evidence.email,evidence.hosted_domain))
+
+async def can_manage(db,user,cls,org_id):
+    course=await class_course(db,cls,org_id)
+    if user.is_superadmin:return course
+    if course is not None:
+        assignment=(await db.exec(select(TeachingAssignment).where(TeachingAssignment.course_id==cls.course_id,TeachingAssignment.user_id==user.id,TeachingAssignment.active==True))).first()
+        if assignment is not None:return course
+    # Owner authority covers only unmatched school classes; matched classes keep
+    # the administrator-controlled native teaching assignment as their authority.
+    if course is None and await verified_owner(db,user,cls):return course
+    raise HTTPException(403,'This course is not assigned to you' if course is not None else 'This school class is not yours')
 
 def _positive_number(value, name, maximum=20):
     value = str(value)

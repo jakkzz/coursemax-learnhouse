@@ -62,7 +62,7 @@ async def own_identity(request:Request, response:Response, db:AsyncSession=Depen
     classroom = await project(db,user,config.org_id,evidence,request=request)
     return {'eligible': bool(hint), 'search_hint': hint,
         'school_menu': bool(identity or student_number),
-        'classes_menu': bool(classroom['classes'] or classroom['can_create']),
+        'classes_menu': bool(identity or classroom['classes'] or classroom['can_create']),
         'school_kind': 'staff' if identity else 'student' if student_number else None,
         'student_number_hint': student_number,
         'registrar_details_status': 'directory_confirmed' if identity else 'roster_matched' if student else 'identity_conflict' if match_status=='conflict' else 'waiting_for_class_roster' if student_number else 'not_connected',

@@ -7,9 +7,9 @@ import { Button } from '@/extensions/route66/adapters/ui'
 import SchoolTimetable from '../Account/subpages/SchoolTimetable'
 import { confirmedStaff, type StaffProjection } from '../Account/subpages/school-workspace-model'
 
-import type { RegistrarClassContext } from './real-teaching/model'
+import type { AcademicClassLink, RegistrarClassContext } from './real-teaching/model'
 
-export default function TeacherTimetable({ th, collapsed = false, onStaffStatus, onOpenClass }: { th: boolean; collapsed?: boolean; onStaffStatus?: (staff: boolean) => void; onOpenClass?: (context: RegistrarClassContext) => void }) {
+export default function TeacherTimetable({ th, collapsed = false, onStaffStatus, onOpenClass, linkedClasses, linksKnown }: { th: boolean; collapsed?: boolean; onStaffStatus?: (staff: boolean) => void; onOpenClass?: (context: RegistrarClassContext) => void; linkedClasses?: AcademicClassLink[]; linksKnown?: boolean }) {
   const [expanded, setExpanded] = useState(!collapsed)
   const [status, setStatus] = useState<StaffProjection | null>(null)
   const [failed, setFailed] = useState(false)
@@ -27,14 +27,14 @@ export default function TeacherTimetable({ th, collapsed = false, onStaffStatus,
   }, [attempt, onStaffStatus])
   if (failed) return <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg bg-amber-50 p-4 text-sm text-amber-900">
     <AlertTriangle size={18} aria-hidden="true" />
-    <p className="min-w-0 flex-1">{th ? 'ตรวจสอบตารางสอนของคุณไม่ได้ ชั้นเรียนในระบบยังแสดงแยกด้านล่าง' : 'Your timetable could not be checked. LearnHouse classes are shown separately below.'}</p>
+    <p className="min-w-0 flex-1">{th ? 'ตรวจสอบชั้นเรียนจากทะเบียนไม่ได้ ลองอีกครั้ง หรือเปิดชั้นเรียน LearnHouse ที่แสดงแยกไว้' : 'Your school classes could not be checked. Retry, or open the separate LearnHouse classes view.'}</p>
     <Button variant="outline" className="min-h-11" onClick={() => setAttempt(n => n + 1)}>{th ? 'ลองอีกครั้ง' : 'Try again'}</Button>
   </div>
   if (!status) return <p role="status" className="flex items-center gap-2 text-sm text-neutral-600"><Loader2 size={16} className="animate-spin" aria-hidden="true" />{th ? 'กำลังตรวจสอบตารางสอนของคุณ…' : 'Checking your teaching timetable…'}</p>
   if (confirmedStaff(status) && status.directory_identity) {
-    const timetable = <SchoolTimetable staffId={status.directory_identity.officer_id} teacherName={status.directory_identity.name_th} onOpenClass={onOpenClass} />
+    const timetable = <SchoolTimetable staffId={status.directory_identity.officer_id} teacherName={status.directory_identity.name_th} onOpenClass={onOpenClass} schoolMode linkedClasses={linkedClasses} linksKnown={linksKnown} />
     return collapsed ? <details className="border-t border-neutral-200 pt-4" onToggle={event => setExpanded(event.currentTarget.open)}><summary className="min-h-11 cursor-pointer text-sm font-medium">{th ? 'ตารางสอนจากทะเบียน (อ่านอย่างเดียว)' : 'Registrar timetable (read-only)'}</summary>{expanded && timetable}</details> : timetable
   }
-  if (status.school_kind !== 'staff') return null
+  if (status.school_kind === 'student') return <p className="text-sm leading-relaxed text-neutral-600">{th ? 'ชั้นเรียนที่จับคู่กับรายชื่อของคุณอยู่ในมุมมองชั้นเรียน LearnHouse' : 'Classes matched to your student roster are available in the LearnHouse classes view.'}</p>
   return <p className="text-sm leading-relaxed text-neutral-600">{th ? 'ยืนยันข้อมูลสถานศึกษาเพื่อดูตารางสอนจากทะเบียน' : 'Confirm your school identity to view your registrar timetable.'}{' '}<Link href="/account/school-identity" className="inline-flex min-h-11 items-center font-medium text-blue-700 underline underline-offset-4">{th ? 'ตรวจสอบข้อมูลสถานศึกษา' : 'Review school identity'}</Link></p>
 }

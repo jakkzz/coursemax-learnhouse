@@ -6,7 +6,7 @@ export type RegistrarClass = {
   meetings: { day: string; start_time: string; end_time: string; details: string }[]
 }
 export type RegistrarTimetable = { academic_year: number; semester: number; fetched_at: string; classes: RegistrarClass[] }
-export type RegistrarClassContext = Omit<RegistrarTimetable, 'classes'> & { classRow: RegistrarClass; returnFocusId?: string }
+export type RegistrarClassContext = Omit<RegistrarTimetable, 'classes'> & { classRow: RegistrarClass; returnFocusId?: string; teacher_name?: string }
 export type AcademicClassLink = {
   id: number; registry_course_id: string | null; academic_year: number; semester: number; section: string
   manageable: boolean; course_uuid: string; course_available: boolean

@@ -126,6 +126,28 @@ async def section_status(request: Request, response: Response, body: SectionQuer
             "courses": [{"id": c.id, "name": c.name} for c in courses]}
 
 
+@router.get("/official-roster")
+async def official_section_roster(request: Request, response: Response,
+                                 body: SectionQuery = Depends(),
+                                 db: AsyncSession = Depends(get_db_session)):
+    """Read the teacher's exact official section without creating a learning class."""
+    private(response); user, config, evidence = await context(request, db)
+    facts = await verified_section(db, user, config, evidence, body, request)
+    cls = SimpleNamespace(**body.model_dump(), registry_course_code=facts["course_code"],
+                          registry_class_id=None)
+    try:
+        rows, _ = await asyncio.wait_for(roster.fetch_roster(cls), timeout=10)
+    except (ValueError, TimeoutError):
+        raise HTTPException(503, "The official roster is unavailable. Retry from this section") from None
+    return {"academic_year": body.academic_year, "semester": body.semester,
+            "registry_course_id": body.registry_course_id, "section": body.section,
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "source_url": roster.source(cls)["url"],
+            "students": [{key: row.get(key) for key in
+                ("student_number", "full_name_th", "faculty", "program",
+                 "registry_status_code", "display_position")} for row in rows]}
+
+
 @router.post("/setup")
 async def setup_section(body: Setup, request: Request, response: Response,
                         db: AsyncSession = Depends(get_db_session)):

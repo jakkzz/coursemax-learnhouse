@@ -335,6 +335,59 @@ class LearningAccessTests(AcademicRosterTests):
             self.assertEqual((await db.exec(select(ResourceAuthor))).all(), [])
             self.assertEqual((await db.exec(select(TrailRun))).all(), [])
 
+    async def test_official_roster_reads_own_section_without_learning_assignment_or_writes(self):
+        from dataclasses import replace
+        from types import SimpleNamespace
+        from contextlib import asynccontextmanager
+        from fastapi import FastAPI
+        import httpx
+        from src.route66_ext.routers import academic_classes as api, school_identity, class_connections as connections
+        from src.route66_ext.db.school_identity import NrruTeacherIdentity
+        from src.route66_ext.db.academic_classes import TeachingAssignment
+        proof = replace(self.google, subject="official-reader", verified_email="official.reader@nrru.ac.th", hosted_domain="nrru.ac.th")
+        identity = await self.link(user=2, proof=proof); _, session = await self.login(proof)
+        async with self.sessions.begin() as db:
+            db.add(NrruTeacherIdentity(user_id=2, identity_id=identity, officer_id="90001", officer_code="90002", name_th="ผู้สอนทดสอบ", name_en="Synthetic teacher"))
+            assignment = (await db.exec(select(TeachingAssignment).where(TeachingAssignment.user_id == 2))).one()
+            assignment.active = False; db.add(assignment)
+        app = FastAPI(); app.include_router(api.router, prefix="/api/v1/academic-classes")
+        async def database():
+            async with self.sessions() as db: yield db
+        app.dependency_overrides[get_db_session] = database
+        config = SimpleNamespace(org_id=1, handoff=SimpleNamespace(client=SimpleNamespace(public_origin="https://learn.example.com")))
+        @asynccontextmanager
+        async def resources(_): yield None, None
+        facts = {"registry_course_id": "100", "academic_year": 2569, "semester": 2, "section": "P2"}
+        timetable = {**facts, "classes": [{"registry_course_id": "100", "section": "P2", "course_code": "990001", "title": "Synthetic subject"}]}
+        models = (AcademicClass, AcademicRosterEntry, AcademicClassEvent, SchoolStudent, UserGroupUser, ResourceAuthor, TrailRun)
+        async def snapshot():
+            async with self.sessions() as db:
+                return {model.__name__: [r.model_dump(mode="json") for r in (await db.exec(select(model))).all()] for model in models}
+        before = await snapshot()
+        fetch = AsyncMock(return_value=(self.rows("6900000001"), "d" * 64))
+        with patch.object(school_identity, "settings", return_value=config), patch.object(connections, "resources", resources), patch.object(connections, "throttle", AsyncMock()), patch.object(connections, "teacher_timetable", AsyncMock(return_value=timetable)), patch.object(connections.roster, "fetch_roster", fetch):
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://learn.example.com", cookies={"LH_access": session.access_token}) as client:
+                path = "/api/v1/academic-classes/connections/official-roster"
+                result = await client.get(path, params=facts)
+                self.assertEqual(result.status_code, 200, result.text)
+                self.assertIn("no-store", result.headers["cache-control"])
+                self.assertIn("Cookie", result.headers["vary"])
+                self.assertEqual(result.json()["students"][0]["student_number"], "6900000001")
+                self.assertNotIn("user_id", result.json()["students"][0])
+                cls = fetch.await_args.args[0]
+                self.assertEqual((cls.registry_class_id, cls.registry_course_code, cls.section), (None, "990001", "P2"))
+                self.assertEqual((await client.get(path, params={**facts, "section": "P99"})).status_code, 409)
+                self.assertEqual(fetch.await_count, 1)
+                fetch.side_effect = ValueError("Synthetic source outage")
+                self.assertEqual((await client.get(path, params=facts)).status_code, 503)
+                fetch.side_effect = None
+                async with self.sessions.begin() as db:
+                    await db.delete(await db.get(NrruTeacherIdentity, 2))
+                self.assertEqual((await client.get(path, params=facts)).status_code, 403)
+                self.assertEqual(fetch.await_count, 2)
+                self.assertEqual((await client.get(path, params=facts, headers={"Cookie": ""})).status_code, 401)
+        self.assertEqual(before, await snapshot())
+
     async def test_connection_dto_rejects_pasted_urls_and_source_is_fixed(self):
         from pydantic import ValidationError
         from types import SimpleNamespace

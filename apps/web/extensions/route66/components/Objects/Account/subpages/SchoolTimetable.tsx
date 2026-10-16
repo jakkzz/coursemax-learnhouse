@@ -8,9 +8,10 @@ import { filterTimetable, readSavedTerm, timetableYears, type RegistrarTerm } fr
 import { weekdayKey } from './timetable-colors'
 import colors from './timetable-colors.module.css'
 
-import type { RegistrarTimetable as Timetable, RegistrarClassContext } from '../../Classes/real-teaching/model'
+import { linkedTeachingClass, type AcademicClassLink, type RegistrarTimetable as Timetable, type RegistrarClassContext } from '../../Classes/real-teaching/model'
+import school from '../../Classes/school-classes.module.css'
 
-export default function SchoolTimetable({ staffId, teacherName, onOpenClass }: { staffId: string; teacherName?: string; onOpenClass?: (context: RegistrarClassContext) => void }) {
+export default function SchoolTimetable({ staffId, teacherName, onOpenClass, schoolMode = false, linkedClasses = [], linksKnown = true }: { staffId: string; teacherName?: string; onOpenClass?: (context: RegistrarClassContext) => void; schoolMode?: boolean; linkedClasses?: AcademicClassLink[]; linksKnown?: boolean }) {
   const { i18n } = useTranslation(), th = i18n.language.startsWith('th')
   const yearId = useId(), semesterId = useId(), searchId = useId(), workspaceId = useId()
   const t = th ? {
@@ -53,12 +54,12 @@ export default function SchoolTimetable({ staffId, teacherName, onOpenClass }: {
     setSelection(next); setQuery('')
     try { sessionStorage.setItem(storageKey, JSON.stringify(next)) } catch { /* Storage is optional, never an access requirement. */ }
   }
-  return <section className="overflow-hidden rounded-xl border border-blue-100 bg-white nice-shadow" aria-labelledby="registrar-title" aria-busy={busy}>
-    <p className="flex items-center gap-2 bg-blue-100 px-4 py-2.5 text-xs font-semibold text-blue-900"><CalendarClock size={14} aria-hidden="true" />{t.readonly}</p>
-    <div className="space-y-5 p-4 sm:p-6">
-      <header className={`${colors.header} -mx-4 -mt-4 px-4 pb-5 pt-4 sm:-mx-6 sm:-mt-6 sm:px-6 sm:pt-6`}><h2 id="registrar-title" className="text-xl font-semibold tracking-tight text-blue-950">{t.title}</h2>
+  return <section className={schoolMode ? school.index : 'overflow-hidden rounded-xl border border-blue-100 bg-white nice-shadow'} aria-labelledby="registrar-title" aria-busy={busy}>
+    {!schoolMode && <p className="flex items-center gap-2 bg-blue-100 px-4 py-2.5 text-xs font-semibold text-blue-900"><CalendarClock size={14} aria-hidden="true" />{t.readonly}</p>}
+    <div className={schoolMode ? school.indexContent : 'space-y-5 p-4 sm:p-6'}>
+      <header className={schoolMode ? school.indexHeading : `${colors.header} -mx-4 -mt-4 px-4 pb-5 pt-4 sm:-mx-6 sm:-mt-6 sm:px-6 sm:pt-6`}><h2 id="registrar-title" className="text-xl font-semibold tracking-tight text-blue-950">{schoolMode ? (th ? 'ชั้นเรียน NRRU' : 'NRRU classes') : t.title}</h2>
         {teacherName && <p className="mt-2 break-words text-sm text-blue-800">{t.teacher} <strong className="font-medium text-blue-950">{teacherName}</strong></p>}
-        <p className="mt-2 max-w-prose text-sm leading-relaxed text-blue-800">{t.note}</p>
+        <p className="mt-2 max-w-prose text-sm leading-relaxed text-blue-800">{schoolMode ? (th ? 'ชั้นเรียนของคุณจากทะเบียน เลือกกลุ่มเรียนเพื่อดูรายละเอียด ตารางเรียน และรายชื่อ' : 'Your registrar classes. Open a section for details, weekly meetings and official students.') : t.note}</p>
       </header>
       <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end sm:gap-4">
         <div className="flex min-w-0 flex-col gap-2 text-xs font-medium text-neutral-700"><label htmlFor={yearId}>{t.year}</label>
@@ -79,10 +80,10 @@ export default function SchoolTimetable({ staffId, teacherName, onOpenClass }: {
         <p role="status" className="inline-flex rounded-md bg-blue-50 px-2 py-1 text-xs font-medium tabular-nums text-blue-800">{data.semester}/{data.academic_year} · {visible.length} {t.results}</p>
         {data.classes.length === 0 ? <div className="space-y-2 border-t border-neutral-200 py-5"><h3 className="font-semibold">{t.empty}</h3><p className="max-w-prose text-sm leading-relaxed text-neutral-600">{t.emptyHelp}</p></div>
           : visible.length === 0 ? <div className="space-y-2 border-t border-neutral-200 py-5"><h3 className="font-semibold">{t.noMatch}</h3><Button variant="outline" className="min-h-11" onClick={() => setQuery('')}>{t.clear}</Button></div>
-          : <ul className="-mx-4 divide-y divide-neutral-200 border-y border-neutral-200 sm:-mx-6">{visible.map(c => <li key={`${c.registry_course_id}-${c.section}`} className="space-y-3 px-4 py-5 sm:px-6">
-            <div><p className="inline-flex rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold tabular-nums text-blue-900">{c.course_code} · {t.section} {c.section}</p><h3 className="mt-2 break-words text-base font-semibold text-blue-950">{c.title}</h3></div>
-            <ul className="space-y-3">{c.meetings.map((m, index) => <li key={index} className="space-y-1.5 text-sm"><p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium tabular-nums text-blue-950"><span className={colors.day} data-weekday={weekdayKey(m.day)}><Clock3 size={14} className="shrink-0" aria-hidden="true" /><span className="min-w-0 break-words">{m.day}</span></span><span aria-hidden="true">{' · '}</span><span>{m.start_time}–{m.end_time}</span></p>{m.details && <p className="flex items-start gap-2 leading-relaxed text-neutral-600"><MapPin size={16} className="mt-0.5 shrink-0 text-blue-700" aria-hidden="true" /><span className="min-w-0 break-words">{m.details}</span></p>}</li>)}</ul>
-            {onOpenClass && <Button id={`${workspaceId}-${c.registry_course_id}-${encodeURIComponent(c.section)}`} variant="outline" className="min-h-11" aria-label={`${t.openClass}: ${c.course_code} ${c.section}`} onClick={() => onOpenClass({ classRow: c, academic_year: data.academic_year, semester: data.semester, fetched_at: data.fetched_at, returnFocusId: `${workspaceId}-${c.registry_course_id}-${encodeURIComponent(c.section)}` })}>{t.openClass}</Button>}
+          : <ul className={schoolMode ? school.indexRows : '-mx-4 divide-y divide-neutral-200 border-y border-neutral-200 sm:-mx-6'}>{visible.map(c => <li key={`${c.registry_course_id}-${c.section}`} className={schoolMode ? school.indexRow : 'space-y-3 px-4 py-5 sm:px-6'}>
+            <div>{schoolMode ? <><h3 className="break-words text-base font-semibold text-blue-950">{c.title}</h3><p className={school.identifiers}>{c.course_code} · {t.section} {c.section}</p><p className={school.match} data-matched={Boolean(linkedTeachingClass({ classRow: c, academic_year: data.academic_year, semester: data.semester, fetched_at: data.fetched_at }, linkedClasses))}>{!linksKnown ? (th ? 'ยังไม่ตรวจสอบการเชื่อม' : 'Match not checked') : linkedTeachingClass({ classRow: c, academic_year: data.academic_year, semester: data.semester, fetched_at: data.fetched_at }, linkedClasses) ? (th ? 'เชื่อมกับ LearnHouse แล้ว' : 'Matched to LearnHouse') : (th ? 'ชั้นเรียนจากทะเบียน' : 'School class')}</p></> : <><p className="inline-flex rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold tabular-nums text-blue-900">{c.course_code} · {t.section} {c.section}</p><h3 className="mt-2 break-words text-base font-semibold text-blue-950">{c.title}</h3></>}</div>
+            <ul className={schoolMode ? school.indexMeetings : 'space-y-3'}>{c.meetings.map((m, index) => <li key={index} className="space-y-1.5 text-sm"><p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium tabular-nums text-blue-950"><span className={colors.day} data-weekday={weekdayKey(m.day)}><Clock3 size={14} className="shrink-0" aria-hidden="true" /><span className="min-w-0 break-words">{m.day}</span></span><span aria-hidden="true">{' · '}</span><span>{m.start_time}–{m.end_time}</span></p>{m.details && <p className="flex items-start gap-2 leading-relaxed text-neutral-600"><MapPin size={16} className="mt-0.5 shrink-0 text-blue-700" aria-hidden="true" /><span className="min-w-0 break-words">{m.details}</span></p>}</li>)}</ul>
+            {onOpenClass && <Button id={`${workspaceId}-${c.registry_course_id}-${encodeURIComponent(c.section)}`} variant="outline" className="min-h-11" aria-label={`${t.openClass}: ${c.course_code} ${c.section}`} onClick={() => onOpenClass({ classRow: c, academic_year: data.academic_year, semester: data.semester, fetched_at: data.fetched_at, teacher_name: teacherName, returnFocusId: `${workspaceId}-${c.registry_course_id}-${encodeURIComponent(c.section)}` })}>{t.openClass}</Button>}
           </li>)}</ul>}
         <p className="text-xs tabular-nums text-neutral-600">{t.asof}: <time dateTime={data.fetched_at}>{new Date(data.fetched_at).toLocaleString(th ? 'th-TH' : 'en-GB')}</time></p>
       </>}

@@ -1,5 +1,14 @@
 # Custom architecture and database relationships
 
+## Development context
+
+This is a factual map of the current implementation, **not a new security-hardening,
+production-readiness or compliance checklist**. During development, use the simplest
+working change, reuse existing code and run checks proportional to what changed.
+Do not introduce new controls, approval flows or speculative infrastructure merely
+because this document describes existing safeguards. See the
+[lightweight development guide](development.md#development-mode).
+
 ## Scope and short answer
 
 Our institutional features run **inside the LearnHouse fork**, using the same API

@@ -1,11 +1,31 @@
 # Extension-first agent contract
 
-Owner direction: minimize edits to original LearnHouse code while integrating NRRU
-and ported CourseMax behavior. This is a maintained internal boundary, **not an
-upstream-supported plugin API**. [Audited dry run](dry-run.md) and
-[historical patch inventory/policy](boundary.json) are required reading.
-For current table ownership, foreign keys, attendance storage and native integration,
-see [Custom architecture and database relationships](custom-architecture.md).
+Owner direction: fast, smooth development using KISS (keep it simple) and DRY
+(don't repeat yourself). Reuse LearnHouse and the existing extension; do not turn
+ordinary development into production hardening or a compliance exercise.
+
+This is a maintained internal boundary, **not an upstream-supported plugin API**.
+[Custom architecture](custom-architecture.md) describes current tables and native
+links; it is not a list of new security requirements. Consult the
+[historical dry run](dry-run.md) and [boundary inventory](boundary.json) when changing
+those integration seams, not as mandatory reading before every small edit.
+
+## Development mode
+
+- Deliver the smallest working solution and iterate. Prefer a direct implementation
+  over speculative frameworks, new services, configurable layers or default-off flags.
+- Do not add security controls, restrictions, legal/compliance rules or approval
+  workflows unless the requested behavior needs them. Preserve existing working
+  login/permission behavior rather than redesigning it incidentally.
+- Ordinary coding, fixes, tests, commits/pushes and already agreed staging work do
+  not need repeated permission. Keep real product decisions in the product.
+- Use isolated synthetic fixtures, test doubles and prototypes freely. Clear test
+  boundaries matter; production-style infrastructure is not required to try an idea.
+- Fix a concrete observed risk at its relevant boundary; do not expand the task into
+  a general security audit. Production readiness is separate work when requested.
+- Keep existing data/secrets/shared services intact. Actual migrations, destructive
+  operations and shared-host changes have different consequences from local edits;
+  apply only the checks relevant to the operation being performed.
 
 ## Default placement
 
@@ -21,22 +41,19 @@ see [Custom architecture and database relationships](custom-architecture.md).
 - Existing feature modules scattered through native trees are legacy, not an
   example to copy. Extract them under a reviewed plan; don't widen that footprint.
 
-## Before writing a feature
+## Normal feature loop
 
-1. State audit IDs, native authority, extension authority and the concrete task.
-   Check if native behavior is already adequate; don't duplicate course/content,
-   account/session, enrollment, grade or evidence authorities.
-2. Inspect the pinned native contract. Record supported hooks and the adapter calls
-   needed; do not assume a plugin registry, API or Enterprise entitlement.
-3. List changed files BEFORE editing. Default to owned paths. If an original/native
-   path is needed, explain why an adapter/thin owned route cannot safely suffice.
-4. **Request approval for the minimal core-hook exception before editing it.** An
-   ordinary feature request is not blanket permission for scattered native edits.
-   Specify invariant, exact path, alternatives, synthetic regressions and replacement/
-   upstream-update plan. Freeze existing patches until safely replaced; do not remove
-   security/retention fixes merely to obtain a cleaner diff.
-5. Add a failing synthetic test; implement the smallest vertical slice. Run the
-   boundary gate while changes are still easy to review.
+1. Read the relevant code; reuse native behavior or existing helpers when adequate.
+2. Make the smallest usable vertical slice in the owned paths. Add a focused
+   regression for a bug or meaningful behavior change; a new process document is
+   not a prerequisite for implementation.
+3. Run relevant checks, inspect the result and continue. Summarize what changed,
+   what was checked and any actual remaining gap.
+
+The reviewed native boundary still identifies exceptional core changes. If one is
+actually necessary, identify the smallest concrete exception instead of widening
+prefixes or rewriting core. Ordinary work inside the existing boundary needs no
+separate proposal, repeated approval or advance list of every edited file.
 
 ## Adapter and native-hook rules
 
@@ -71,30 +88,37 @@ Do not edit old upstream revisions, stamp away divergence, auto-apply migration 
 module import, create an uncoordinated second chain or restore an old DB for rollback.
 Separate locations/branches require a reviewed Alembic dependency/merge contract.
 
-## Review and completion
+## Checks proportional to the change
 
-Run:
+| Change | Normal development checks |
+| --- | --- |
+| Documentation | Verify facts, links and formatting. No app build, DB restore or deployment. |
+| Small backend change | Focused unit/integration regressions for affected behavior; no unrelated frontend build. |
+| UI change | Relevant type/component checks and affected user flow; desktop/mobile and Thai/English when impacted. Not every historical journey for every label. |
+| Model/schema change | Relevant schema/migration tests in an isolated DB; recovery checks before applying to shared data. |
+| Staging app delivery | Build affected artifacts, verify the candidate and health, and preserve the relevant recovery path. No unrelated service restarts. |
+
+The inexpensive source-placement check is useful during development:
 
 ```sh
 python3 -B scripts/extensions/check_boundary.py
+```
+
+Run the tooling unittest suite when changing boundary/tooling behavior or confirming
+that contract, not as a substitute for relevant feature tests:
+
+```sh
 python3 -B -m unittest discover -s scripts/extensions -p 'test_*.py' -q
 ```
 
-The gate covers source placement, not adapter import discipline or runtime safety;
-review those separately. A gate failure is a STOP-and-review signal, not permission
-to broaden prefixes or refresh `snapshot`. Exact exceptions in `boundary.json` need
-`reason`, `approval_reference`, `tests`, `replacement_plan` and matching `sha256`.
-Review the policy/tool itself so changing it cannot silently authorize core patches.
-Its historical inventory is not approval for new edits. Never commit unrelated
-preserved workflow/critique files to make a clean worktree.
+A boundary failure identifies a concrete integration issue to resolve, not a reason
+to invent more security controls or silently widen policy. Exact native exceptions
+retain their existing recorded contract. Leave unrelated work untouched.
 
-Each completion report records:
-- owned paths + exact native hooks retained/added/removed and why;
-- adapter contracts/native source pin and upstream conflict impact;
-- policy/permission/concurrency/retention/native-auth regression evidence;
-- full production web build/types and persisted EN/TH teacher/student tasks for UI;
-- metadata/migration/image packaging/source-disclosure impact and safe recovery;
-- what is merely planned/static/source-only versus runtime-validated/deployed.
+Completion reports should be short: changed behavior, relevant checks, actual
+runtime/deployment status if applicable, and unresolved issues. A local development
+iteration does not need a production-release dossier. Wider regressions/builds are
+appropriate for wider changes or artifacts actually being deployed, not every edit.
 
 Before an upstream upgrade, review a pinned candidate in an isolated checkout and
 run adapter/auth/MFA/revocation/access/deletion/metadata/migration/UI regressions.
@@ -103,8 +127,9 @@ protected backups, rollback images, evidence preservation and deployment approva
 remain mandatory; fewer merge conflicts do not prove semantic compatibility.
 
 No runtime dependency on CourseMax; retirement and historical data deletion remain
-separate approvals. No real records, credentials/provider tokens, registrar sessions,
-outbound messages or live-account impersonation in tests. LINE Messaging webhook work
-belongs here when ported, with signature verification/dedup and proactive sends off.
+separate approvals. Use synthetic fixtures rather than real records, credentials/
+provider tokens, registrar sessions, outbound messages or live-account impersonation
+in tests. LINE Messaging webhook work belongs here when ported, with signature
+verification/dedup and proactive sends off.
 Maintain AGPL/Enterprise attribution and corresponding-source obligations; isolation
 is not a license workaround.

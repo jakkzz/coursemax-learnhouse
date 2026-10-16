@@ -1,18 +1,46 @@
 # LearnHouse fork: extension-first instructions
 
-Read `docs/extensions/development.md`, `docs/extensions/dry-run.md` and
-`docs/extensions/boundary.json` BEFORE coding. Read upstream `CONTRIBUTING.md` and
-framework instructions for affected apps. When this checkout is under the private
-handoff workspace, also read `../AGENTS.md`, `../STATUS.md`, `../PLAN.md` and the
-referenced scope/identity documents; current decisions supersede historical notes.
+Start with the current task, this guide and relevant parts of
+`docs/extensions/development.md`. In the private handoff workspace, use the newest
+`../STATUS.md` and `../PLAN.md` when current implementation state matters. Read
+framework, identity, boundary and historical evidence only as needed for the change;
+do not turn every small edit into a full handoff/release audit.
 
-## Current owner directive (2026-10-16)
+## Current owner directive: development speed, KISS and DRY
+
+This is the development phase, not production acceptance. This instruction supersedes
+older process-heavy wording below and in historical handoffs:
+
+- Implement the smallest usable change. Reuse existing code; avoid speculative
+  abstractions, extra services, flags, approval flows and duplicated authorities.
+- Do not add unsolicited security hardening, compliance requirements, legal claims,
+  threat-model exercises or new prohibitions. Keep existing working authentication
+  and permissions as-is unless the task actually concerns them.
+- Routine development, fixes, tests and owner-fork commits/pushes need no repeated
+  approval. Ask only for an actual unresolved product choice or a concrete operation
+  outside the agreed scope—not routine engineering work.
+- Use focused tests and short feedback loops. Documentation does not require an app
+  build; a small change does not automatically require every suite, four browser
+  sizes, a backup/restore rehearsal or deployment. Match checks to affected behavior.
+- Isolated synthetic fixtures, test fakes and local prototypes are normal development
+  tools. Do not mistake them for real institutional acceptance or copy real sessions.
+- Architecture documents describe current implementation, not a mandate to add more
+  controls. Broader security/production-readiness work is a separate requested task.
+- Preserve existing data, secrets and shared services. Actual database changes or
+  shared-host deployment still need the relevant practical recovery checks; those
+  checks are not prerequisites for unrelated coding or documentation.
+
+Keep the existing extension boundary as the simple default; do not start an unrelated
+core refactor or policy expansion. No runtime security or infrastructure change is
+requested by this development-process directive.
+
+## Earlier demo-retirement directive (completed; historical context)
 
 Remove production demos and dry-run the full-goal plan through sequential, bounded
 GPT-5.6 jobs. Retain synthetic test fixtures only; do not ship fake institution data,
 fabricate milestones, or treat a source-contract audit as runtime/user-task acceptance.
-This directive does not relax any safety, native-boundary, migration, or deployment rule
-below.
+This earlier directive does not require workers, full-goal audits or production-style
+release gates for every subsequent development task.
 
 ## Current owner requirement: automatic school-data acquisition (2026-10-16)
 
@@ -46,11 +74,9 @@ put necessary course/roster decisions in the product, not in a chat approval loo
 Optional academic-service failure must not prevent sign-in; isolate and recover it
 without retaining provably stale bridge grants or deleting manual access/evidence.
 
-Preserve the mandatory boundary and all real authorization/identity/license/privacy/
-retention/backup/capacity safeguards below. This instruction does not authorize
-impersonation, inferred privileges/course equivalence, destructive unenrollment,
-real historical migration, deletion or cutover. New native-core hook approval is
-still required; solve through owned adapters/routes first. Newest ../STATUS.md and
+Use the lightweight development directive above. Keep existing account/data ownership
+and shared services intact; real historical migration and cutover remain separate
+work. Prefer owned adapters/routes over native-core changes. Newest ../STATUS.md and
 current release pointer are authoritative over historical deployment headings.
 
 ## Historical extraction baseline
@@ -62,23 +88,23 @@ only the router registration changed further. No schema/data migration. Current
 upstream default `dev` is still our original `45cf5d4f` baseline: isolated pull
 reported zero incoming commits/conflicts, NOT future upgrade compatibility.
 
-## Mandatory boundary
+## Existing architecture and compatibility boundary
 
 - Put our backend logic/tests in `apps/api/src/route66_ext/`, frontend logic/copy/
   tests in `apps/web/extensions/route66/`. Feature code has been extracted there;
   old feature paths are compatibility delegates, not places to add logic. Read
   `docs/extensions/extraction.md` and the exact extraction map before refactoring.
-- Avoid original LearnHouse edits. Native integration uses typed adapters and minimal
-  explicit hooks; request approval BEFORE a new core-hook edit and record exact file,
-  invariant, alternatives, tests and replacement/update plan. Route/model/migration
-  wrappers outside owned paths need exact reviewed registration too.
+- Prefer existing adapters and minimal explicit hooks over scattered native edits.
+  An actually new native hook is an exceptional integration decision under the
+  existing exact boundary policy, not a reason for repeated approval or a design
+  dossier for routine extension work.
 - Do not auto-refresh the boundary snapshot, widen allowlists, modify checker policy
   to hide failures, monkeypatch native internals, shadow duplicate routes or silently
   restore unsafe native auth. Current auth/lifecycle/retention patches remain frozen
   until a tested replacement exists.
-- Run `python3 -B scripts/extensions/check_boundary.py` and
-  `python3 -B -m unittest discover -s scripts/extensions -p 'test_*.py' -q`.
-  These are advisory source-placement tests, not runtime or upgrade acceptance.
+- Use `python3 -B scripts/extensions/check_boundary.py` for lightweight source
+  placement checks. Run the `scripts/extensions` unittest suite when its contract
+  is affected. Neither is a replacement for focused feature checks or runtime proof.
 - One LearnHouse account/session/content/access authority. Our NRRU bridge/class
   metadata/academic evidence is an extension, not a parallel catalog/login or runtime
   dependency on old CourseMax. My classes is not an upstream-official feature.
@@ -93,10 +119,12 @@ reported zero incoming commits/conflicts, NOT future upgrade compatibility.
   institutional records, secrets or evidence with this public source fork.
 - Communicate in English; retain natural Thai/English product copy and mobile tasks.
 
-Changes must report owned paths, every unavoidable native hook, actual acceptance
-and deployment scope. Existing untracked `.github/workflows/native-google-web.yaml`
+Report changes and relevant checks briefly; mention actual native-boundary or runtime
+changes when present, not an exhaustive release checklist for every edit.
+Existing untracked `.github/workflows/native-google-web.yaml`
 and `.impeccable/` are unrelated: leave untouched/uncommitted.
 
-Deployment, cleanup and host mutations are separate from an offline dry run. On the
+Recovery/capacity gates below apply to actual deployment or heavy host work, not
+ordinary edits, documentation or lightweight tests. On the
 shared staging host retain >=10 GiB disk (>=12 GiB pre-pull) and >=3 GiB available
 RAM; recheck before heavy operations. No broad cleanup or unrelated restarts.

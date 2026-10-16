@@ -1,6 +1,35 @@
 # Internal extension deployment records
 
-## Latest: roster refresh icon — deployed 2026-10-16
+## Latest: school-first classes — deployed 2026-10-16
+
+Live source `3bd5cfed1d2b8827b9b3c6883848bb3f50339141`, image
+`coursemax-learnhouse:school-first-20261016`, ID
+`sha256:32af953b4f709e9ab70a5fa7ac01df5e9e1285365188eae86e3823eca8f1d47c`.
+NRRU classes now lead, scoped to the user's existing verified school association.
+Term/search → class details, weekly schedule and official roster works without a
+LearnHouse match. LearnHouse classes/member management remain a separate view.
+The own-section roster GET reuses official-source parsing and timetable ownership
+checks; it creates no class, membership, accepted snapshot or learning grant.
+Confirmed own-school staff receive the navigation entry, not a new native role.
+
+59 web / 54 isolated PostgreSQL tests, bundle/separate types, seven compiled teacher/
+student desktop/mobile tasks and four live bootstrap navigation smokes pass. Live
+non-school and anonymous official-roster reads return 403/401 without opening real
+student records. Inline design review: one batch and one confirmation; ship for four
+listed fixes, not independent or institutional acceptance. See
+[school-first-classes.md](school-first-classes.md).
+
+Fresh protected backups, exact compatible a0c8 parent archive/load and isolated
+restore pass. 1,010 API/config/migration entries verified, with only three intended
+owned source/test changes; 5,305 web entries verified. App-only restart/gateway
+reload; schema and identity/grants/progress/academic snapshots/runtime/env/non-app
+IDs preserved except four native role startup timestamps. Source menu updated,
+footer unchanged. No historical migration, cutover or host/daemon change. Image has
+127 layers; future builds must retain the new backend rather than selecting an old
+web-only base indiscriminately. Evidence: `school-first-20261016/`,
+`school-first-web-final-20261016/`, `releases/school-first-20261016/`.
+
+## Previous: roster refresh icon — deployed 2026-10-16
 
 Live source `a0c8a8dbe706d2bda1de2ae62c936c28fa4a48e4`, image
 `coursemax-learnhouse:roster-refresh-20261016`, ID

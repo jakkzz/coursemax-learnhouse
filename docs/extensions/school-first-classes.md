@@ -32,3 +32,28 @@ preserve it. Record scoped evidence here after the bounded desktop/mobile review
 Official roster reads do not import, accept missing snapshots, match accounts or
 change LearnHouse membership, grants, enrollment or progress. Existing connection
 and saved-roster editing workflows remain explicit and separate.
+
+## Built system and acceptance
+
+The built route keeps the incumbent white/native-sans system. Blue selection and
+focus (`#1d4ed8`), pale blue data controls (`#eff6ff`), green matched labels
+(`#166534` on `#f0fdf4`) and neutral school-only labels retain the scoped palette.
+Class rows reflow from aligned desktop columns to stacked records; official students
+use subtle alternating white/slate rows. Source controls and refresh targets are
+at least 44px. Existing weekday colors and native account navigation remain intact.
+
+59 web tests, 54 isolated PostgreSQL/native-session tests, full production bundle
+and separate route/types pass. Seven compiled task journeys cover EN/TH at 1440/390,
+unmatched school details/schedule/roster, term/search, source failure/retry with
+retained rows, independent LearnHouse management, student content handoff and
+optional native-service failure. The new own-section GET returns official rows
+without writing classes, roster history, grants or progress; absent school identity,
+foreign section and anonymous requests are rejected. School navigation becomes
+available to confirmed own-school staff without an unrelated native assignment.
+
+One batched visual inspection and one correction/confirmation pass: compacted the
+index header, renamed Open class, separated roster provenance and added a connection
+status retry. Inline degraded finish verdict: ship for those four listed fixes;
+not an independent design review or genuine institutional account acceptance.
+Root DESIGN.md and `.impeccable/` were preserved; their historical prototype/shell
+text was not canonized or repaired. No shipping raster assets were introduced.

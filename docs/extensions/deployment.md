@@ -1,6 +1,27 @@
 # Internal extension deployment records
 
-## Latest: roster row color and selection — deployed 2026-10-16
+## Latest: roster refresh icon — deployed 2026-10-16
+
+Live source `a0c8a8dbe706d2bda1de2ae62c936c28fa4a48e4`, image
+`coursemax-learnhouse:roster-refresh-20261016`, ID
+`sha256:ab60cdd8f853e4d4f2536557bb226f9c5fdb0bdc176b0c9a692768499848c036`.
+“Load official roster” is now a localized, accessible 44px refresh icon. Saved rosters
+already load automatically on open/reopen; registrar refresh retains the existing
+review/apply behavior. Loading copy now names the roster. 55 web tests, bundle/types,
+four compiled EN/TH desktop/mobile task checks and four live bootstrap navigation
+smokes pass. Source-failure/retry keeps visible rows; no automatic academic write.
+
+Deployment resumed after RAM headroom recovered. Fresh protected backups, exact live
+`a5ad9257` rollback archive/load and isolated restore passed. A byte-compatible
+`7acb67a5` build base avoids the known layer ceiling: one web layer, 124 total;
+884 previous in-flight assets retained. All 1,010 API/config/migration hashes remain
+unchanged; 6,186 web entries verified. App-only restart/gateway reload; schema,
+identity/grants/progress/academic snapshots, runtime/env and non-app IDs preserved
+except four native role startup timestamps. No host/daemon changes. Source menu
+updated; footer unchanged. Evidence: `roster-refresh-20261016/`,
+`roster-refresh-web-20261016/`, `releases/roster-refresh-20261016/`.
+
+## Previous: roster row color and selection — deployed 2026-10-16
 
 Live source `a5ad92576e8ac7d9289cb3fa7dcb863644a576ab`, image
 `coursemax-learnhouse:roster-color-20261016`, ID

@@ -1,6 +1,34 @@
 # Internal extension deployment records
 
-## Latest: usable section setup and durable status — deployed 2026-10-16
+## Latest: class workspace color hierarchy — deployed 2026-10-16
+
+Live source `255e6d75c1c4febbbd3446192b88c1e2e50c0494`, image
+`coursemax-learnhouse:classes-color-20261016`, ID
+`sha256:f8a7078282ed3245814cb749bc89dbee193e0ecf5a29e6293901cabd6c8b5a68`.
+[Scoped color roles](classes-color.md): existing blue for actions/selection, green
+for connected classes/access, amber for pending matches/repair and red for failures.
+Roster account labels retain text and gain semantic color/icons; unmatched accounts
+stay neutral. Native shell, weekday colors, copy and workflows are unchanged.
+
+51 web tests, production build and separate route/types pass. Four compiled EN/TH
+1440/390 task journeys cover class list, pending/direct/connected/conflicting states,
+source retry and roster handoff. 104 computed foreground/surface checks pass, minimum
+4.84:1; text-pair tests also simulate common color-vision deficiencies. Selected tasks
+retain a visible underline. Native CSS transitions are allowed to settle before exact
+color assertions. One batched desktop/mobile visual inspection; no polish/rebuild loop.
+Four live native-bootstrap navigation/reload smokes verify the actual primary action
+is blue with white text, without opening real student rosters.
+
+All 1,010 API/config/migration hashes are parent-identical; 5,300 web entries match.
+Fresh protected backups, exact seven-archive compatible 7acb parent image/load
+round-trip and isolated restore pass. No schema operation. App-only restart/gateway
+reload; identity/grants/progress/academic snapshots, runtime/env and non-app IDs
+preserved, apart from four native role startup timestamps. Footer unchanged; source
+menu updated to exact source revision. No native hook, permission, academic-data or
+global theme change. Protected evidence: `classes-color-20261016/`,
+`classes-color-web-20261016/`, `releases/classes-color-20261016/`.
+
+## Previous: usable section setup and durable status — deployed 2026-10-16
 
 Live source `7acb67a5b68515cb11ca18b9729c89b56f4c6e5c`, image
 `coursemax-learnhouse:class-workspace-20261016`, ID

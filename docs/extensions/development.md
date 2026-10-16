@@ -4,6 +4,8 @@ Owner direction: minimize edits to original LearnHouse code while integrating NR
 and ported CourseMax behavior. This is a maintained internal boundary, **not an
 upstream-supported plugin API**. [Audited dry run](dry-run.md) and
 [historical patch inventory/policy](boundary.json) are required reading.
+For current table ownership, foreign keys, attendance storage and native integration,
+see [Custom architecture and database relationships](custom-architecture.md).
 
 ## Default placement
 

@@ -23,6 +23,14 @@ Unmatched accounts remain neutral rather than making an ordinary roster look lik
 an alert. Existing labels remain, Lucide icons reinforce state, and selected task
 navigation has an underline as a non-color cue.
 
+The roster extends this hierarchy with a blue filter/header band, subtle alternating
+white/slate rows and a blue bordered selected member. Responsive columns align identity,
+membership/account labels and actions when the content area is wide; narrow layouts
+keep each student's identity and controls together. Active membership is green,
+withdrawn membership stays neutral, and teacher-added origin is blue. Membership and
+account matching remain separate labels. The selected action exposes its expanded
+state and references the existing member editor; selecting a row does not save a change.
+
 Native button interaction/disabled behavior is reused. Selection, caret and focus
 remain blue, reduced-motion preferences are respected and forced-colors retains
 system-visible boundaries. No global stylesheet or native component is modified.

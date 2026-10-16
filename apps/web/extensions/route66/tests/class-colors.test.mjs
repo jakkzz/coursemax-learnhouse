@@ -41,6 +41,19 @@ test('action and semantic text retain AA contrast, including simulated color-vis
   }
 })
 
+test('roster colors distinguish membership, account matching and the selected member', () => {
+  const source = fs.readFileSync(new URL('ClassesWorkspace.tsx', dir), 'utf8')
+  assert.match(css, /\.rosterRow:nth-of-type\(even\)/)
+  assert.match(css, /\.rosterRow\[data-selected='true'\][^{]*\{[^}]*border-color: #1d4ed8/)
+  assert.match(css, /@container \(min-width: 700px\)/)
+  assert.match(source, /data-state=\{p\.status\}/)
+  assert.match(source, /data-state=\{p\.account_status\}/)
+  assert.match(source, /data-selected=\{person\?\.id===p\.id\}/)
+  assert.match(source, /aria-expanded=\{person\?\.id===p\.id\}/)
+  assert.match(source, /id="roster-member-editor"/)
+  assert.match(source, /<UserMinus/)
+})
+
 test('status color is accompanied by existing labels, icons and a non-color selection cue', () => {
   const connections = fs.readFileSync(new URL('ClassConnections.tsx', dir), 'utf8')
   assert.match(connections, /data-state=\{data\?\.status/)

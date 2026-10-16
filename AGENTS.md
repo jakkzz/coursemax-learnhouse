@@ -6,6 +6,14 @@ framework instructions for affected apps. When this checkout is under the privat
 handoff workspace, also read `../AGENTS.md`, `../STATUS.md`, `../PLAN.md` and the
 referenced scope/identity documents; current decisions supersede historical notes.
 
+## Current owner directive (2026-10-16)
+
+Remove production demos and dry-run the full-goal plan through sequential, bounded
+GPT-5.6 jobs. Retain synthetic test fixtures only; do not ship fake institution data,
+fabricate milestones, or treat a source-contract audit as runtime/user-task acceptance.
+This directive does not relax any safety, native-boundary, migration, or deployment rule
+below.
+
 ## End-to-end delivery (owner instruction, 2026-10-15)
 
 Make the requested workflow work, not merely its backend. Complete ordinary wiring,

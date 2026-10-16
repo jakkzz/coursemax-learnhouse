@@ -1,6 +1,6 @@
-import { Suspense } from 'react'
-import ClassesPreview from '@/extensions/route66/components/Dashboard/Pages/ClassesPreview/ClassesPreview'
+import { redirect } from 'next/navigation'
 
+/** Retained URL delegate for the retired preview. */
 export default function ClassesPreviewPage() {
-  return <Suspense><ClassesPreview /></Suspense>
+  redirect('/classes')
 }

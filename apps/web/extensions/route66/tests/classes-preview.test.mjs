@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import { canViewSection, initialState, members, sections, transition, visibleCourses, hasReview } from '../components/Dashboard/Pages/ClassesPreview/model.ts'
-import { copy } from '../components/Dashboard/Pages/ClassesPreview/copy.ts'
+import { canViewSection, initialState, members, sections, transition, visibleCourses, hasReview } from './fixtures/ClassesPreview/model.ts'
+import { copy } from './fixtures/ClassesPreview/copy.ts'
 
 test('teacher sees every section of both assigned courses, not unrelated courses', () => {
   assert.equal(visibleCourses('teacher').length, 2)
@@ -95,8 +95,24 @@ test('English and Thai cover the same copy keys', () => {
   assert.deepEqual(Object.keys(copy.en).sort(), Object.keys(copy.th).sort())
   assert.ok(Object.values(copy.th).every(v => v.trim()))
 })
-test('prototype source has no storage, network writers or auth/roster service imports', () => {
-  const source = fs.readFileSync(new URL('../components/Dashboard/Pages/ClassesPreview/ClassesPreview.tsx', import.meta.url), 'utf8')
-  assert.doesNotMatch(source, /fetch\s*\(|localStorage|sessionStorage|@services\/(auth|users|organizations|courses)|access_token|id_token/)
-  assert.match(source, /if \(!canManageOrg\)/)
+test('retired preview is an inert redirect and cannot expose synthetic records', () => {
+  const component = fs.readFileSync(new URL('../components/Dashboard/Pages/ClassesPreview/ClassesPreview.tsx', import.meta.url), 'utf8')
+  const route = fs.readFileSync(new URL('../app/orgs/[orgslug]/dash/classes-preview/page.tsx', import.meta.url), 'utf8')
+  for (const source of [component, route]) {
+    assert.match(source, /redirect\('\/classes'\)/)
+    assert.doesNotMatch(source, /fetch\s*\(|useReducer|localStorage|sessionStorage|\brole\b|\bview\b|\bquery\b|Demo Student|DEMO101/)
+  }
+})
+
+test('historical fixture is test-only and production compatibility modules are inert', () => {
+  const fixture = fs.readFileSync(new URL('./fixtures/ClassesPreview/model.ts', import.meta.url), 'utf8')
+  assert.match(fixture, /Demo Student/)
+  const productionRoot = new URL('../', import.meta.url).pathname
+  const productionFiles = []
+  const walk = dir => { for (const entry of fs.readdirSync(dir, { withFileTypes: true })) { const path = `${dir}/${entry.name}`; if (entry.isDirectory() && entry.name !== 'tests') walk(path); else if (entry.isFile() && /\.(ts|tsx|js|jsx|mjs)$/.test(entry.name)) productionFiles.push(path) } }
+  walk(productionRoot)
+  for (const path of productionFiles) assert.doesNotMatch(fs.readFileSync(path, 'utf8'), /tests\/fixtures|fixtures\/ClassesPreview/)
+  for (const name of ['model.ts', 'copy.ts']) assert.match(fs.readFileSync(new URL(`../components/Dashboard/Pages/ClassesPreview/${name}`, import.meta.url), 'utf8'), /export\s*\{\}/)
+  assert.match(fs.readFileSync(new URL('../components/Objects/Classes/ClassesWorkspace.tsx', import.meta.url), 'utf8'), /export|function|class/)
+  assert.match(fs.readFileSync(new URL('../components/Objects/Account/subpages/SchoolIdentity.tsx', import.meta.url), 'utf8'), /export|function|const/)
 })

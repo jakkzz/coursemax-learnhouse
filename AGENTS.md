@@ -14,6 +14,24 @@ fabricate milestones, or treat a source-contract audit as runtime/user-task acce
 This directive does not relax any safety, native-boundary, migration, or deployment rule
 below.
 
+## Current owner requirement: automatic school-data acquisition (2026-10-16)
+
+Do not ask teachers or administrators to paste roster URLs or transcribe internal
+school IDs. LearnHouse must acquire NRRU rosters and schedules internally, following
+CourseMax's synchronization and calendar semantics. Users select a term/class and
+review actual course equivalence, permissions or ambiguous source matches—not
+engineering lookup gaps. Preserve exact verified student matching, manual members,
+history, two accepted missing snapshots, and reviewed calendar/rotation/exceptions.
+School data never grants native roles, authorship or enrollment. No portal credentials,
+fabricated keys, per-course hardcoded shortcuts or runtime dependency on CourseMax.
+
+The live manual-link form is not yet replaced. CourseMax's historical setup seeded
+class keys; it is not evidence of generic discovery. NRRU also exposes a course/term
+RTF roster export, observed without saving or printing student records. Integrate and
+validate the appropriate source and exact section before import; do not treat a
+missing class ID on the timetable as a reason to ask users for a link. Replace the
+flow end to end, not by hiding a backend-required field. Historical migration stays last.
+
 ## End-to-end delivery (owner instruction, 2026-10-15)
 
 Make the requested workflow work, not merely its backend. Complete ordinary wiring,

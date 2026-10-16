@@ -15,22 +15,31 @@ and hands content reading to the native course route. Persisted attendance sourc
 check-in/no-class routes also exist. These are source observations, not completed audit
 capabilities or live acceptance.
 
+**Immediate priority — automatic NRRU acquisition, not pasted links.**
+Users select a term/class; the server discovers and retrieves the school data. Port
+CourseMax's scheduled roster reconciliation and calendar semantics, preserving native
+authorization, verified student matching, manual members and history. CourseMax's
+existing configured keys were seeded historically, not generically discovered.
+NRRU also provides a course/term RTF roster export: absence of class IDs on the grid
+is not justification for a manual-link task. Source parsing, exact section validation
+and the existing class-key model/API contract still need implementation and tests.
+Replace the flow end to end before continuing identity/syllabus/dated-plan work;
+do not hide required inputs while leaving the server dependent on them. No portal
+credentials, fabricated identifiers, runtime CourseMax dependency or historical migration.
+
 The retired preview compatibility component and route redirect to `/classes` and ignore
 legacy role/view/query state. Production code must neither statically nor dynamically
-import or re-export its test fixtures. Retirement has not been declared deployed. If the
-preview links remain, removing them requires narrow prior review of exactly:
-
-- `apps/web/components/Dashboard/Menus/DashLeftMenu.tsx`
-- `apps/web/components/Dashboard/Menus/DashMobileMenu.tsx`
-
-Do not bypass boundary policy or alter those native files under this rehearsal.
+import or re-export its test fixtures. Retirement and the two explicitly approved
+native menu-entry removals are deployed at `3019c79e`; see
+[deployment evidence](demo-retirement.md). This rehearsal is not permission to
+make further native edits or bypass the boundary.
 
 Actual syllabus editing and persisted dated teaching plans are missing; the current
 syllabus surface is a native reader handoff. Absence submission/review/overrides,
 historical attendance reporting/CSV, and identity correction/admin-review handlers are
 also missing. Students need a task hub, while native content and progress remain the
 single authority. Parent review found all seven academic tables empty, and no historical
-migration is authorized. Production-demo source retirement is not yet deployed.
+migration is authorized. Retirement does not establish academic feature parity.
 
 ## Next delivery queue — current execution override (2026-10-16)
 
@@ -38,8 +47,10 @@ The canonical LH phase groups remain audit/acceptance reference groups. They do 
 require reimplementing accepted foundation or delay a usable basic syllabus/teaching
 plan until every team tool or assessment migration is complete.
 
-1. Finish retiring production demos; review the exact two native-menu deletions,
-   restore capacity safely, then run full build, browser, and protected deploy checks.
+1. Production-demo and approved menu retirement are deployed. Next repair automatic
+   NRRU class/roster/schedule acquisition so no teacher or administrator pastes a
+   roster URL or transcribes school IDs. Validate exact source matches, scheduled
+   refresh, preserved history and calendar-derived sessions end to end.
 2. Run the connected-class integration exercise with isolated synthetic native
    sessions, explicit native authoring rights (READ alone is not edit), the real
    SchoolIdentity → Myclasses student path, and persisted identity-case resolution.
@@ -55,7 +66,8 @@ plan until every team tool or assessment migration is complete.
    cutover last.
 
 No production mock, duplicate catalog/session/enrollment, or fake completion is allowed.
-Current retirement is source-only pending 9.7 GiB capacity and native-menu review.
+Retirement is live. Automatic NRRU acquisition remains an implementation gap;
+source observations alone do not close it.
 
 ## Reviewed ordered phase manifest
 

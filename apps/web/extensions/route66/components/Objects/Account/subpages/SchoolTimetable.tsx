@@ -19,13 +19,13 @@ export default function SchoolTimetable({ staffId, teacherName, onOpenClass, sch
     year: 'ปีการศึกษา (พ.ศ.)', term: 'ภาคเรียน', loading: 'กำลังดึงตารางสอน…', error: 'ดึงตารางสอนไม่ได้ โปรดลองอีกครั้ง', retry: 'ลองอีกครั้ง',
     empty: 'ทะเบียนไม่แสดงชั้นเรียนในภาคเรียนนี้', emptyHelp: 'ลองเลือกภาคเรียนหรือปีการศึกษาอื่น ข้อมูลนี้ไม่ได้หมายความว่าคุณไม่มีรายวิชาที่ได้รับมอบหมายในระบบ',
     asof: 'ดึงข้อมูลเมื่อ', section: 'กลุ่มเรียน', readonly: 'ข้อมูลทะเบียน · อ่านอย่างเดียว', teacher: 'ตารางสอนของ',
-    search: 'ค้นหาวิชา กลุ่มเรียน วัน หรือห้อง', noMatch: 'ไม่พบชั้นเรียนที่ตรงกับคำค้น', clear: 'ล้างคำค้น', results: 'กลุ่มเรียน', openClass: 'เปิดพื้นที่ชั้นเรียน',
+    search: 'ค้นหาวิชา กลุ่มเรียน วัน หรือห้อง', noMatch: 'ไม่พบชั้นเรียนที่ตรงกับคำค้น', clear: 'ล้างคำค้น', results: 'กลุ่มเรียน', openClass: schoolMode ? 'ดูชั้นเรียน' : 'เปิดพื้นที่ชั้นเรียน',
   } : {
     title: 'Registrar timetable', note: 'Your university timetable, separate from LearnHouse classes. These entries do not assign courses or enroll students automatically.',
     year: 'Academic year (Buddhist Era)', term: 'Semester', loading: 'Loading registrar timetable…', error: 'The registrar timetable could not be loaded. Try again.', retry: 'Try again',
     empty: 'No registrar classes for this semester', emptyHelp: 'Try another semester or academic year. This does not describe your LearnHouse teaching assignments.',
     asof: 'Fetched', section: 'Section', readonly: 'Registrar data · Read-only', teacher: 'Timetable for',
-    search: 'Search course, section, day or room', noMatch: 'No classes match your search', clear: 'Clear search', results: 'sections', openClass: 'Open class workspace',
+    search: 'Search course, section, day or room', noMatch: 'No classes match your search', clear: 'Clear search', results: 'sections', openClass: schoolMode ? 'Open class' : 'Open class workspace',
   }
   const [data, setData] = useState<Timetable | null>(null), [selection, setSelection] = useState<RegistrarTerm | null>(null)
   const [ready, setReady] = useState(false), [error, setError] = useState(false), [busy, setBusy] = useState(true), [attempt, setAttempt] = useState(0), [query, setQuery] = useState('')
@@ -58,8 +58,8 @@ export default function SchoolTimetable({ staffId, teacherName, onOpenClass, sch
     {!schoolMode && <p className="flex items-center gap-2 bg-blue-100 px-4 py-2.5 text-xs font-semibold text-blue-900"><CalendarClock size={14} aria-hidden="true" />{t.readonly}</p>}
     <div className={schoolMode ? school.indexContent : 'space-y-5 p-4 sm:p-6'}>
       <header className={schoolMode ? school.indexHeading : `${colors.header} -mx-4 -mt-4 px-4 pb-5 pt-4 sm:-mx-6 sm:-mt-6 sm:px-6 sm:pt-6`}><h2 id="registrar-title" className="text-xl font-semibold tracking-tight text-blue-950">{schoolMode ? (th ? 'ชั้นเรียน NRRU' : 'NRRU classes') : t.title}</h2>
-        {teacherName && <p className="mt-2 break-words text-sm text-blue-800">{t.teacher} <strong className="font-medium text-blue-950">{teacherName}</strong></p>}
-        <p className="mt-2 max-w-prose text-sm leading-relaxed text-blue-800">{schoolMode ? (th ? 'ชั้นเรียนของคุณจากทะเบียน เลือกกลุ่มเรียนเพื่อดูรายละเอียด ตารางเรียน และรายชื่อ' : 'Your registrar classes. Open a section for details, weekly meetings and official students.') : t.note}</p>
+        {teacherName && <p className="mt-2 break-words text-sm text-blue-800">{schoolMode ? (th ? 'ชั้นเรียนของ' : 'Classes for') : t.teacher} <strong className="font-medium text-blue-950">{teacherName}</strong></p>}
+        {!schoolMode && <p className="mt-2 max-w-prose text-sm leading-relaxed text-blue-800">{t.note}</p>}
       </header>
       <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end sm:gap-4">
         <div className="flex min-w-0 flex-col gap-2 text-xs font-medium text-neutral-700"><label htmlFor={yearId}>{t.year}</label>

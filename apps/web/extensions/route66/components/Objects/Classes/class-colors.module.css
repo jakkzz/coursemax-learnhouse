@@ -1,0 +1,69 @@
+/* Existing LearnHouse/School blue, scoped to class tasks rather than the shell. */
+.workspace {
+  --color-primary: #1d4ed8;
+  --color-primary-foreground: #ffffff;
+  --color-accent: #eff6ff;
+  --color-accent-foreground: #1e40af;
+  --color-ring: #1d4ed8;
+}
+.status {
+  --status-foreground: #1e40af;
+  --status-surface: #eff6ff;
+  --status-border: #bfdbfe;
+  padding: 20px;
+  border: 1px solid var(--status-border);
+  border-radius: 8px;
+  background: var(--status-surface);
+  color: var(--status-foreground);
+}
+.status[data-state='connected'], .status[data-state='ready-access'] {
+  --status-foreground: #166534;
+  --status-surface: #f0fdf4;
+  --status-border: #86efac;
+}
+.status[data-state='requested'], .status[data-state='needs_course'], .status[data-state='needs_repair'] {
+  --status-foreground: #92400e;
+  --status-surface: #fffbeb;
+  --status-border: #fcd34d;
+}
+.status[data-state='conflict'], .status[data-state='error'] {
+  --status-foreground: #991b1b;
+  --status-surface: #fef2f2;
+  --status-border: #fca5a5;
+}
+.status[data-state='loading'] {
+  --status-foreground: #525252;
+  --status-surface: #fafafa;
+  --status-border: #d4d4d4;
+}
+.status :is(p, label, h2, h3) { color: inherit; }
+.status :is(input, select) { accent-color: #1d4ed8; }
+.statusHeading { display: flex; align-items: flex-start; gap: 10px; }
+.statusHeading > svg { flex-shrink: 0; margin-top: 3px; }
+.status p[role='alert'] { color: #991b1b; }
+.workspace .link { color: #1d4ed8; text-underline-offset: 4px; }
+.workspace .link:hover { color: #1e40af; }
+.classRow { border-radius: 8px; transition: background-color 150ms ease-out; }
+.classRow:hover, .classRow:focus-within { background: #eff6ff; }
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  border-radius: 4px;
+  padding: 3px 7px;
+  background: #f5f5f5;
+  color: #525252;
+  line-height: 1.5;
+}
+.badge > svg { flex-shrink: 0; }
+.badge[data-state='matched'] { background: #f0fdf4; color: #166534; }
+.badge[data-state='conflict'] { background: #fffbeb; color: #92400e; }
+.workspace ::selection { background: #dbeafe; color: #1e3a8a; }
+.workspace :is(input, textarea) { caret-color: #1d4ed8; }
+@media (max-width: 600px) { .status { padding: 16px; } }
+@media (prefers-reduced-motion: reduce) { .classRow { transition: none; } }
+@media (forced-colors: active) {
+  .status, .badge { border: 1px solid CanvasText; }
+  .workspace .link { color: LinkText; }
+}

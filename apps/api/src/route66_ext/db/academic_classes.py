@@ -26,6 +26,7 @@ class AcademicClass(SQLModel, table=True):
     __table_args__ = (
         UniqueConstraint('registry_class_id','academic_year','semester',name='uq_official_class_term'),
         UniqueConstraint('course_id','academic_year','semester','section',name='uq_course_section_term'),
+        UniqueConstraint('registry_course_id','academic_year','semester','section',name='uq_official_course_section_term'),
         CheckConstraint('semester BETWEEN 1 AND 3 AND academic_year BETWEEN 2500 AND 2700',name='ck_class_term'),)
     id: int | None = Field(default=None, primary_key=True)
     course_id: int = Field(foreign_key='course.id', index=True)
@@ -33,7 +34,7 @@ class AcademicClass(SQLModel, table=True):
     semester: int
     section: str = Field(max_length=40)
     registry_course_id: str = Field(max_length=20)
-    registry_class_id: str = Field(max_length=20)
+    registry_class_id: str | None = Field(default=None, max_length=20)
     registry_course_code: str = Field(max_length=30)
     version: int = 0
     last_source_hash: str | None = Field(default=None, max_length=64)

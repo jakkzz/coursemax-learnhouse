@@ -39,7 +39,7 @@ class ClassSetup(Body):
     semester:int=Field(ge=1,le=3)
     section:str=Field(min_length=1,max_length=40,pattern=r'^[A-Za-z0-9/-]+$')
     registry_course_id:str=Field(pattern=r'^[1-9][0-9]{0,19}$')
-    registry_class_id:str=Field(pattern=r'^[1-9][0-9]{0,19}$')
+    registry_class_id:str|None=Field(default=None,pattern=r'^[1-9][0-9]{0,19}$')
     @field_validator('section')
     @classmethod
     def canonical_section(cls,value):return value.upper()
@@ -176,13 +176,14 @@ async def preview(class_id:int,request:Request,response:Response,db:AsyncSession
         await throttle(redis,request,config,'roster-source-'+str(user.id))
         import asyncio
         try:rows,digest=await asyncio.wait_for(service.fetch_roster(cls),timeout=10)
-        except (ValueError,TimeoutError):raise HTTPException(503,'Registrar roster is unavailable or does not match this class. Check the registry IDs, year and section; retry.') from None
+        except (ValueError,TimeoutError):raise HTTPException(503,'Registrar roster is unavailable or does not match this class. Retry from this class; no internal ID or URL is needed.') from None
         await db.refresh(cls);await service.can_manage(db,user,cls,config.org_id)
         current=(await db.exec(select(AcademicRosterEntry,SchoolStudent).join(SchoolStudent,SchoolStudent.id==AcademicRosterEntry.student_id).where(AcademicRosterEntry.class_id==cls.id))).all()
         incoming={r['student_number'] for r in rows};existing={p.student_number for e,p in current};missing=[(e,p) for e,p in current if e.source=='registry' and e.status=='active' and p.student_number not in incoming]
-        token=secrets.token_urlsafe(32);payload={'user_id':user.id,'org_id':config.org_id,'class_id':cls.id,'version':cls.version,'source_hash':digest,'rows':rows}
+        selected_source=service.source(cls)
+        token=secrets.token_urlsafe(32);payload={'user_id':user.id,'org_id':config.org_id,'class_id':cls.id,'version':cls.version,'source_hash':digest,'source_kind':selected_source['kind'],'source_url':selected_source['url'],'rows':rows}
         await redis.set('lh:roster:'+config.deployment+':'+token,json.dumps(payload),ex=600)
-    return {'preview_id':token,'incoming_count':len(rows),'added_count':len(incoming-existing),'missing_count':len(missing),'withdraw_count':sum(e.missing_count>=1 for e,p in missing),'source_url':service.source_url(cls),'expires_in':600,'version':cls.version}
+    return {'preview_id':token,'incoming_count':len(rows),'added_count':len(incoming-existing),'missing_count':len(missing),'withdraw_count':sum(e.missing_count>=1 for e,p in missing),'source_url':selected_source['url'],'source_kind':selected_source['kind'],'source_digest':digest,'expires_in':600,'version':cls.version}
 
 @router.post('/{class_id}/roster/apply')
 async def apply(class_id:int,body:Apply,request:Request,response:Response,db:AsyncSession=Depends(get_db_session)):
@@ -196,7 +197,8 @@ async def apply(class_id:int,body:Apply,request:Request,response:Response,db:Asy
         if (data['user_id'],data['org_id'],data['class_id'],data['version'])!=(user.id,config.org_id,cls.id,cls.version):raise HTTPException(409,'Class or permission changed. Load a new preview.')
         if cls.last_source_hash==data['source_hash'] and cls.last_synced_at and datetime.now(timezone.utc)-cls.last_synced_at<timedelta(minutes=30):raise HTTPException(409,'This roster was recently applied. Wait before checking another missing snapshot.')
         if await redis.eval("if redis.call('GET',KEYS[1]) == ARGV[1] then redis.call('DEL',KEYS[1]); return 1 end; return 0",1,key,raw)!=1:raise HTTPException(409,'Preview already used. Load a new preview.')
-        counts=await service.apply_roster(db,cls,data['rows'],data['source_hash'],user.id)
+        counts=await service.apply_roster(db,cls,data['rows'],data['source_hash'],user.id,
+            data.get('source_kind'),data.get('source_url'))
         await commit(db)
     return {'applied':True,'counts':counts,'version':cls.version}
 

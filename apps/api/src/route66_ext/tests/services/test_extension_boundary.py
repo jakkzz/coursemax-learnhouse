@@ -116,6 +116,13 @@ class DiscoveryTests(unittest.TestCase):
             self.assertTrue(wrapper.upgrade.__module__.startswith('src.route66_ext.migrations.'))
             previous = revision
 
+    def test_composed_migrations_have_one_owned_head_without_duplicate_old_implementations(self):
+        from alembic.script import ScriptDirectory
+        from src.route66_ext.migrations.config import migration_config
+        script = ScriptDirectory.from_config(migration_config())
+        self.assertEqual(script.get_heads(), ["f47eb52fa044"])
+        self.assertEqual(script.get_revision("f47eb52fa044").down_revision, "f36da41e9f33")
+
     def test_native_imports_confined_to_adapters(self):
         root = Path(__file__).resolve().parents[2]
         for file in root.rglob('*.py'):

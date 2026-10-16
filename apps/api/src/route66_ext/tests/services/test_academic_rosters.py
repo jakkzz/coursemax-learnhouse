@@ -14,6 +14,8 @@ from src.db.user_organizations import UserOrganization
 from src.route66_ext.db.school_identity import SchoolGoogleEvidence
 from src.route66_ext.services import academic_rosters as s
 from src.route66_ext.routers import academic_classes as api
+from src.route66_ext.routers import class_connections as connections
+from src.route66_ext.adapters.native_learning_access_test_support import PublicUser
 
 @unittest.skipUnless(os.getenv('RUN_IDENTITY_POSTGRES_TESTS')=='1','isolated PostgreSQL required')
 class AcademicRosterTests(NativeGoogleTests):
@@ -55,12 +57,42 @@ class AcademicRosterTests(NativeGoogleTests):
         b=await self.snapshot('6900000001');self.assertEqual(b['withdrawn'],1)
         c=await self.snapshot('6900000001','6900000002');self.assertEqual(c['reactivated'],1)
         async with self.sessions() as db:self.assertEqual([e.id for e in (await db.exec(select(AcademicRosterEntry).order_by(AcademicRosterEntry.id))).all()],old_ids)
+    async def test_export_omissions_do_not_clear_known_faculty_or_program(self):
+        await self.snapshot('6900000001')
+        row=self.rows('6900000001')[0];row['faculty']='';row['program']=''
+        async with self.sessions.begin() as db:
+            await s.serialize(db);await s.apply_roster(db,await db.get(AcademicClass,20),[row],'b'*64,2,'course_rtf','https://reg.nrru.ac.th/registrar/teach_stdlistRTFallgroup.asp?courseid=100&acadyear=2569&semester=1')
+        async with self.sessions() as db:
+            profile=(await db.exec(select(SchoolStudent))).one()
+            self.assertEqual((profile.faculty,profile.program),('คณะตัวอย่าง','สาขาตัวอย่าง'))
+            snapshot=(await db.exec(select(AcademicClassEvent).where(AcademicClassEvent.kind=='roster_snapshot_applied').order_by(AcademicClassEvent.id.desc()))).first()
+            self.assertEqual(snapshot.details['source_kind'],'course_rtf')
+            self.assertIn('source_url',snapshot.details)
+
     async def test_manual_members_survive_registry_absence(self):
         async with self.sessions.begin() as db:
             p=SchoolStudent(user_id=3,full_name_th='Manual fixture',faculty='',program='');db.add(p);await db.flush();db.add(AcademicRosterEntry(class_id=20,student_id=p.id,source='manual',display_position=1))
         await self.snapshot('6900000001');await self.snapshot('6900000001')
         async with self.sessions() as db:
             e=(await db.exec(select(AcademicRosterEntry).where(AcademicRosterEntry.source=='manual'))).one();self.assertEqual((e.status,e.missing_count),('active',0))
+
+    async def test_manual_status_and_position_survive_registrar_appearance_and_absence(self):
+        async with self.sessions.begin() as db:
+            active = SchoolStudent(student_number='6900000002', full_name_th='Manual active', faculty='', program='')
+            withdrawn = SchoolStudent(student_number='6900000003', full_name_th='Manual withdrawn', faculty='', program='')
+            db.add(active); db.add(withdrawn); await db.flush()
+            db.add(AcademicRosterEntry(class_id=20, student_id=active.id, source='manual',
+                display_position=7, status='active'))
+            db.add(AcademicRosterEntry(class_id=20, student_id=withdrawn.id, source='manual',
+                display_position=8, status='withdrawn'))
+            active_id, withdrawn_id = active.id, withdrawn.id
+        await self.snapshot('6900000002', '6900000003')
+        await self.snapshot('6900000001'); await self.snapshot('6900000001')
+        async with self.sessions() as db:
+            entries = (await db.exec(select(AcademicRosterEntry).where(
+                AcademicRosterEntry.source == 'manual').order_by(AcademicRosterEntry.display_position))).all()
+            self.assertEqual([(e.student_id, e.display_position, e.status, e.missing_count) for e in entries], [
+                (active_id, 7, 'active', 0), (withdrawn_id, 8, 'withdrawn', 0)])
     async def test_multiple_verified_claims_never_transfer_identity(self):
         await self.claim();await self.snapshot('6900000001');await self.claim(3)
         async with self.sessions() as db:
@@ -100,6 +132,89 @@ class AcademicRosterTests(NativeGoogleTests):
         with self.assertRaises(IntegrityError):
             async with self.sessions.begin() as db:
                 db.add(AcademicClass(course_id=11,academic_year=2569,semester=1,section='P2',registry_course_id='100',registry_class_id='200',registry_course_code='990001'));await db.flush()
+
+    async def test_direct_proposal_rejects_official_tuple_owned_by_another_course(self):
+        async with self.sessions.begin() as db:
+            owned = AcademicClass(course_id=11, academic_year=2569, semester=2, section='P2',
+                registry_course_id='100', registry_class_id=None, registry_course_code='990001')
+            db.add(owned); await db.flush()
+            event = AcademicClassEvent(actor_user_id=2, kind='class_connection_requested', details={
+                'org_id': 1, 'registry_course_id': '100', 'course_code': '990001',
+                'academic_year': 2569, 'semester': 2, 'section': 'P2', 'teacher_id': 2})
+            db.add(event); await db.flush()
+            before_classes = [(c.id, c.course_id, c.registry_class_id) for c in
+                (await db.exec(select(AcademicClass))).all()]
+            before_students = [(p.id, p.student_number, p.user_id) for p in
+                (await db.exec(select(SchoolStudent))).all()]
+            before_entries = [(e.id, e.student_id, e.source, e.status) for e in
+                (await db.exec(select(AcademicRosterEntry))).all()]
+            with self.assertRaises(HTTPException) as raised:
+                await connections.proposal(db, PublicUser.model_validate(await db.get(User, 3)), 1,
+                    event, connections.Choice(course_id=10))
+            self.assertEqual(raised.exception.status_code, 409)
+            self.assertEqual(before_classes, [(c.id, c.course_id, c.registry_class_id) for c in
+                (await db.exec(select(AcademicClass))).all()])
+            self.assertEqual(before_students, [(p.id, p.student_number, p.user_id) for p in
+                (await db.exec(select(SchoolStudent))).all()])
+            self.assertEqual(before_entries, [(e.id, e.student_id, e.source, e.status) for e in
+                (await db.exec(select(AcademicRosterEntry))).all()])
+    async def test_course_export_migration_changes_only_nullability_and_official_uniqueness(self):
+        from alembic import op
+        from alembic.migration import MigrationContext
+        from alembic.operations import Operations
+        from src.route66_ext.migrations.versions import f47eb52fa044_course_export_source as migration
+        async with self.engine.begin() as conn:
+            await conn.execute(text('ALTER TABLE academicclass DROP CONSTRAINT uq_official_course_section_term'))
+            await conn.execute(text('ALTER TABLE academicclass ALTER COLUMN registry_class_id SET NOT NULL'))
+            def upgrade(sync_conn):
+                with Operations.context(MigrationContext.configure(sync_conn)):
+                    migration.upgrade()
+            await conn.run_sync(upgrade)
+            nullable=(await conn.execute(text("SELECT is_nullable FROM information_schema.columns WHERE table_name='academicclass' AND column_name='registry_class_id'"))).scalar_one()
+            constraints=(await conn.execute(text("SELECT constraint_name FROM information_schema.table_constraints WHERE table_name='academicclass'"))).scalars().all()
+            self.assertEqual(nullable,'YES');self.assertIn('uq_official_course_section_term',constraints)
+            await conn.execute(text("INSERT INTO academicclass (course_id,academic_year,semester,section,registry_course_id,registry_class_id,registry_course_code,version) VALUES (11,2569,2,'3','101',NULL,'990002',0)"))
+            def downgrade(sync_conn):
+                with Operations.context(MigrationContext.configure(sync_conn)):
+                    migration.downgrade()
+            with self.assertRaisesRegex(RuntimeError,'Refusing downgrade'):
+                await conn.run_sync(downgrade)
+
+    async def test_bootstrap_named_migration_entrypoint_preserves_rows(self):
+        import asyncio, importlib.util, os
+        from unittest.mock import patch
+        from pathlib import Path
+        path=Path('/deployment/apply_nrru_source_migration.py')
+        spec=importlib.util.spec_from_file_location('named_nrru_migration',path)
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        async with self.engine.begin() as conn:
+            await conn.execute(text('ALTER TABLE academicclass DROP CONSTRAINT uq_official_course_section_term'))
+            await conn.execute(text('ALTER TABLE academicclass ALTER COLUMN registry_class_id SET NOT NULL'))
+        url='postgresql://fixture@/fixture?host=/scratch&options=-csearch_path%3D'+self.schema
+        with patch.dict(os.environ,{'LEARNHOUSE_SQL_CONNECTION_STRING':url}):
+            await asyncio.to_thread(module.main)
+        async with self.engine.begin() as conn:
+            values=(await conn.execute(text('SELECT id,registry_class_id FROM academicclass'))).all()
+            self.assertEqual(values,[(20,'200')])
+            nullable=(await conn.execute(text("SELECT is_nullable FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='academicclass' AND column_name='registry_class_id'"))).scalar_one()
+            self.assertEqual(nullable,'YES')
+
+    async def test_course_export_migration_preflight_rejects_duplicate_official_tuple_first(self):
+        from alembic.migration import MigrationContext
+        from alembic.operations import Operations
+        from src.route66_ext.migrations.versions import f47eb52fa044_course_export_source as migration
+        async with self.engine.begin() as conn:
+            await conn.execute(text('ALTER TABLE academicclass DROP CONSTRAINT uq_official_course_section_term'))
+            await conn.execute(text('ALTER TABLE academicclass ALTER COLUMN registry_class_id SET NOT NULL'))
+            await conn.execute(text("INSERT INTO academicclass (course_id,academic_year,semester,section,registry_course_id,registry_class_id,registry_course_code,version) VALUES (11,2569,1,'P1','100','201','990001',0)"))
+            def upgrade(sync_conn):
+                with Operations.context(MigrationContext.configure(sync_conn)):
+                    migration.upgrade()
+            with self.assertRaisesRegex(RuntimeError,'duplicate official'):
+                await conn.run_sync(upgrade)
+            nullable=(await conn.execute(text("SELECT is_nullable FROM information_schema.columns WHERE table_name='academicclass' AND column_name='registry_class_id'"))).scalar_one()
+            self.assertEqual(nullable,'NO')
+
     async def test_events_are_append_only_in_database(self):
         await self.snapshot('6900000001')
         for statement in ('UPDATE academicclassevent SET kind=\'changed\'','DELETE FROM academicclassevent'):

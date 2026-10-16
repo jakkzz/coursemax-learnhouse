@@ -197,10 +197,12 @@ class LearningAccessTests(AcademicRosterTests):
         @asynccontextmanager
         async def source_resources(_): yield None, None
         timetable = {"academic_year": 2569, "semester": 2, "classes": [{"registry_course_id": "100", "section": "P2", "course_code": "990001", "title": "Synthetic official course"}]}
-        with patch.object(school_identity, "settings", return_value=config), patch.object(connections, "resources", source_resources), patch.object(connections, "throttle", AsyncMock()), patch.object(connections, "teacher_timetable", AsyncMock(return_value=timetable)):
+        imported_rows = self.rows("6900000001")
+        source_fetch = AsyncMock(return_value=(imported_rows, "b" * 64))
+        with patch.object(school_identity, "settings", return_value=config), patch.object(connections, "resources", source_resources), patch.object(connections, "throttle", AsyncMock()), patch.object(connections, "teacher_timetable", AsyncMock(return_value=timetable)), patch.object(connections.roster, "fetch_roster", source_fetch):
             async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://learn.example.com", headers={"Origin": "https://learn.example.com"}, cookies={"LH_access": teacher_session.access_token}) as learner:
                 path = "/api/v1/academic-classes/connections/requests"
-                body = {"registry_course_id": "100", "academic_year": 2569, "semester": 2, "section": "P2", "roster_url": "https://reg.nrru.ac.th/registrar/student_inclass_all.asp?classid=201&courseid=100&acadyear=2569&semester=2"}
+                body = {"registry_course_id": "100", "academic_year": 2569, "semester": 2, "section": "P2"}
                 denied = await learner.post(path, json=body, headers={"Origin": "https://foreign.invalid"})
                 self.assertEqual(denied.status_code, 403)
                 sent = await learner.post(path, json=body); self.assertEqual(sent.status_code, 200, sent.text)
@@ -211,28 +213,74 @@ class LearningAccessTests(AcademicRosterTests):
                 self.assertEqual(len((await owner.get(path)).json()["requests"]), 1)
                 p = await owner.post(f"{path}/{ident}/preview", json={"course_id": 10})
                 self.assertEqual(p.status_code, 200, p.text)
+                self.assertNotIn("rows", p.json()); self.assertNotIn("students", p.json())
+                self.assertEqual((p.json()["candidate_count"], p.json()["source_kind"], p.json()["source_digest"]), (0, "course_rtf", "b" * 64))
                 apply_body = {"course_id": 10, "confirm_changes": True, "expected_fingerprint": p.json()["expected_fingerprint"], "request_id": uuid.uuid4().hex}
                 rejected = await owner.post(f"{path}/{ident}/connect", json={**apply_body, "confirm_changes": False})
                 self.assertEqual(rejected.status_code, 400)
+
+                source_fetch.side_effect = ValueError("Synthetic registrar outage")
+                unavailable = await owner.post(f"{path}/{ident}/connect", json=apply_body)
+                self.assertEqual(unavailable.status_code, 503)
+                self.assertFalse(await self.decision(2))
+                async with self.sessions() as db:
+                    self.assertEqual(len((await db.exec(select(AcademicClass))).all()), 1)
+                    self.assertEqual((await db.exec(select(AcademicRosterEntry))).all(), [])
+
+                source_fetch.side_effect = None
+                source_fetch.return_value = (imported_rows, "c" * 64)
+                changed = await owner.post(f"{path}/{ident}/connect", json=apply_body)
+                self.assertEqual(changed.status_code, 409)
+                self.assertFalse(await self.decision(2))
+                async with self.sessions() as db:
+                    self.assertEqual(len((await db.exec(select(AcademicClass))).all()), 1)
+                    self.assertEqual((await db.exec(select(AcademicRosterEntry))).all(), [])
+
+                source_fetch.return_value = (imported_rows, "b" * 64)
                 connected = await owner.post(f"{path}/{ident}/connect", json=apply_body)
                 self.assertEqual(connected.status_code, 200, connected.text)
-                self.assertFalse(connected.json()["roster_imported"])
-                self.assertEqual((await owner.post(f"{path}/{ident}/connect", json=apply_body)).json()["class_id"], connected.json()["class_id"])
+                self.assertTrue(connected.json()["roster_imported"])
+                fetches_after_connect = source_fetch.await_count
+                replay = await owner.post(f"{path}/{ident}/connect", json=apply_body)
+                self.assertEqual(replay.json()["class_id"], connected.json()["class_id"])
+                self.assertEqual(source_fetch.await_count, fetches_after_connect)
         self.assertTrue(await self.decision(2)); self.assertFalse(await self.decision(2, AccessAction.UPDATE))
         async with self.sessions() as db:
             self.assertEqual(len((await db.exec(select(AcademicClass))).all()), 2)
-            self.assertEqual((await db.exec(select(AcademicRosterEntry))).all(), [])
+            imported = (await db.exec(select(AcademicRosterEntry).join(AcademicClass).where(AcademicClass.section == "P2"))).all()
+            self.assertEqual(len(imported), 1)
+            created = (await db.exec(select(AcademicClass).where(AcademicClass.section == "P2"))).one()
+            self.assertIsNone(created.registry_class_id)
+            self.assertEqual((await db.exec(select(ResourceAuthor))).all(), [])
             self.assertEqual((await db.exec(select(Trail))).all(), [])
+            self.assertEqual((await db.exec(select(TrailRun))).all(), [])
+            self.assertEqual((await db.exec(select(TrailStep))).all(), [])
+            teacher_user = await db.get(User, 2)
+            self.assertFalse(teacher_user.is_superadmin)
             rows = (await db.exec(select(AcademicClassEvent).where(AcademicClassEvent.kind == "class_connection_completed"))).all()
             self.assertEqual(len(rows), 1); self.assertEqual(rows[0].actor_user_id, 3)
+            snapshots = (await db.exec(select(AcademicClassEvent).where(AcademicClassEvent.kind == "roster_snapshot_applied", AcademicClassEvent.class_id == created.id))).all()
+            self.assertEqual(len(snapshots), 1)
+            self.assertEqual((snapshots[0].details["source_kind"], snapshots[0].details["source_hash"]), ("course_rtf", "b" * 64))
 
-    async def test_roster_link_parser_rejects_cross_course_credentials_duplicate_ids_and_inference(self):
-        from src.route66_ext.routers.class_connections import roster_class_id
-        facts = {"registry_course_id": "100", "academic_year": 2569, "semester": 2}
-        valid = "https://reg.nrru.ac.th/registrar/student_inclass_all.asp?classid=201&courseid=100&acadyear=2569&semester=2"
-        self.assertEqual(roster_class_id(valid, facts), "201")
-        for value in (valid.replace("reg.nrru.ac.th", "elsewhere.invalid"), valid + "&CLASSID=201", valid.replace("courseid=100", "courseid=101"), valid.replace("https://", "https://user:secret@"), valid.replace("classid=201&", ""), valid.replace("classid=201", "classid=0201")):
-            with self.assertRaises(HTTPException): roster_class_id(value, facts)
+    async def test_connection_dto_rejects_pasted_urls_and_source_is_fixed(self):
+        from pydantic import ValidationError
+        from types import SimpleNamespace
+        from src.route66_ext.routers.class_connections import Section, Choice
+        facts = dict(registry_course_id="100", academic_year=2569, semester=2, section="2")
+        with self.assertRaises(ValidationError):
+            Section.model_validate({**facts, "roster_url": "https://elsewhere.invalid/roster"})
+        with self.assertRaises(ValidationError):
+            Choice.model_validate({"course_id": 10, "roster_url": "https://reg.nrru.ac.th/"})
+        cls = SimpleNamespace(**facts, registry_course_code="990001", registry_class_id=None)
+        self.assertEqual(roster.source_url(cls),
+            "https://reg.nrru.ac.th/registrar/teach_stdlistRTFallgroup.asp?courseid=100&acadyear=2569&semester=2")
+        for section in ("P2", "01"):
+            cls.section = section
+            self.assertIn("teach_stdlistRTFallgroup.asp?", roster.source_url(cls))
+        for section in ("", "../../bad", "<script>"):
+            cls.section = section
+            with self.assertRaises(ValueError): roster.source_url(cls)
 
     async def test_native_private_read_is_granted_only_to_matching_student(self):
         await self.active()

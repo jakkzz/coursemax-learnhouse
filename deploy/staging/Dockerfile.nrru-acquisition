@@ -1,0 +1,8 @@
+# Exact verified parent; only owned API changes and a validated web overlay.
+ARG PARENT=coursemax-learnhouse:retire-menus-3019c79e
+FROM ${PARENT}
+ARG SOURCE_REVISION
+COPY --chown=1000:1000 route66_ext/ /app/api/src/route66_ext/
+COPY --chown=1000:1000 apply_nrru_source_migration.py /app/api/nrru-source-migration.py
+ADD --chown=1000:1000 web-delta.tar.gz /app/web/
+LABEL org.opencontainers.image.revision="${SOURCE_REVISION}"

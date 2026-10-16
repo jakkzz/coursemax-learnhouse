@@ -9,6 +9,7 @@ from hashlib import sha256
 import re
 from html.parser import HTMLParser
 from urllib.parse import urlencode
+import json
 import httpx
 from fastapi import HTTPException
 from sqlalchemy import text
@@ -18,8 +19,11 @@ from src.route66_ext.db.school_identity import SchoolGoogleEvidence
 from src.route66_ext.db.provider_identity import ProviderIdentity
 from src.route66_ext.adapters.db_courses_courses import Course
 from src.route66_ext.services.nrru_directory import student_hint
+from src.route66_ext.services.nrru_course_roster import MAX_BYTES as RTF_MAX_BYTES, parse_course_roster
 
 ROSTER_URL='https://reg.nrru.ac.th/registrar/student_inclass_all.asp'
+COURSE_ROSTER_URL='https://reg.nrru.ac.th/registrar/teach_stdlistRTFallgroup.asp'
+LEGACY_MAX_BYTES=512*1024
 
 async def serialize(db):
     await db.execute(text('SELECT pg_advisory_xact_lock(664466, 1)'))
@@ -87,8 +91,37 @@ async def can_manage(db,user,cls,org_id):
     if not user.is_superadmin and assignment is None:raise HTTPException(403,'This course is not assigned to you')
     return course
 
+def _positive_number(value, name, maximum=20):
+    value = str(value)
+    if not re.fullmatch(r'[1-9][0-9]{0,' + str(maximum - 1) + r'}', value):
+        raise ValueError('Class has invalid registrar ' + name)
+    return value
+
+
+def source(cls):
+    """Return the fixed registrar source selected only from persisted facts."""
+    course_id = _positive_number(cls.registry_course_id, 'course identifier')
+    year = _positive_number(cls.academic_year, 'academic year', 4)
+    semester = _positive_number(cls.semester, 'semester', 1)
+    if not (2500 <= int(year) <= 2700 and 1 <= int(semester) <= 3):
+        raise ValueError('Class has invalid registrar term metadata')
+    class_id = cls.registry_class_id
+    if class_id is not None:
+        class_id = _positive_number(class_id, 'class identifier')
+        url = ROSTER_URL + '?' + urlencode({'classid': class_id, 'courseid': course_id,
+            'acadyear': year, 'semester': semester, 'backto': 'teach_time'})
+        return {'kind': 'legacy_html', 'url': url, 'max_bytes': LEGACY_MAX_BYTES}
+    # Sections are official tokens (including P7 and 01), never inferred IDs.
+    # The all-group export must be filtered again by the exact selected section.
+    if not isinstance(cls.section, str) or not re.fullmatch(r'[A-Za-z0-9/-]{1,40}', cls.section):
+        raise ValueError('Class has invalid registrar section')
+    url = COURSE_ROSTER_URL + '?' + urlencode({'courseid': course_id,
+        'acadyear': year, 'semester': semester})
+    return {'kind': 'course_rtf', 'url': url, 'max_bytes': RTF_MAX_BYTES}
+
+
 def source_url(cls):
-    return ROSTER_URL+'?'+urlencode({'classid':cls.registry_class_id,'courseid':cls.registry_course_id,'acadyear':cls.academic_year,'semester':cls.semester,'backto':'teach_time'})
+    return source(cls)['url']
 
 class Rows(HTMLParser):
     def __init__(self):super().__init__(convert_charrefs=True);self.rows=[];self.row=None;self.parts=None
@@ -131,19 +164,30 @@ def parse_roster(content,cls):
     return result
 
 async def fetch_roster(cls):
-    url=source_url(cls)
+    selected = source(cls)
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(8),follow_redirects=False,trust_env=False) as client:
-            async with client.stream('GET',url,headers={'User-Agent':'LearnHouseRoster/1.0'}) as response:
-                if response.status_code!=200:raise ValueError('Registrar roster is unavailable')
-                data=bytearray()
+        async with httpx.AsyncClient(timeout=httpx.Timeout(8), follow_redirects=False,
+                                     trust_env=False, cookies=None) as client:
+            async with client.stream('GET', selected['url'],
+                    headers={'User-Agent':'LearnHouseRoster/1.0'}) as response:
+                if response.status_code != 200:
+                    raise ValueError('Registrar roster is unavailable')
+                data = bytearray()
                 async for chunk in response.aiter_bytes():
                     data.extend(chunk)
-                    if len(data)>512*1024:raise ValueError('Registrar response exceeds supported size')
-    except httpx.HTTPError:raise ValueError('Registrar roster is unavailable') from None
-    raw=bytes(data);return parse_roster(raw,cls),sha256(raw).hexdigest()
+                    if len(data) > selected['max_bytes']:
+                        raise ValueError('Registrar response exceeds supported size')
+    except httpx.HTTPError:
+        raise ValueError('Registrar roster is unavailable') from None
+    raw = bytes(data)
+    if selected['kind'] == 'course_rtf':
+        rows = parse_course_roster(raw, cls)
+        canonical = json.dumps(rows, ensure_ascii=False, sort_keys=True,
+                               separators=(',', ':')).encode('utf-8')
+        return rows, sha256(canonical).hexdigest()
+    return parse_roster(raw, cls), sha256(raw).hexdigest()
 
-async def apply_roster(db,cls,rows,source_hash,actor):
+async def apply_roster(db,cls,rows,source_hash,actor,source_kind=None,source_url_value=None):
     # Revalidate server-owned preview rows, never accept browser-supplied names.
     claims=await active_claims(db)
     existing=(await db.exec(select(AcademicRosterEntry).where(AcademicRosterEntry.class_id==cls.id))).all()
@@ -153,15 +197,21 @@ async def apply_roster(db,cls,rows,source_hash,actor):
         if profile is None:
             profile=SchoolStudent(student_number=row['student_number'],full_name_th=row['full_name_th'],faculty=row['faculty'],program=row['program'],has_registry_evidence=True);db.add(profile);await db.flush()
         else:
-            for key in ('full_name_th','faculty','program'):setattr(profile,key,row[key])
+            # The course export has no faculty and may omit a program.  Empty
+            # source fields never erase previously known registrar facts.
+            for key in ('full_name_th','faculty','program'):
+                if row.get(key):setattr(profile,key,row[key])
             profile.has_registry_evidence=True;db.add(profile)
         seen.add(profile.id);entry=by_student.get(profile.id)
         if entry is None:
             entry=AcademicRosterEntry(class_id=cls.id,student_id=profile.id,display_position=row['display_position']);counts['added']+=1;kind='registry_member_added'
         else:
             kind='registrar_membership_confirmed' if entry.source=='manual' else 'registry_member_seen'
-            if entry.status=='withdrawn':counts['reactivated']+=1;kind='registry_member_reactivated'
-            entry.status='active';entry.source='registry';entry.missing_count=0;entry.display_position=row['display_position']
+            # Registrar appearance is evidence, not permission to replace a
+            # teacher's manual membership/withdrawal decision or its source.
+            if entry.source!='manual':
+                if entry.status=='withdrawn':counts['reactivated']+=1;kind='registry_member_reactivated'
+                entry.status='active';entry.missing_count=0;entry.display_position=row['display_position']
         entry.registry_status_code=row.get('registry_status_code')
         db.add(entry);event(db,actor,kind,{'student_number':row['student_number'],'full_name_th':row['full_name_th'],'faculty':row['faculty'],'program':row['program'],'registry_status_code':entry.registry_status_code},cls,profile)
         status=await reconcile(db,actor,row['student_number'],claims,cls)
@@ -172,7 +222,12 @@ async def apply_roster(db,cls,rows,source_hash,actor):
         if entry.missing_count>=2:entry.status='withdrawn';counts['withdrawn']+=1
         db.add(entry);event(db,actor,'registry_member_missing',{'missing_count':entry.missing_count,'status':entry.status},cls,await db.get(SchoolStudent,entry.student_id))
     cls.version+=1;cls.last_source_hash=source_hash;cls.last_synced_at=datetime.now(timezone.utc);db.add(cls)
-    event(db,actor,'roster_snapshot_applied',{'source_hash':source_hash,'counts':counts,'version':cls.version},cls)
+    source_details = {'source_hash':source_hash,'counts':counts,'version':cls.version}
+    if source_kind is not None:
+        source_details['source_kind']=source_kind
+        source_details['source_digest_policy']='selected_rows_v1' if source_kind=='course_rtf' else 'legacy_raw_v1'
+    if source_url_value is not None:source_details['source_url']=source_url_value
+    event(db,actor,'roster_snapshot_applied',source_details,cls)
     await db.flush()
     from src.route66_ext.services.learning_access import refresh_course
     await refresh_course(db,actor,cls.course_id)

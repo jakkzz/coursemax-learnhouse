@@ -1,6 +1,42 @@
 # Internal extension deployment records
 
-## Latest: automatic NRRU acquisition — deployed 2026-10-16
+## Latest: usable section setup and durable status — deployed 2026-10-16
+
+Live source `7acb67a5b68515cb11ca18b9729c89b56f4c6e5c`, image
+`coursemax-learnhouse:class-workspace-20261016`, ID
+`sha256:81f6b6d8467c95599efd24b3f6c91c0d023ca59ed359354ea1b5d63f0aa74fa4`.
+[Section workflow](class-section-setup.md): already-assigned teachers can set up a
+section of an explicitly mapped course and import its initial roster directly.
+New mapping/access decisions retain the existing review. Request status survives
+reload, pending requests are not repeated, and the open workspace discovers a
+completed connection. Overview, Timetable and Roster replace unfinished tabs;
+connected sections offer real roster/session/native-content handoffs.
+
+53 focused disposable-PostgreSQL/native-session tests and 48 web tests pass, as do
+the production build and separate route/types check. Four compiled EN/TH 1440/390
+journeys complete request/reload/status refresh, direct setup, source failure/retry
+and roster handoff. They exposed and now cover an aborted-response bug that could
+replace valid connection data with `{}`. Four live native-bootstrap navigation and
+reload smokes pass against the actual authorized class list; they do not open real
+student rosters or impersonate an institutional teacher.
+
+1,010 API/config/migration hashes, 95 owned API files and 5,297 web entries verified.
+No new native hook/boundary exception. Exact compatible d96f parent retained and
+six-archive image/load round-trip verified. Fresh DB/content/runtime backups and
+isolated restore passed; an interrupted final restore-verification attempt was
+retained and the verifier rerun to completion before application. No schema or
+migration operation. App only recreated and gateway reloaded; identity/grants,
+progress, existing academic rows, runtime/env and all non-app container IDs match.
+Only four native role startup timestamps changed. Native settings now say
+“Development” instead of “Preview only”; the source menu points to the exact source
+revision. Other organization configuration was verified unchanged.
+
+Protected evidence: `class-workspace-20261016/`,
+`class-workspace-web-release-20261016/`, `releases/class-workspace-20261016/`.
+No real roster/history migration, syllabus/plan editor, unattended roster refresh,
+calendar generation or cutover is claimed.
+
+## Previous: automatic NRRU acquisition — deployed 2026-10-16
 
 Live source `d96f2c6cb2f7916574f6f1ffb97a62ef355f5e9c`, image
 `coursemax-learnhouse:nrru-auto-20261016`, ID

@@ -826,6 +826,22 @@
       ],
       "replacement_plan": "Remove old command alias only after all validation scripts consume owned test paths.",
       "sha256": "a74ca6fe174105cdd52b651d0883f3e0d5e5a4046f5c3a031f943f34d11b4dfe"
+    },
+    "apps/web/components/Dashboard/Menus/DashLeftMenu.tsx": {
+      "reason": "Exact approved removal of the obsolete classes-preview native menu entry only.",
+      "approval_reference": "Owner's 2026-10-16 narrow obsolete-menu-removal approval.",
+      "tests": ["Native menu regression checks; owned web tests; boundary and source audits"],
+      "replacement_plan": "No replacement; classes-preview is retired and native courses/assignments routes remain.",
+      "sha256": "1b96388141e8e9dcd297c532dfc791502fd02b64698a0ff49bc76a84f3dd0f54",
+      "previous_sha256": "acf1f16a5f57b9da1d427375362f2978da6d648f214f055bcc8014dc447f33bf"
+    },
+    "apps/web/components/Dashboard/Menus/DashMobileMenu.tsx": {
+      "reason": "Exact approved removal of the obsolete classes-preview native menu entry only.",
+      "approval_reference": "Owner's 2026-10-16 narrow obsolete-menu-removal approval.",
+      "tests": ["Native menu regression checks; owned web tests; boundary and source audits"],
+      "replacement_plan": "No replacement; classes-preview is retired and native courses/assignments routes remain.",
+      "sha256": "61413b453b28f18386445c135a7e21357ea7ffd5a841e9299ee01441f855bb5f",
+      "previous_sha256": "74d98143022013c75e428408b95fc1cc89ff8dbece06ac5127d786a908d14515"
     }
   },
   "legacy_inventory": [

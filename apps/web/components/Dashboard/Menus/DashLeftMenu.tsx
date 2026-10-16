@@ -406,16 +406,6 @@ function DashLeftMenu() {
               })()}
             </HoverMenu>
 
-            {canManageOrg && (
-              <MenuLink
-                href="/dash/classes-preview"
-                icon={<ChalkboardSimple size={20} weight="fill" />}
-                label={t('classes_preview.nav')}
-                isCollapsed={isCollapsed}
-                active={isActivePath('/dash/classes-preview')}
-              />
-            )}
-
             {/* Assignments with hover menu */}
             <div onMouseEnter={fetchAssignments}>
             <HoverMenu

@@ -95,6 +95,17 @@ test('English and Thai cover the same copy keys', () => {
   assert.deepEqual(Object.keys(copy.en).sort(), Object.keys(copy.th).sort())
   assert.ok(Object.values(copy.th).every(v => v.trim()))
 })
+test('native menus retire preview navigation without changing native routes or guards', () => {
+  const left = fs.readFileSync(new URL('../../../components/Dashboard/Menus/DashLeftMenu.tsx', import.meta.url), 'utf8')
+  const mobile = fs.readFileSync(new URL('../../../components/Dashboard/Menus/DashMobileMenu.tsx', import.meta.url), 'utf8')
+  for (const source of [left, mobile]) {
+    assert.doesNotMatch(source, /classes-preview|classes_preview\\.nav/)
+    assert.match(source, /courses/)
+    assert.match(source, /assignments/)
+    assert.match(source, /canManageOrg/)
+  }
+})
+
 test('retired preview is an inert redirect and cannot expose synthetic records', () => {
   const component = fs.readFileSync(new URL('../components/Dashboard/Pages/ClassesPreview/ClassesPreview.tsx', import.meta.url), 'utf8')
   const route = fs.readFileSync(new URL('../app/orgs/[orgslug]/dash/classes-preview/page.tsx', import.meta.url), 'utf8')

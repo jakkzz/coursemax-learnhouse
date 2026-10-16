@@ -1,0 +1,5 @@
+ARG PARENT_IMAGE=coursemax-learnhouse:retire-demo-2066d2f7
+FROM ${PARENT_IMAGE}
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.revision=${SOURCE_REVISION}
+ADD --chown=1000:1000 web-delta.tar.gz /app/web/

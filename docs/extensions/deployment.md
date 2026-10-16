@@ -1,6 +1,35 @@
 # Internal extension deployment records
 
-## Latest: class workspace color hierarchy — deployed 2026-10-16
+## Latest: roster row color and selection — deployed 2026-10-16
+
+Live source `a5ad92576e8ac7d9289cb3fa7dcb863644a576ab`, image
+`coursemax-learnhouse:roster-color-20261016`, ID
+`sha256:9f7326aa657f886cf2b3aa09d363f9f7953539f3f7d06e8a4c8c40e6e9dffb00`.
+The roster now has a blue filter/header band, alternating white/slate rows, distinct
+membership/account labels, neutral withdrawn rows and a blue selected-member border.
+Columns respond to content width; mobile retains readable grouped records. Existing
+editor actions and search/filter behavior are unchanged; selection saves nothing.
+
+52 web tests, 4 overlay tests, full bundle and separate route/types pass. Six compiled
+EN/TH 1440/900/390 journeys complete search, both filters, member selection/switch/close
+and verify no academic writes. 498 computed text pairs pass (minimum 4.84:1); filter
+control borders reach 4.76:1. One batched inspection and one confirmation; the only
+visual correction made filter fields white with clearer boundaries. Four live
+native-bootstrap navigation/color smokes pass without opening real student rosters.
+
+The inherited three-layer package hit Docker's depth limit (129 layers); that failed
+image/log is retained. `Dockerfile.web-overlay` packages this frontend-only change in
+one layer (127 total), without host/daemon changes. The accepted frontend tree is
+identical across the packaging-only commit. All 1,010 API/config/migration hashes are
+parent-identical and 5,300 web entries verified. Fresh protected backups, exact
+compatible parent archive/load round-trip and isolated restore pass. App only
+restarted/gateway reloaded; schema, academic/identity/grant/progress snapshots,
+runtime/env and non-app IDs preserved except four native role startup timestamps.
+No backend, permission, roster-data, global theme or cutover change. Native source
+menu points to the exact revision. Evidence: `roster-color-20261016/`,
+`roster-color-web-final-20261016/`, `releases/roster-color-20261016/`.
+
+## Previous: class workspace color hierarchy — deployed 2026-10-16
 
 Live source `255e6d75c1c4febbbd3446192b88c1e2e50c0494`, image
 `coursemax-learnhouse:classes-color-20261016`, ID

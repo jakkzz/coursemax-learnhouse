@@ -24,6 +24,15 @@ class WebOverlayTests(unittest.TestCase):
                 path.write_text('same')
         self.output = self.root / 'delta.tar.gz'
 
+    def test_frontend_only_dockerfile_adds_one_layer_without_backend_copies(self):
+        text = Path(__file__).with_name('Dockerfile.web-overlay').read_text()
+        instructions = [line for line in text.splitlines() if line and not line.startswith('#')]
+        self.assertIn('ARG PARENT', instructions)
+        self.assertIn('FROM ${PARENT}', instructions)
+        self.assertEqual([line for line in instructions if line.startswith(('ADD ', 'COPY ', 'RUN '))],
+                         ['ADD --chown=1000:1000 web-delta.tar.gz /app/web/'])
+        self.assertNotIn('/app/api', text)
+
     def test_complete_overlay_matches_validated_tree_and_preserves_old_assets(self):
         (self.parent / 'old.js').write_text('in-flight asset')
         (self.desired / 'server.js').write_text('new')

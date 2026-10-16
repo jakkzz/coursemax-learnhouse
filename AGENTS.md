@@ -25,12 +25,16 @@ history, two accepted missing snapshots, and reviewed calendar/rotation/exceptio
 School data never grants native roles, authorship or enrollment. No portal credentials,
 fabricated keys, per-course hardcoded shortcuts or runtime dependency on CourseMax.
 
-The live manual-link form is not yet replaced. CourseMax's historical setup seeded
-class keys; it is not evidence of generic discovery. NRRU also exposes a course/term
-RTF roster export, observed without saving or printing student records. Integrate and
-validate the appropriate source and exact section before import; do not treat a
-missing class ID on the timetable as a reason to ask users for a link. Replace the
-flow end to end, not by hiding a backend-required field. Historical migration stays last.
+The URL-free connection flow is deployed at d96f2c6c. CourseMax's historical setup
+seeded class keys; new LearnHouse classes instead support an absent class ID and the
+official course/term RTF export with exact section validation. Source failure/stale
+review cannot partially connect/import. Do not reintroduce pasted links, fabricated
+IDs or all-group imports. Owned migration discovery composes native wrappers with
+new owned versions; unversioned bootstrap deployment uses the checked named runner,
+never ad-hoc DDL or an inferred native-version stamp. See
+`docs/extensions/nrru-automatic-acquisition.md` and newest deployment record.
+Unattended refresh and dated-calendar semantics remain unfinished; weekly timetable
+facts alone do not create dated sessions. Historical migration stays last.
 
 ## End-to-end delivery (owner instruction, 2026-10-15)
 

@@ -15,17 +15,19 @@ and hands content reading to the native course route. Persisted attendance sourc
 check-in/no-class routes also exist. These are source observations, not completed audit
 capabilities or live acceptance.
 
-**Immediate priority — automatic NRRU acquisition, not pasted links.**
+**Automatic NRRU acquisition — URL-free connection deployed at d96f2c6c.**
 Users select a term/class; the server discovers and retrieves the school data. Port
 CourseMax's scheduled roster reconciliation and calendar semantics, preserving native
 authorization, verified student matching, manual members and history. CourseMax's
 existing configured keys were seeded historically, not generically discovered.
-NRRU also provides a course/term RTF roster export: absence of class IDs on the grid
-is not justification for a manual-link task. Source parsing, exact section validation
-and the existing class-key model/API contract still need implementation and tests.
-Replace the flow end to end before continuing identity/syllabus/dated-plan work;
-do not hide required inputs while leaving the server dependent on them. No portal
-credentials, fabricated identifiers, runtime CourseMax dependency or historical migration.
+NRRU also provides a course/term RTF roster export: the deployed parser validates
+its course/term/header and exact section. Classes may retain NULL official class IDs
+with globally unique official course/year/semester/section ownership. Admin review
+automatically retrieves the count; connection imports the initial roster atomically.
+See [actual acceptance and remaining scope](nrru-automatic-acquisition.md).
+Unattended refresh and dated-calendar construction still need implementation and
+acceptance; do not call weekly grid facts dated sessions. No portal credentials,
+fabricated identifiers, runtime CourseMax dependency or historical migration.
 
 The retired preview compatibility component and route redirect to `/classes` and ignore
 legacy role/view/query state. Production code must neither statically nor dynamically
@@ -47,10 +49,9 @@ The canonical LH phase groups remain audit/acceptance reference groups. They do 
 require reimplementing accepted foundation or delay a usable basic syllabus/teaching
 plan until every team tool or assessment migration is complete.
 
-1. Production-demo and approved menu retirement are deployed. Next repair automatic
-   NRRU class/roster/schedule acquisition so no teacher or administrator pastes a
-   roster URL or transcribes school IDs. Validate exact source matches, scheduled
-   refresh, preserved history and calendar-derived sessions end to end.
+1. Retirement and URL-free initial class/roster acquisition are deployed. Complete
+   unattended refresh and calendar-derived sessions with explicit authority and
+   reviewed dates; preserve the accepted exact-source and history safeguards.
 2. Run the connected-class integration exercise with isolated synthetic native
    sessions, explicit native authoring rights (READ alone is not edit), the real
    SchoolIdentity → Myclasses student path, and persisted identity-case resolution.
@@ -66,8 +67,9 @@ plan until every team tool or assessment migration is complete.
    cutover last.
 
 No production mock, duplicate catalog/session/enrollment, or fake completion is allowed.
-Retirement is live. Automatic NRRU acquisition remains an implementation gap;
-source observations alone do not close it.
+Retirement and URL-free initial acquisition are live with isolated native-session,
+compiled task and deployed-source evidence. Unattended refresh and dated-calendar
+parity remain gaps; the 52-ID source audit is still not runtime acceptance.
 
 ## Reviewed ordered phase manifest
 

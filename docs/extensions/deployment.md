@@ -1,6 +1,52 @@
 # Internal extension deployment records
 
-## Latest: production preview and menu retirement — deployed 2026-10-16
+## Latest: automatic NRRU acquisition — deployed 2026-10-16
+
+Live source `d96f2c6cb2f7916574f6f1ffb97a62ef355f5e9c`, image
+`coursemax-learnhouse:nrru-auto-20261016`, ID
+`sha256:75effee94fd16093ed5982158f362def37ed39b56739c8a104c5733d53a83a11`.
+[Workflow and authority contract](nrru-automatic-acquisition.md). Select term/section,
+review the matching native course and automatically retrieved section count, then
+connect with initial roster import in the same transaction. No roster URL/internal
+ID input. Existing timetable acquisition is reused; no fabricated class identifiers.
+
+216 isolated PostgreSQL/native-session/auth/access/roster/attendance/migration tests,
+19 pure parser tests, 46 owned web tests and 25 boundary/source-tool tests pass.
+Fresh full production bundle and separate generated-route/types pass. Sixteen
+compiled EN/TH desktop/mobile journeys include URL-free connection, automatic
+initial roster, source-failure retry without partial writes, persisted roster,
+student native-content handoff and preserved manual access/work. Six live native
+auth/account/workspace smoke journeys pass. The actual deployed acquisition
+function also read the official export and validated exactly 45 P7 students without
+saving/printing student records or accessing the database. These are distinct from
+genuine institutional provider/session acceptance, which is not claimed.
+
+1,010 API/config/migration hashes and 5,297 web entries verified. All non-owned API,
+configuration and native migration bytes are parent-identical; no native hook or
+boundary exception was added. API source retains native root ownership; web entries
+retain exact parent ownership when unchanged and UID/GID1000 when overlaid. Image
+configuration except revision labels and the parent RootFS prefix are preserved.
+
+Protected fresh DB/content/runtime backups, exact saved3019 image archive/load
+round-trip and isolated socket restore passed before applying owned revision
+`f47eb52fa044`. The exact candidate migration entrypoint was exercised against the
+restored database. Full schema comparison permits only nullable `registry_class_id`
+and the named unique official course/term/section constraint; all other schema,
+identity/provider keys, grants, progress and academic rows match. The existing
+native-bootstrap database remains unversioned; no inferred Alembic head was stamped.
+All role fields match except four native-startup timestamps. Only app was recreated;
+gateway reloaded. All non-app container IDs and runtime/environment match this
+release's own before snapshot. The previous release's unrelated-container failure
+remains recorded below, not erased or excluded.
+
+No real roster/history/content migration, cutover, host cleanup or unrelated service
+mutation occurred. The saved3019 app rollback refuses if any NULL-ID source class
+has since been created; preserve evidence and forward-repair instead. Never restore
+historical live DB/content for app rollback. Unattended periodic refresh, dated
+calendar planning, persisted identity cases and wider academic parity remain open.
+Protected evidence: `releases/nrru-auto-20261016/`, `nrru-auto-20261016/`.
+
+## Previous: production preview and menu retirement — deployed 2026-10-16
 
 Live source `3019c79e8a2abfe2ebd78e8f464c578caf092126`, image
 `coursemax-learnhouse:retire-menus-3019c79e`, ID
@@ -25,7 +71,7 @@ concurrently; the exact discrepancy and unchanged remaining IDs are recorded, no
 ignored. CourseMax and LearnHouse stores/gateway IDs match. No cleanup or unrelated
 mutation was performed. Full details: [demo-retirement.md](demo-retirement.md).
 Protected releases: `retire-demo-2066d2f7-20261016` and
-`retire-menus-3019c79e-20261016`; the latter is current. App-only rollback to the
+`retire-menus-3019c79e-20261016`; the latter was current at that checkpoint. App-only rollback to the
 API-identical exact parent preserves all live evidence; never restore historical DB
 or files. Real identity resolution, syllabus, dated plans and academic parity remain
 unfinished. No real migration or cutover occurred.

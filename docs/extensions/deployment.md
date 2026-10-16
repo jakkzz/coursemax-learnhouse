@@ -1,6 +1,36 @@
 # Internal extension deployment records
 
-## Latest: class connections and access recovery — deployed 2026-10-15
+## Latest: production preview and menu retirement — deployed 2026-10-16
+
+Live source `3019c79e8a2abfe2ebd78e8f464c578caf092126`, image
+`coursemax-learnhouse:retire-menus-3019c79e`, ID
+`sha256:741c3ebf51c013efc32141d7ff18efdf54a5e87e6e9a006aa6832e9cef0ec240`.
+First deployed `2066d2f7` removes the production synthetic renderer and redirects the
+legacy manager route to `/classes`; then the two explicitly approved native menu
+entries were removed. Native dashboard denials remain authoritative for non-managers.
+Both menu files, ordinary task links and security/plan controls remain intact.
+
+Full production bundles, separate generated-route/types, sixteen compiled journeys
+and ten live smoke journeys pass for the final release. Desktop/mobile EN/TH menu
+and legacy-role-query tasks are covered. All 1,001 backend/config/migration hashes
+match exact parent `2066d2f7`; 5,296 required web entries match bytes/links/modes and
+ownership (unchanged parent ownership retained, changed entries UID/GID1000).
+Fresh protected backups, isolated socket restore and exact-parent image archive
+round-trip pass. API/schema/runtime/identity/grant/progress/academic snapshots match;
+only four native default-role startup timestamps differ after full-field comparison.
+
+Only the staging app was recreated by this deployment; gateway was reloaded. The
+original global non-app-ID assertion failed because an unrelated container vanished
+concurrently; the exact discrepancy and unchanged remaining IDs are recorded, not
+ignored. CourseMax and LearnHouse stores/gateway IDs match. No cleanup or unrelated
+mutation was performed. Full details: [demo-retirement.md](demo-retirement.md).
+Protected releases: `retire-demo-2066d2f7-20261016` and
+`retire-menus-3019c79e-20261016`; the latter is current. App-only rollback to the
+API-identical exact parent preserves all live evidence; never restore historical DB
+or files. Real identity resolution, syllabus, dated plans and academic parity remain
+unfinished. No real migration or cutover occurred.
+
+## Previous: class connections and access recovery — deployed 2026-10-15
 
 Live source **7bf6ed1fde349f9a580ff92ad610e742cf389b09**, image
 `coursemax-learnhouse:class-connections-7bf6ed1f`, ID

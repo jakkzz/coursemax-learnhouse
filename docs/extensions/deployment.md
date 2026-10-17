@@ -1,6 +1,42 @@
 # Internal extension deployment records
 
-## Latest: pending calendar UI deployed — 2026-10-17
+## Latest: attendance arrival deployed — 2026-10-17
+
+Implementation/source-menu revision `bf4aeb94` is live at `https://learn.route66.click`.
+Image `coursemax-learnhouse:attendance-arrival-bf4aeb94-20261017`, ID
+`sha256:5f5f6ea1ab96264d1560732953f6e67e91efb394b3bd22c9e5b1fee13e1c17d4`.
+Scan-before-login/LIFF reservation, automatic completion, stationary renewal,
+committed receipt/reload, projector privacy and teacher/own-phone streams are active.
+See [arrival design and checks](attendance-loop.md) for the exact acceptance boundary.
+
+74 focused database/HTTP/policy/native-LINE/legacy cases (four optional Redis skips),
+109 real-Redis/OAuth tests, 6 Bun/44 assertions, 83 source checks, full native bundle/types,
+4 component/3 compiled-native scenarios, 13 gateway/4 overlay/25 tooling checks pass.
+Real two-nginx first-frame proof is about 32 ms. Baked handoff/policy checks also pass.
+Two live native-login EN1440/TH390 missing-handoff/Google-cancel recovery scenarios
+pass without false receipts, horizontal overflow or page errors. No actual class scan
+or provider/device acceptance is claimed.
+
+Standard capacity gates passed throughout final delivery; no calendar-only override.
+Final native font fetch used build networking without live secrets. Exact 126-layer
+packaging prefix plus full reviewed overlay avoids the runtime layer limit. Native
+Config and the 991-file Next package/link layout are preserved; 1,033 API files and
+4,690 web delta entries/node permissions verify. Four unrelated offline mapping files were not added.
+Current and prior in-flight chunk bytes serve exactly. Fresh backup/archive-list check;
+app-only recreate and exact outer SSE nginx location/reload. Inner nginx unchanged.
+Schema/protected academic/identity/content/source state, env, mounts and peer IDs match.
+Source-menu URL alone advances. No migration, real academic write, data restoration,
+unrelated restart, workflow activation or old-evidence cleanup.
+
+Retained compatible code reader/rollback is actual calendar parent
+`calendar-ui-owner-20261017` / `e3914821…`; never restore older academic data. Its older
+routes cannot finish new transient handoffs; rescanning may be required on rollback.
+Current release pointer updated to `releases/attendance-arrival-bf4aeb94-20261017`.
+Physical phones/LINE/provider interruptions/projector distance/shared-NAT capacity
+remain outstanding; existing native OAuth 30/IP/action/5min limits are unchanged.
+Corrections/history/CSV/leave and institutional migration/cutover are not this release.
+
+## Previous: pending calendar UI deployed — 2026-10-17
 
 Calendar UI `9fc87afb` is now live at `https://learn.route66.click` in
 `coursemax-learnhouse:calendar-ui-owner-20261017`, image

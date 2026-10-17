@@ -1,9 +1,12 @@
 # Attendance arrival loop
 
-## Implemented arrival slice — 2026-10-17
+## Deployed arrival slice — 2026-10-17
 
-Source implementation is validated; attendance is not yet deployed. The current live
-image remains `calendar-ui-owner-20261017` / `e3914821…`. No migration is needed.
+Source `bf4aeb94` is deployed at `https://learn.route66.click`, image
+`attendance-arrival-bf4aeb94-20261017` / `5f5f6ea1…`. No migration. The retained
+calendar image `e3914821…` is the immediate compatible academic-reader/code recovery
+parent; never restore older academic data. Rolling back loses the new handoff routes,
+so unfinished transient handoffs may require a fresh scan.
 
 - Camera entry reserves the server observation before native sign-in; LINE's in-app
   browser carries that opaque reservation into LIFF before SDK/provider waits.
@@ -34,8 +37,20 @@ second frame at 700 ms; the unchanged inner configuration and generated outer SS
 location are both exercised. Inline review caught and fixed native dialog centering/
 entrance exposing the private roster; viewport opacity/coverage is now asserted.
 
-Private evidence is outside Git in `attendance-arrival-20261017` and
-`attendance-arrival-web-fonts-20261017`. Physical iOS/Android/LINE handoff behavior,
+The 127-layer candidate preserves native image Config and Next layout after exact
+991-file review; 1,033 API files and 4,690 overlaid web entries/permissions verify.
+Four unrelated offline mapping modules were deliberately not added to the runtime.
+Fresh backup/archive-list check preceded app-only replacement and exact outer nginx
+reload; inner nginx is byte-unchanged. Schema/protected state/env/mounts/peer IDs match.
+Live guards, current/prior chunk bytes and two fresh-login EN/TH recovery journeys
+pass without academic writes. Source menu points to the published implementation.
+Standard capacity gates passed; the calendar-only override was not reused.
+
+Private evidence is outside Git in `attendance-arrival-20261017`,
+`attendance-arrival-web-fonts-20261017` and `releases/attendance-arrival-bf4aeb94-20261017`.
+Native OAuth limits remain 30 per IP/action per five minutes; shared-NAT classroom
+capacity needs a real trial, not a silent security-policy relaxation.
+Physical iOS/Android/LINE handoff behavior,
 real provider/MFA interruptions, shared-Wi-Fi class-wide login capacity and projector
 scan distance remain unaccepted. Synthetic API/provider boundaries are not production
 or institutional acceptance. Corrections/history/CSV and leave are later slices.

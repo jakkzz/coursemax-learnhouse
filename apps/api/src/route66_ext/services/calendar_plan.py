@@ -1,9 +1,9 @@
 """Pure academic-calendar payload validation and deterministic meeting planner.
 
 No database, network or clock access. Rotations, teaching weeks and make-up
-dates come only from the reviewed payload (a non-teaching week plans only its
-explicit closures and their make-ups); nothing is inferred from week-number
-parity, exam labels or weekday guesses.
+dates come from the reviewed payload or separate teacher-confirmed course dates
+(a non-teaching week plans only explicit closures and make-ups). Date-only course
+period suggestions are not school facts; no rotation or closure is inferred.
 """
 from datetime import date, datetime, time, timedelta, timezone
 from hashlib import sha256
@@ -83,6 +83,59 @@ class Payload(_Model):
     terms: list[Term] = Field(default_factory=list, max_length=3)
     events: list[Event] = Field(default_factory=list, max_length=300)
     unresolved: list[str] = Field(default_factory=list, max_length=50)
+
+
+class CoursePlanning(_Model):
+    """Teacher-reviewed course dates, never amendments to the school calendar."""
+    program: str = Field(min_length=1, max_length=120)
+    starts_on: date
+    ends_on: date
+    closures: list[Closure] = Field(default_factory=list, max_length=200)
+
+
+def planning_options(payload):
+    result = [{'semester': t.semester, 'program': '', 'requires_plan': False,
+               'starts_on': t.starts_on.isoformat(), 'ends_on': t.ends_on.isoformat(), 'events': []}
+              for t in payload.terms if t.weeks]
+    for semester, program in sorted({(e.semester, e.program) for e in payload.events}):
+        if any(t.semester == semester and t.weeks for t in payload.terms):
+            continue
+        events = [e for e in payload.events if (e.semester, e.program) == (semester, program)]
+        opening = min((e.starts_on for e in events if e.kind == 'opening'), default=None)
+        final = min((e.starts_on for e in events if e.kind == 'final'), default=None)
+        closing = min((e.starts_on for e in events if e.kind == 'closing'), default=None)
+        # A proposed course boundary, not a fact added to the published calendar.
+        end = min(d for d in (final, closing) if d is not None) - timedelta(days=1) if final or closing else None
+        result.append({'semester': semester, 'program': program, 'requires_plan': True,
+                       'starts_on': opening.isoformat() if opening else '',
+                       'ends_on': end.isoformat() if end and (not opening or end >= opening) else '',
+                       'events': [e.model_dump(mode='json') for e in events]})
+    return result
+
+
+def course_payload(payload, semester, planning=None):
+    term = next((t for t in payload.terms if t.semester == semester and t.weeks), None)
+    if term:
+        if planning is not None:
+            raise ValueError('This semester already has reviewed teaching weeks; use those calendar weeks / ภาคเรียนนี้มีสัปดาห์สอนที่ตรวจสอบแล้ว โปรดใช้สัปดาห์จากปฏิทิน')
+        return payload
+    if planning is None:
+        raise ValueError('Select the semester program and review course teaching dates / เลือกรูปแบบการศึกษาและตรวจสอบวันสอนของรายวิชา')
+    if not any(e.semester == semester and e.program == planning.program for e in payload.events):
+        raise ValueError('Choose a program listed in this calendar for the class semester / เลือกรูปแบบการศึกษาที่ระบุในปฏิทินสำหรับภาคเรียนของชั้นเรียนนี้')
+    days = (planning.ends_on - planning.starts_on).days + 1
+    if not 1 <= days <= 280:
+        raise ValueError('The course teaching period must be 1–280 days / วันสิ้นสุดต้องไม่ก่อนวันเริ่มสอน และช่วงสอนต้องไม่เกิน 280 วัน')
+    weeks = [Week(number=i // 7 + 1, starts_on=planning.starts_on + timedelta(days=i),
+                  ends_on=min(planning.starts_on + timedelta(days=i + 6), planning.ends_on),
+                  rotation='teaching', teaching=True) for i in range(0, days, 7)]
+    term = Term(semester=semester, starts_on=planning.starts_on, ends_on=planning.ends_on,
+                weeks=weeks, closures=planning.closures)
+    result = Payload(terms=[term], events=payload.events)
+    errors = issues(result)
+    if errors:
+        raise ValueError(' · '.join(errors) + ' / โปรดตรวจสอบวันงดสอนและวันชดเชยของรายวิชา')
+    return result
 
 
 def has_teaching_weeks(payload):

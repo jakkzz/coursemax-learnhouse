@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy import func
 from sqlmodel import select
-from src.route66_ext.db.academic_classes import AcademicClass
+from src.route66_ext.db.academic_classes import AcademicClass, AcademicClassEvent
 from src.route66_ext.db.class_attendance import AttendanceSession, AttendanceChallenge, AttendanceEvent
 from src.route66_ext.db.school_calendar import SchoolCalendar, SchoolCalendarSource, SchoolCalendarRevision, ClassSchedule
 from src.route66_ext.services import academic_rosters as roster
@@ -43,6 +43,7 @@ async def calendar_summary(db, calendar, user=None):
             'track': calendar.track, 'scope': calendar.scope, 'can_edit': can_edit(calendar, user),
             'published_revision_id': published,
             'has_teaching_weeks': bool(payload and planner.has_teaching_weeks(planner.Payload.model_validate(payload.payload))),
+            'planning_options': planner.planning_options(planner.Payload.model_validate(payload.payload)) if payload else [],
             'latest_revision_id': max((i for i, _ in rows), default=None)}
 
 
@@ -144,6 +145,17 @@ async def heads(db, class_id):
     return result, evidence
 
 
+async def saved_planning(db, schedule):
+    if schedule is None:
+        return None
+    event = (await db.exec(select(AcademicClassEvent).where(
+        AcademicClassEvent.class_id == schedule.class_id,
+        AcademicClassEvent.kind == 'class_schedule_applied',
+        AcademicClassEvent.details['schedule_version'].astext == str(schedule.version)
+    ).order_by(AcademicClassEvent.id.desc()))).first()
+    return event.details.get('planning') if event else None
+
+
 async def schedule_dto(db, cls, schedule, manageable):
     rows, replaced = await class_sessions(db, cls.id) if cls else ([], set())
     revision = await db.get(SchoolCalendarRevision, schedule.revision_id) if schedule else None
@@ -156,7 +168,9 @@ async def schedule_dto(db, cls, schedule, manageable):
     return {'class_id': cls.id if cls else None, 'version': schedule.version if schedule else 0,
             'manageable': manageable, 'revision_id': revision.id if revision else None,
             'calendar_name': calendar.name if calendar else None, 'pattern': schedule.pattern if schedule else '',
-            'newer_revision_id': newer, 'sessions': [session_dto(r, r.id in replaced) for r in rows]}
+            'newer_revision_id': newer, 'planning': await saved_planning(db, schedule),
+            'syllabus_available': bool(cls and cls.course_id),
+            'sessions': [session_dto(r, r.id in replaced) for r in rows]}
 
 
 def _same(head, row):
@@ -205,7 +219,8 @@ async def preview(db, cls, schedule, revision, payload, facts, pattern, now):
         warnings = sorted({*warnings, f'{protected} past or recorded meetings are kept unchanged'})
     version = schedule.version if schedule else 0
     material = {'class_id': cls.id if cls else None, 'class_version': cls.version if cls else None,
-                'schedule_version': version, 'revision_id': revision.id, 'payload': revision.payload,
+                'schedule_version': version, 'revision_id': revision.id, 'payload': payload.model_dump(mode='json'),
+                'calendar_payload': revision.payload,
                 'source_id': revision.source_id, 'pattern': pattern, 'facts': facts,
                 'actions': [(a, r, h and (h.id, h.version, h.state, h.id in evidence)) for a, r, h in actions]}
     sessions = []

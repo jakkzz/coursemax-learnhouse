@@ -99,7 +99,15 @@ test('academic dates are real calendar content without inventing teaching weeks'
  assert.match(view, /onChange \?/)
  assert.match(view, /Academic date to edit/)
  assert.match(lib, /events => \{ setPayload/)
- assert.match(source('calendar/ClassSchedule.tsx'), /r.has_teaching_weeks !== false/)
+ const schedule = source('calendar/ClassSchedule.tsx')
+ assert.doesNotMatch(schedule, /r.has_teaching_weeks !== false/)
+ assert.match(schedule, /o.semester === context.semester/)
+ assert.match(schedule, /CourseDatesForm/)
+ assert.match(schedule, /Create class schedule/)
+ assert.match(schedule, /Create or open syllabus draft/)
+ assert.match(schedule, /syllabus.editor_url/)
+ assert.match(source('calendar/CourseDatesForm.tsx'), /do not alter the school calendar/)
+ assert.match(source('calendar/CourseDatesForm.tsx'), /Course holidays and make-ups/)
 })
 test('PDF URL errors offer localized retry or file upload without claiming a source was saved', async () => {
  const original = globalThis.fetch

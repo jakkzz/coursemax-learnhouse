@@ -158,5 +158,62 @@ class PlannerTests(unittest.TestCase):
             p.Payload.model_validate({'terms': [], 'surprise': 1})
 
 
+class CoursePlanningTests(unittest.TestCase):
+    def dates(self):
+        return p.Payload(events=[p.Event(semester=semester, program=program, kind=kind, title=kind,
+            starts_on=MON + timedelta(days=offset), ends_on=MON + timedelta(days=offset))
+            for semester, program, kind, offset in [(1, 'A', 'opening', 0), (1, 'A', 'final', 28),
+                (1, 'B', 'opening', 7), (1, 'B', 'final', 42), (2, 'A', 'opening', 150)]])
+
+    def test_program_and_semester_specific_suggestions_are_not_school_weeks(self):
+        source = self.dates(); before = source.model_dump(mode='json')
+        options = p.planning_options(source)
+        self.assertEqual([(o['semester'], o['program'], o['starts_on'], o['ends_on']) for o in options], [
+            (1, 'A', str(MON), str(MON + timedelta(days=27))),
+            (1, 'B', str(MON + timedelta(days=7)), str(MON + timedelta(days=41))),
+            (2, 'A', str(MON + timedelta(days=150)), '')])
+        plan = p.CoursePlanning(program='A', starts_on=MON, ends_on=MON + timedelta(days=15))
+        draft = p.course_payload(source, 1, plan)
+        self.assertEqual([w.number for w in draft.terms[0].weeks], [1, 2, 3])
+        self.assertEqual(draft.terms[0].weeks[-1].ends_on, plan.ends_on)
+        self.assertEqual(source.model_dump(mode='json'), before)
+        self.assertEqual(p.issues(draft), [])
+        self.assertTrue(self.run_errors(draft, 'even_onsite'))
+
+    def run_errors(self, draft, mode):
+        return p.plan(draft, 1, MEETINGS, mode, 'fixture')[2]
+
+    def test_syllabus_uses_selected_program_without_inventing_curriculum(self):
+        from types import SimpleNamespace
+        from src.route66_ext.services.course_syllabus import document
+        source = self.dates()
+        source.events[1].note = 'Only for the stated course group'
+        revision = SimpleNamespace(number=3, payload=source.model_dump(mode='json'))
+        cls = SimpleNamespace(semester=1, academic_year=2569, registry_course_code='FIX101', registry_title=None)
+        planning = p.CoursePlanning(program='A', starts_on=MON, ends_on=MON + timedelta(days=7)).model_dump(mode='json')
+        doc = document(cls, SimpleNamespace(name='Synthetic calendar', track='A'), revision, planning, True, 'Verified course name')
+        text = p.canonical(doc)
+        self.assertIn('Verified course name', text)
+        self.assertIn('Only for the stated course group', text)
+        self.assertIn('22/6/2569', text)
+        self.assertIn('เติมข้อมูล', text)
+        self.assertNotIn(' · B · ', text)  # program B dates never merged into program A
+        self.assertNotIn('3/8/2569', text)
+        self.assertEqual(source.terms, [])
+
+    def test_course_dates_need_a_real_program_and_valid_period(self):
+        source = self.dates()
+        with self.assertRaises(ValueError):
+            p.course_payload(source, 1)
+        for program, start, end in [('X', MON, MON), ('A', MON, MON - timedelta(days=1)),
+                                    ('A', MON, MON + timedelta(days=280))]:
+            with self.assertRaises(ValueError):
+                p.course_payload(source, 1, p.CoursePlanning(program=program, starts_on=start, ends_on=end))
+        reviewed = payload([week(1)])
+        self.assertIs(p.course_payload(reviewed, 1), reviewed)
+        with self.assertRaises(ValueError):
+            p.course_payload(reviewed, 1, p.CoursePlanning(program='A', starts_on=MON, ends_on=MON))
+
+
 if __name__ == '__main__':
     unittest.main()

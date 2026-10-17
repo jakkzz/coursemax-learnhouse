@@ -10,10 +10,12 @@ export function formatCalendarDate(value: string, th: boolean) {
   const date = new Date(value + 'T00:00:00Z')
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(th ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(date)
 }
-export type CalendarSummary = { scope?: 'organization' | 'teacher'; can_edit?: boolean; id: number; name: string; academic_year: number; track: string; published_revision_id: number | null; latest_revision_id: number; has_teaching_weeks?: boolean }
+export type CoursePlanning = { program: string; starts_on: string; ends_on: string; closures: Closure[] }
+export type PlanningOption = { semester: number; program: string; requires_plan: boolean; starts_on: string; ends_on: string; events: AcademicDate[] }
+export type CalendarSummary = { planning_options?: PlanningOption[]; scope?: 'organization' | 'teacher'; can_edit?: boolean; id: number; name: string; academic_year: number; track: string; published_revision_id: number | null; latest_revision_id: number; has_teaching_weeks?: boolean }
 export type Revision = { source_url?: string | null; resolved_url?: string | null; fetched_at?: string | null; derived_from_revision_id?: number | null; id: number; calendar_id: number; version: number; state: 'draft' | 'published'; payload: CalendarPayload; source_name: string; source_hash: string; parse_note: string | null; calendar: CalendarSummary; issues?: string[]; source_pages?: { page: number; text: string }[]; source_truncated?: boolean; source_page_count?: number | null; source_kind?: 'abridged_multi_program' | null }
 export type MeetingSession = { id?: number; slot_key: string | null; superseded?: boolean; action?: string; starts_at: string; ends_at: string; title: string; state: 'scheduled' | 'no_class'; week_number: number | null; rotation: Rotation | null; nominal_date: string | null; makeup_for: string | null; mode: string | null; location: string | null; note: string | null; attendance_url?: string | null }
-export type Schedule = { class_id: number | null; version: number; manageable: boolean; revision_id: number | null; calendar_name: string | null; pattern: string; sessions: MeetingSession[]; newer_revision_id?: number | null }
+export type Schedule = { planning?: CoursePlanning | null; syllabus_available?: boolean; class_id: number | null; version: number; manageable: boolean; revision_id: number | null; calendar_name: string | null; pattern: string; sessions: MeetingSession[]; newer_revision_id?: number | null }
 export type SchedulePreview = { fingerprint: string; sessions: MeetingSession[]; warnings: string[]; errors?: string[]; protected_count: number; changes: { added: number; replaced: number; unchanged: number; cancelled?: number; skipped_past?: number }; version: number }
 
 export async function calendarRequest<T>(path: string, th: boolean, options: RequestInit = {}): Promise<T> {

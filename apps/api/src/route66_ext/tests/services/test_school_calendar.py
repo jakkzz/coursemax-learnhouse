@@ -76,7 +76,8 @@ class SchoolCalendarTests(AcademicRosterTests):
         async def context(request, db):
             user = await db.get(User, self.actor)
             evidence = (await db.exec(select(SchoolGoogleEvidence).where(SchoolGoogleEvidence.user_id == self.actor))).first()
-            return user, self.config, evidence
+            from src.route66_ext.adapters.native_learning_access_test_support import PublicUser
+            return PublicUser.model_validate(user), self.config, evidence
 
         async def verified(db, user, config, evidence, body, request, meetings=False):
             facts = self.timetable.get((user.id, body.registry_course_id, body.section))
@@ -772,7 +773,7 @@ END; $$"""))
         self.timetable[(3, '100', 'P9')] = {'course_code': '990001', 'title': 'วิชาตัวอย่าง', 'meetings': MEETINGS}
         listing = (await self.client.get('/api/v1/school-calendars')).json()['calendars']
         self.assertEqual([(c['published_revision_id'], c['has_teaching_weeks']) for c in listing if c['id'] == draft['calendar_id']],
-                         [(published['id'], False)])  # readable in the library, not offered as a timetable
+                         [(published['id'], False)])  # selectable as dates; course-specific weeks require teacher review
         self.assertEqual((await self.client.get(f"/api/v1/school-calendars/revisions/{draft['id']}")).json()['payload'], published['payload'])
         async def rows():
             async with self.sessions() as db:
@@ -784,7 +785,7 @@ END; $$"""))
             if step == 'apply':
                 body.update(expected_version=0, fingerprint='0' * 64, reviewed=True)
             planned = await self.client.post(f'/api/v1/school-calendars/schedules/{step}', json=body)
-            self.assertEqual((planned.status_code, planned.json()['detail']['code']), (422, 'teaching_weeks_required'), step)
+            self.assertEqual((planned.status_code, planned.json()['detail']['code']), (422, 'course_dates_required'), step)
         self.assertEqual(await rows(), before)  # no class, schedule or session created or changed
         self.actor = 1
         return published
@@ -997,6 +998,126 @@ END; $$"""))
         published = await self.date_calendar_boundaries(drafts[0], accept=False)
         Path(folder, 'pg-dto-proof.json').write_text(json.dumps({'upload': drafts, 'parse': read, 'published': published},
                                                                 ensure_ascii=False, indent=1, default=str))
+
+
+    async def test_date_calendar_course_schedule_review_apply_and_reload(self):
+        await self.make_admin()
+        first = monday(2)
+        payload = {'events': [{'semester': 1, 'program': program, 'kind': kind, 'title': kind,
+            'starts_on': str(first + timedelta(days=offset)), 'ends_on': str(first + timedelta(days=offset))}
+            for program, kind, offset in [('A', 'opening', 0), ('A', 'final', 28), ('B', 'opening', 7), ('B', 'final', 42)]]}
+        published = await self.published(payload)
+        await self.teacher(3); self.actor = 3
+        self.timetable[(3, '100', 'P9')] = {'course_code': '990001', 'title': 'วิชาตัวอย่าง', 'meetings': MEETINGS}
+        catalog = (await self.client.get('/api/v1/school-calendars')).json()['calendars']
+        self.assertEqual([o['program'] for o in catalog[0]['planning_options']], ['A', 'B'])
+        planning = {'program': 'A', 'starts_on': str(first), 'ends_on': str(first + timedelta(days=20)),
+                    'closures': [{'affected_on': str(first + timedelta(days=3)), 'makeup_on': str(first + timedelta(days=5)), 'note': 'Course holiday'}]}
+        planning = api.planner.CoursePlanning.model_validate(planning).model_dump(mode='json')
+        body = {'section': self.section(), 'revision_id': published['id'], 'pattern': 'onsite', 'planning': planning}
+        response = await self.client.post('/api/v1/school-calendars/schedules/preview', json=body)
+        self.assertEqual(response.status_code, 200, response.text)
+        preview = response.json()
+        self.assertEqual(preview['errors'], [])
+        self.assertEqual(preview['changes']['added'], 7)
+        self.assertTrue(any('Teacher-reviewed' in w for w in preview['warnings']))
+        apply = {**body, 'expected_version': preview['version'], 'fingerprint': preview['fingerprint'], 'reviewed': True}
+        changed = {**apply, 'planning': {**planning, 'ends_on': str(first + timedelta(days=27))}}
+        self.assertEqual((await self.client.post('/api/v1/school-calendars/schedules/apply', json=changed)).status_code, 409)
+        saved = await self.client.post('/api/v1/school-calendars/schedules/apply', json=apply)
+        self.assertEqual(saved.status_code, 200, saved.text)
+        saved = saved.json()
+        self.assertEqual(saved['planning'], planning)
+        repeated = await self.client.post('/api/v1/school-calendars/schedules/apply', json=apply)
+        self.assertEqual((repeated.status_code, repeated.json()['version']), (200, 1))
+        loaded = (await self.client.get('/api/v1/school-calendars/schedules', params=self.section())).json()
+        self.assertEqual(loaded['planning'], planning)
+        self.assertEqual(len(loaded['sessions']), 7)
+        self.assertFalse(loaded['syllabus_available'])  # no inferred native course or authoring rights
+        original = (await self.client.get(f"/api/v1/school-calendars/revisions/{published['id']}")).json()
+        self.assertEqual(original['payload'], published['payload'])
+        self.assertEqual(original['payload']['terms'], [])
+        self.assertEqual((await self.client.post(f"/api/v1/school-calendars/schedules/by-class/{saved['class_id']}/syllabus", json={'expected_version': 1})).status_code, 409)
+
+    async def test_native_syllabus_draft_is_course_owned_unpublished_and_not_overwritten(self):
+        from src.route66_ext.adapters import native_course_syllabus as native
+        from src.route66_ext.adapters.native_learning_access_test_support import CourseChapter, ChapterActivity, ResourceAuthor, UserGroup, UserGroupResource, UserGroupUser, PublicUser, read_native_activity
+        from src.route66_ext.tests.services.test_native_google_sessions import request as native_request
+        async with self.engine.begin() as conn:
+            for table in (native.Chapter.__table__, native.Activity.__table__, CourseChapter.__table__, ChapterActivity.__table__, ResourceAuthor.__table__, UserGroup.__table__, UserGroupResource.__table__, UserGroupUser.__table__):
+                await conn.run_sync(table.create)
+        await self.make_admin()
+        revision = await self.published(calendar_payload(monday(2)))
+        from src.route66_ext.adapters.db_courses_courses import Course
+        async with self.sessions.begin() as db:
+            course = await db.get(Course, 10); course.public = True; course.published = True; db.add(course)
+        path = '/api/v1/school-calendars/schedules/by-class/20/syllabus'
+        body = {'expected_version': 0, 'revision_id': revision['id']}
+        self.actor = 2  # can read the course and manage its class, not author it
+        denied = await self.client.post(path, json=body)
+        self.assertEqual(denied.status_code, 403, denied.text)
+        async with self.sessions.begin() as db:
+            db.add(ResourceAuthor(user_id=2, resource_uuid='course_fixture_10', authorship='CREATOR', authorship_status='ACTIVE'))
+        with patch('src.services.courses.chapters.index_course'), patch.object(native, 'create_activity', AsyncMock(side_effect=HTTPException(503, 'Synthetic creation failure'))):
+            failed = await self.client.post(path, json=body)
+        self.assertEqual(failed.status_code, 503)
+        async with self.sessions() as db:
+            self.assertEqual((await db.exec(select(native.Chapter))).all(), [])
+            self.assertEqual((await db.exec(select(native.Activity))).all(), [])
+        with patch('src.services.courses.chapters.index_course'), patch('src.services.courses.activities.activities.index_activity'):
+            results = await asyncio.gather(*[self.client.post(path, json={**body, 'language': 'th'}) for _ in range(2)])
+        self.assertEqual([r.status_code for r in results], [200, 200], [r.text for r in results])
+        self.assertEqual(sorted(r.json()['created'] for r in results), [False, True])
+        created = next(r for r in results if r.json()['created'])
+        self.assertEqual(created.status_code, 200, created.text)
+        self.assertTrue(created.json()['created'])
+        self.assertEqual(created.json()['editor_url'], f"/course/fixture_10/activity/{created.json()['activity_uuid'].removeprefix('activity_')}/edit")
+        async with self.sessions.begin() as db:
+            activity = (await db.exec(select(native.Activity))).one()
+            self.assertFalse(activity.published)
+            self.assertEqual(activity.course_id, 10)
+            self.assertIn('2569', str(activity.content))
+            self.assertIn('Synthetic course 10', str(activity.content))
+            self.assertEqual(activity.extra_metadata['route66_syllabus']['calendar_revision_id'], revision['id'])
+        async with self.sessions() as db:
+            learner = PublicUser.model_validate(await db.get(User, 3))
+            with self.assertRaises(HTTPException) as denied:
+                await read_native_activity(native_request(), created.json()['activity_uuid'], learner, db)
+            self.assertEqual(denied.exception.status_code, 404)
+        authored = {'type': 'doc', 'content': [{'type': 'paragraph', 'content': [{'type': 'text', 'text': 'Teacher-authored syllabus'}]}]}
+        async with self.sessions.begin() as db:
+            activity = (await db.exec(select(native.Activity))).one()
+            activity.content = authored; activity.published = True; db.add(activity)
+        repeated = await self.client.post(path, json=body)
+        self.assertEqual((repeated.status_code, repeated.json()['created']), (200, False))
+        self.assertEqual(created.json()['activity_uuid'], repeated.json()['activity_uuid'])
+        async with self.sessions() as db:
+            activity = (await db.exec(select(native.Activity))).one()
+            self.assertEqual(activity.content, authored)
+            self.assertTrue(activity.published)
+            learner = PublicUser.model_validate(await db.get(User, 3))
+            self.assertEqual((await read_native_activity(native_request(), activity.activity_uuid, learner, db)).content, authored)
+            self.assertEqual((await db.exec(select(AttendanceSession))).all(), [])
+            self.assertEqual((await db.exec(select(ClassSchedule))).all(), [])
+        self.assertEqual((await self.client.post(path, json={**body, 'expected_version': 1})).status_code, 409)
+        # A different program's published syllabus must not be selected or rewritten.
+        async with self.sessions.begin() as db:
+            activity = (await db.exec(select(native.Activity))).one()
+            activity.extra_metadata = {**activity.extra_metadata, 'route66_syllabus': {
+                **activity.extra_metadata['route66_syllabus'], 'program': 'Another synthetic program'}}
+            db.add(activity)
+        with patch('src.services.courses.chapters.index_course'), patch('src.services.courses.activities.activities.index_activity'):
+            different = await self.client.post(path, json=body)
+        self.assertEqual((different.status_code, different.json()['created']), (200, True))
+        self.assertNotEqual(created.json()['activity_uuid'], different.json()['activity_uuid'])
+        async with self.sessions() as db:
+            activities = (await db.exec(select(native.Activity))).all()
+            self.assertEqual(len(activities), 2)
+            original = next(a for a in activities if a.activity_uuid == created.json()['activity_uuid'])
+            self.assertEqual(original.content, authored); self.assertTrue(original.published)
+            new = next(a for a in activities if a.activity_uuid == different.json()['activity_uuid'])
+            self.assertIn(new.extra_metadata['route66_syllabus']['program'], new.name)
+            self.assertFalse(new.published)
 
 
 def static_scope():

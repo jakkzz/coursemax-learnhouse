@@ -1,5 +1,63 @@
 # School academic calendars
 
+## Course planning from a published semester calendar
+
+Validated source; staging deployment pending. The earlier date-only exclusion
+was a workflow discrepancy: a published academic-date calendar must remain selectable.
+The picker now scopes accepted calendars by academic year **and semester**, including
+date-only programs. A teacher chooses the program, reviews suggested first/last
+teaching dates and adds course-specific no-class/make-up exceptions before preview.
+The proposed end precedes that program's first final-exam/closing date; it is not a
+new official calendar fact. Missing boundaries stay empty. Teacher-confirmed seven-day
+course weeks are distinct from institution-authored weeks. No inferred odd/even
+rotation; alternating mode still requires explicit reviewed rotation.
+
+Preview/apply reuse the existing attendance planner, fingerprint/version check and
+past/evidence protections. Source bytes, school payload/publication and other classes
+are unchanged. Course planning input is retained in the existing append-only
+`class_schedule_applied` event and reloaded with its schedule version; no schema change.
+
+`POST /schedules/by-class/{id}/syllabus` accepts `{expected_version,language?,revision_id?,planning?}`.
+It prepares an ordinary **unpublished native course activity**, using the chosen
+semester/program, calendar pin and weekly outline. A saved attendance schedule is
+not required when an accepted revision is selected. Outcomes/topics/grading remain
+explicit instructor-completion placeholders, not invented course facts. Existing
+course/semester/program syllabi are opened without overwriting edits or publication;
+other programs keep separate, clearly named drafts. Native
+READ/CREATE/UPDATE permissions apply independently of school-class management; an
+unmatched section must first use the existing course connection flow. The adapter
+uses native chapter/activity services under savepoints so their commits remain inside
+one caller transaction/roster lock. Failure rolls back partial chapters; concurrent
+retries reuse one draft. Editing/publication/student reading stay native-owned.
+The public editor URL follows the native `/course/{id}/activity/{id}/edit` rewrite,
+not its internal `/editor` route. Draft creation and scheduling work on mobile;
+LearnHouse's existing rich-text editor requires desktop, stated on the handoff link.
+
+Checks: 19 passing calendar/PostgreSQL cases (one additional opt-in real-PDF case
+skipped), 17 pure planner/template cases, 80 web checks, full production bundle and
+generated-route TypeScript. Five compiled native-shell teacher/student journeys cover
+EN/TH desktop and Thai mobile: date-only selection, course exceptions, independent
+syllabus creation, native desktop editing/save/reload, mobile desktop-editor handoff,
+schedule review/apply/reload and student read-only make-ups. No page errors or
+horizontal overflow. Native PostgreSQL tests cover authoring denial, draft reader
+404s, explicit publication, atomic failure, concurrent reuse, program separation and
+preserved edits. Synthetic checks are not institutional/provider acceptance.
+
+### Direction contract
+
+**THESIS** Select the accepted semester calendar and complete the course task, without
+sending teachers back to administrators to manufacture school-wide teaching weeks.
+**OWN-WORLD** Existing LearnHouse controls and pinned Interior material; no new styling
+system, dependency or standalone prose editor.
+**STORY** Choose calendar/program, check proposed dates/exceptions, preview and save
+sessions; prepare a syllabus independently and complete/publish it in the native editor.
+**FIRST VIEWPORT** Retain one class task rail and calendar/mode choices; reveal only
+course dates for date-only sources. Syllabus is a separate secondary action.
+**FORM** Narrow extension of the existing Operate surface, no new visual identity.
+**FINISH** unreviewed and undocumented is unfinished; this build ends with the finish
+review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
+Shared DESIGN.md/Interior remain unchanged; screenshots are private evidence only.
+
 ## Teacher-private calendars and proposal evidence
 
 Deployed to LearnHouse staging, 2026-10-17, source `256bc802`, image
@@ -26,7 +84,8 @@ Existing rows/source bytes and class pins were preserved; no native Alembic stam
   remain null. Cloning and metadata regrouping preserve provenance and lineage.
 - Publication, proposal approval and schedule application remain separate. Existing
   class pins, attendance, rosters, native roles/enrollment and progress are unchanged.
-  Date-only sources still cannot generate teaching sessions.
+  Date-only sources do not define official teaching weeks; course planning now
+  supports separate teacher-reviewed weeks as described above.
 
 Bootstrap-created staging uses `deploy/staging/apply_private_calendar_migration.py`
 only after protected backup and an isolated restore rehearsal. It checks existing
@@ -97,9 +156,11 @@ are available without a questionnaire. Optional focused date editing and one-act
 **Accept calendar** work for date-only calendars. File and URL imports produce equal
 payloads; the private original PDF remains byte-identical. Existing saved empty
 drafts can be opened without re-uploading. No teaching weeks, rotations, closures,
-make-ups or attendance sessions are inferred. Date-only calendars are excluded from
-the class timetable picker; direct preview/apply returns `422 teaching_weeks_required`
-without class/schedule/session writes. Existing full teaching calendars still work.
+make-ups or attendance sessions are inferred into the school calendar. The original
+release excluded date-only calendars from the timetable picker; this is superseded
+by teacher-reviewed course planning above. Preview/apply without required course
+dates returns `422 course_dates_required` without writes. Full teaching calendars
+continue using their reviewed weeks.
 
 Proof: 73 web tests, full bundle/generated-route TypeScript, 34 baked pure tests,
 seven focused isolated PostgreSQL tests, and 13 compiled EN1440/TH390 journeys.
@@ -409,7 +470,8 @@ All routes are composed through `src.route66_ext.bootstrap`, under
 - `POST /{calendar_id}/draft`: `{from_revision_id}`; source-retaining draft clone.
 - `GET /schedules`: exact `registry_course_id,academic_year,semester,section` query.
 - `GET /schedules/by-class/{class_id}`: organization-bound teacher or active member.
-- `POST /schedules/preview`: `{section,revision_id,pattern,expected_version?}`.
+- `POST /schedules/preview`: `{section,revision_id,pattern,expected_version?,planning?}`.
+  `planning` for date-only semesters is `{program,starts_on,ends_on,closures?}`.
 - `POST /schedules/apply`: same plus `{expected_version,fingerprint,reviewed:true}`.
 
 Shared writes use the existing platform-superadmin check. An unmatched class's
@@ -422,7 +484,9 @@ native matching, without gaining native content access.
 Payload also supports up to 300 `events`: `{semester,program,kind,title,starts_on,
 ends_on,page?,uncertain?,note?}`. Kinds are `opening|midterm|final|closing|grades|other`.
 Each separately stated date/range remains separate. Events can publish without
-terms/weeks, but never generate sessions. Summaries expose `has_teaching_weeks`.
+terms/weeks. They do not themselves define meetings; separate teacher-reviewed
+course planning may generate sessions. Summaries expose `has_teaching_weeks` and
+semester/program-specific `planning_options`, with source events and proposed bounds.
 
 Payload: `timezone:'Asia/Bangkok'`, up to three terms, explicit numbered week ranges,
 rotation and `teaching` boolean, dated closures with nullable make-ups, optional page/

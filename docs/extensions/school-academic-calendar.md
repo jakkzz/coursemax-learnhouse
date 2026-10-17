@@ -1,13 +1,58 @@
 # Shared school academic calendar
 
 Status: deployed to LearnHouse staging, 2026-10-17; not institutional acceptance.
-Live source `1e24fbfc55a6f3d613e8bc477a9845c12311e22c`, image
-`coursemax-learnhouse:calendar-pdf-url-20261017`. Assignment work remains excluded.
+Live source `bbad16c7807a353c24dd8ba1b6e97e29db29cabd`, image
+`coursemax-learnhouse:calendar-pdf-dates-20261017`. Assignment work remains excluded.
 Claude Code's Opus 5.5 completed backend work in the separate `school-calendar`
 Herdr session; Impeccable-guided upload/review corrections and desktop/mobile task
 confirmation are complete.
 
-## Current delivery: PDF URL alongside upload
+## Current delivery: the same PDF reads from upload or URL
+
+The retained uploaded MIX PDF and the supplied URL PDF are **byte-identical**:
+111,914 bytes, two pages, SHA256
+`6d0a74393bcbc6ed0a07c69aaf9f59ca31756317331a5a98531351243ba4d5d9`.
+The source-only stop in the previous release was an implementation limitation, not
+a reason to require a different PDF. It is removed.
+
+Upload, URL import, and opening an empty retained draft now read the actual date
+table into **75 dated entries across three separate programs**. Physical table rules
+and positioned text/font decoding keep columns separate. Opening, conditional
+midterm, all separately stated final-exam ranges, closing, grade deadlines and
+registration/other dates retain their source page. The midterm qualifier applies
+only to courses coordinated with the registrar; it is not a universal exam window.
+This uses installed pypdf locally, with no AI/provider dependency or OCR.
+
+The default preview shows key dates; program filtering and registration/other dates
+are available without a questionnaire. Optional focused date editing and one-action
+**Accept calendar** work for date-only calendars. File and URL imports produce equal
+payloads; the private original PDF remains byte-identical. Existing saved empty
+drafts can be opened without re-uploading. No teaching weeks, rotations, closures,
+make-ups or attendance sessions are inferred. Date-only calendars are excluded from
+the class timetable picker; direct preview/apply returns `422 teaching_weeks_required`
+without class/schedule/session writes. Existing full teaching calendars still work.
+
+Proof: 73 web tests, full bundle/generated-route TypeScript, 34 baked pure tests,
+seven focused isolated PostgreSQL tests, and 13 compiled EN1440/TH390 journeys.
+Actual bytes are tested through both upload/URL storage and date-only publication;
+compiled flows cover both import methods, retained-draft retry, program filtering,
+optional editing, publication, original-byte hash, full-calendar regressions, stale
+recovery and read-only student schedules. A bounded desktop/mobile screenshot batch
+was reviewed. Two live fresh-native-login read-only calendar smokes and native
+security/connection checks pass. No agent live institutional parsing/publication/
+class application; the live MIX draft stays version 0 and its source is unchanged.
+Not institutional, owner-browser, provider, OCR or broad PDF-format acceptance.
+
+Code-only app replacement/gateway reload, no migration: 1,027 API and 5,383 required
+web entries, native Config/permissions and in-flight assets verified. Schema,
+source/draft, identity/academic data, environment/mounts and peer IDs are preserved.
+**Recovery uses the new backend with the exact previous web**, verified against the
+new event payload. The exact previous image is retained but cannot read new `events`
+JSON and is not a safe code rollback after new records are saved. Never restore old
+academic evidence for code rollback. Evidence: `calendar-pdf-dates-20261017/`,
+`calendar-pdf-dates-web-confirmed-20261017/`, and the matching release directory.
+
+## Previous delivery: PDF URL alongside upload
 
 Choose **Use PDF URL**, paste a public HTTPS PDF link, then **Read PDF**. It uses
 exactly the same private source/draft storage as file upload; full teaching calendars
@@ -304,6 +349,11 @@ section. It creates the existing `AcademicClass` aggregate, not another class sy
 Matching later retains its class/roster/session IDs; unmatched classes cannot acquire
 native learning grants. Students can read their own schedule both before and after
 native matching, without gaining native content access.
+
+Payload also supports up to 300 `events`: `{semester,program,kind,title,starts_on,
+ends_on,page?,uncertain?,note?}`. Kinds are `opening|midterm|final|closing|grades|other`.
+Each separately stated date/range remains separate. Events can publish without
+terms/weeks, but never generate sessions. Summaries expose `has_teaching_weeks`.
 
 Payload: `timezone:'Asia/Bangkok'`, up to three terms, explicit numbered week ranges,
 rotation and `teaching` boolean, dated closures with nullable make-ups, optional page/

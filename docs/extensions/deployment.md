@@ -1,6 +1,39 @@
 # Internal extension deployment records
 
-## Latest: calendar PDF URL — deployed 2026-10-17
+## Latest: read the same PDF from upload or URL — deployed 2026-10-17
+
+Source `bbad16c7807a353c24dd8ba1b6e97e29db29cabd`, healthy image
+`coursemax-learnhouse:calendar-pdf-dates-20261017`, ID
+`sha256:c589624495e6a94e9052f5cc1af043d0735db57e2f5fd945bf4ef264ec5e711c`.
+The live uploaded MIX PDF is byte-identical to the supplied URL. Both now read
+75 dated entries, separated by three programs, rather than stopping at source-only.
+Retained empty drafts read without re-upload. Preview/filter/edit/explicit acceptance
+support date-only calendars. Conditional midterm wording and separate final ranges
+remain; no teaching weeks/rotations or attendance sessions are invented. Date-only
+calendars cannot be used for timetable generation. No AI configuration, permissions,
+native code, security headers or schema changed. See [school-academic-calendar.md](school-academic-calendar.md).
+
+73 web checks, full bundle/types, 34 baked pure tests, seven focused isolated PG tests,
+13 compiled EN1440/TH390 journeys and actual-byte baked extraction pass. Two live
+fresh-login read-only calendar smokes plus native security/connection checks pass.
+Live MIX source/draft remains unchanged, version 0; no institutional parse/publish/
+class apply by agent. Not owner-browser/provider/OCR or institutional acceptance.
+
+Fresh protected backup; 1,027 API/5,383 required web entries, native Config/permissions
+and actual-parent assets verified. One code-only overlay on the existing verified
+126-layer packaging ancestor; 127 layers total. App-only replacement/gateway reload,
+no migration; schema/source/draft/identity/academic/env/mount/peer IDs preserved,
+except permitted native role startup timestamps and source-menu URL.
+
+**Compatible recovery**: `coursemax-learnhouse:calendar-pdf-dates-recovery-20261017`,
+`sha256:e7dd2f0925b6d5cd83e2d08a9f6207243de7c2beca56b420ed41d0d28b1a3ebc`,
+verified new backend + exact previous web, including reading the new event payload.
+The exact previous a706a4c6 image is retained but cannot read newly saved `events`
+JSON; do not deploy it as a rollback after new records exist. No data restore.
+Evidence: `calendar-pdf-dates-20261017/`, `calendar-pdf-dates-web-confirmed-20261017/`,
+and `releases/calendar-pdf-dates-20261017/`.
+
+## Previous: calendar PDF URL — deployed 2026-10-17
 
 Source `1e24fbfc55a6f3d613e8bc477a9845c12311e22c`, image
 `coursemax-learnhouse:calendar-pdf-url-20261017`, ID

@@ -19,6 +19,15 @@ test('only one accepted year/semester teaching calendar is suggested; ambiguity 
  assert.match(s, /section, .*settings/)
  assert.match(source('calendar/CalendarPreview.tsx'), /week.teaching_dates.map\(day\)/)
 })
+test('schedule review includes past dates, hides zero-counter noise and does not block missing delivery labels', () => {
+ const s = source('calendar/ClassSchedule.tsx')
+ assert.match(s, /dated entries, including past dates/)
+ assert.match(s, /Schedule notes/)
+ assert.match(s, /\{planning && <CourseDatesForm/)
+ assert.doesNotMatch(s, /needsRotation|Past dates not added|preview.changes.unchanged|preview.changes.skipped_past/)
+ assert.match(source('calendar/ScheduleView.tsx'), /Mode not specified by school/)
+ assert.doesNotMatch(source('calendar/ScheduleView.tsx'), /will not be added/)
+})
 test('month view uses complete Monday-first months, leap days and year boundaries', () => {
  assert.equal(monthDays('2028-02').days.length, 29)
  assert.equal(monthDays('2026-11').offset, 6)

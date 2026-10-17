@@ -1,6 +1,39 @@
 # Internal extension deployment records
 
-## Latest: attendance arrival deployed — 2026-10-17
+## Latest: shared Interior controls deployed — 2026-10-17
+
+Source/menu revision `88fea34b` is live at `https://learn.route66.click` in
+`coursemax-learnhouse:interior-controls-88fea34b-20261017`, image
+`sha256:85065604eb84fc303fafd920f481cd2abee34a1d1ffdcfd488c2a3db16ebc50d`.
+Persistent agent guidance now requires shared Interior components across existing/new
+custom UI. The native-backed button/loading faces, clipboard hook/feedback and five
+controlled choice rails are consolidated; native shell, form/date controls, Radix
+panels/dialogs, requests and academic authorities remain intact. No new dependency.
+See [component scope/provenance](interior-ui.md).
+
+83 source checks, six client tests/44 assertions, 18 real-component EN/TH desktop/mobile
+journeys, three compiled-native journeys, full native bundle and independent types
+pass. Four fresh native-login live journeys cover read-only class/calendar navigation,
+PDF-source choice/cancel, expired arrival and Google-cancel continuation without false
+receipts, page errors or overflow. No real academic mutation or provider exchange.
+
+Exact 126-layer prefix/127-layer package, native Config and actual-runtime-verified
+991-file Next package/link layout retained. All 1,033 API files are byte-identical;
+4,834 web delta entries/node permissions verify. Current Interior and previous in-flight
+chunk bytes serve exactly. Fresh backup/archive-list check, app-only recreate and
+proxy DNS reload complete; gateway configuration itself is unchanged. Schema,
+protected academic/identity/content/calendar/source rows, env, mounts and observed
+non-app service IDs match before/after. Source-menu URL alone advances.
+
+Standard capacity gates passed. Only this task's newly generated build scratch was
+reclaimed after complete byte/link/mode/owner archive verification; successful artifacts,
+logs and scratch recovery remain private. No old folders/images/evidence were removed.
+Current pointer is `releases/interior-controls-88fea34b-20261017`; exact compatible
+code-only rollback is attendance parent `attendance-arrival-bf4aeb94-20261017` /
+`5f5f6ea1…`. Never restore older academic data. Physical-device/provider trials and
+broader migration/cutover remain unaccepted; native OAuth policy is unchanged.
+
+## Previous: attendance arrival deployed — 2026-10-17
 
 Implementation/source-menu revision `bf4aeb94` is live at `https://learn.route66.click`.
 Image `coursemax-learnhouse:attendance-arrival-bf4aeb94-20261017`, ID

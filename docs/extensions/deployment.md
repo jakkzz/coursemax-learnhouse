@@ -1,6 +1,40 @@
 # Internal extension deployment records
 
-## Latest: school-first classes — deployed 2026-10-16
+## Latest: shared school calendars — deployed 2026-10-17
+
+Live source `32df4935eed6b582085935f994ef7ef3328cee69`, image
+`coursemax-learnhouse:school-calendar-20261016`, ID
+`sha256:a20af91a1afe88121244b02d130dfce872439dae8142591270624845ff1bd275`.
+My classes → School calendars → private PDF/review/publish; own class → Schedule →
+reviewed dated table/calendar using the same attendance sessions. Unmatched classes
+work without native course grants. Assignments remain untouched. See
+[school-academic-calendar.md](school-academic-calendar.md).
+
+67 frontend checks, full bundle/types, five compiled teacher/student tasks, affected
+PostgreSQL suites and two live EN1440/TH390 login/calendar/return/reload smokes pass.
+Live reads are private, upload controls follow authorization, foreign/anonymous calls
+are denied, and no synthetic academic rows were written to live. Real institutional
+PDF/provider/device acceptance remains separate.
+
+Fresh protected backups, exact school-first image save/load, isolated restore and
+named `b3e9c4d1a702` migration pass. One class-org backfill; no inserted/deleted existing
+academic rows or inferred Alembic stamp. Native FK targets were explicitly registered
+in the standalone runner. Existing identity/roster/progress/grants/runtime/env and
+non-app IDs are preserved; four native role startup timestamps changed as expected.
+Full migration schema delta matches rehearsal (legacy CHECK pretty-printing differs
+on restore). App-only replacement and gateway reload; source menu advanced, footer
+unchanged. No historical import, cutover or host/daemon change.
+
+Depth-128 packaging could not start; byte-verified full current owned API and merged
+web/in-flight assets were rebuilt on the compatible 124-layer a0c8 base. Final image
+has 126 layers; 1,020 API/config/migration and 5,311 desired web entries verified.
+Retain the exact actual parent, but use `school-calendar-compatible-20261016` for
+code recovery after unmatched rows exist: generalized backend plus previous web,
+verified against restored migrated class/session records. Never restore old academic
+data for a code rollback. Evidence: `releases/school-calendar-20261016/` and
+`school-calendar-research-20261016/`.
+
+## Previous: school-first classes — deployed 2026-10-16
 
 Live source `3bd5cfed1d2b8827b9b3c6883848bb3f50339141`, image
 `coursemax-learnhouse:school-first-20261016`, ID

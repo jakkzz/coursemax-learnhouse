@@ -1,11 +1,17 @@
 # Shared school academic calendar
 
-Status: source implementation validated, 2026-10-16; not deployed or institutionally accepted.
-Placement is approved; assignment work is explicitly excluded. Claude Code's
-Opus 5.5 was verified in the separate `school-calendar` Herdr session and completed
-the backend. The connected frontend library/review and class table/calendar flows
-pass isolated compiled desktop/mobile tasks. Shared migration and deployment still
-require practical backup/restore and calendar-compatible rollback verification.
+Status: deployed to LearnHouse staging, 2026-10-17; not institutional acceptance.
+Live source `32df4935eed6b582085935f994ef7ef3328cee69`, image
+`coursemax-learnhouse:school-calendar-20261016`. Assignment work remains excluded.
+Claude Code's Opus 5.5 completed the backend in the separate `school-calendar`
+Herdr session. Connected desktop/mobile task checks, restored-database migration,
+calendar-compatible recovery and live calendar navigation pass.
+
+Use **My classes → School calendars** to upload/review/publish an official PDF
+(existing platform-superadmin permission). Then open your own NRRU class's
+**Schedule**, select its published calendar and teaching mode, preview and apply.
+A native course match is not required. No calendar facts are seeded or fabricated;
+the official PDF and its reviewed dates remain necessary user input.
 
 ## Product outcome
 
@@ -229,7 +235,14 @@ journeys cover PDF/manual repair/publication, unmatched apply, identical table/c
 attendance IDs, matched/unmatched student reading, and publish-return refresh without
 reload. No page errors, horizontal overflow, assignment writes or student academic
 writes were observed in these fixtures. Boundary, diff and 25 tooling checks pass.
-These checks do not claim a deployment or real provider/device acceptance.
+Deployment then passed fresh protected backup/restore, the named migration and
+nullable-course class/session reads in the compatible fallback. Standalone migration
+explicitly imports native FK targets through existing adapters. Two live native-login
+EN1440/TH390 calendar navigation/return/reload tasks pass with private reads, correct
+upload visibility, denied foreign/anonymous access and no academic writes. Existing
+identity, roster, progress, grants, runtime/environment and unrelated service IDs are
+preserved. The intended class-org backfill and four native role startup timestamp
+changes are recorded separately. No real provider/device acceptance is claimed.
 
 Known limits: first apply skips past dates rather than manufacturing historical
 absences; an unmatched class has one owning teacher. Official `W:` numbers must be

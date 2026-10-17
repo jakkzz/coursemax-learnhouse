@@ -1,6 +1,35 @@
 # Internal extension deployment records
 
-## Latest: automatic NRRU PDF reading — deployed 2026-10-17
+## Latest: PDF-first calendar preview — deployed 2026-10-17
+
+Live source `f8bf0e11728fc15f9e7fa7bbbbce686a4c7a5d70`, image
+`coursemax-learnhouse:calendar-pdf-preview-20261017`, ID
+`sha256:2ed2b57479b10ca63426321947a102b3e711f05cdecef9025606af83b532352e`.
+Choose PDF → filled read-only preview → Accept calendar or Edit calendar. No upfront
+name/year/program form, per-item questionnaire or separate save before acceptance.
+Acceptance publishes the explicitly previewed proposals and records source notes;
+validation, existing authorization/MFA/version gates and separate class apply remain.
+No live institutional parsing/publication/application was performed by the agent.
+
+70 web tests, full bundle/types, 21 baked pure checks, five focused PostgreSQL checks
+plus two overlapping source-note/compatibility checks; seven compiled teacher/student
+EN1440/TH390 journeys and two live read-only fresh-login calendar smokes pass. Source
+text proof confirms year 2569, ภาคปกติ, 15 weeks and 11 closures. Not provider, OCR,
+owner-browser or human institutional acceptance.
+
+Fresh protected DB backup and exact previous `calendar-upload-repair-20261017` image
+retained for code-only rollback. Reused the verified 126-layer calendar physical base,
+fully overlaid current owned API and new web while retaining actual-parent asset
+deltas. Candidate: 127 layers, 1,022 API files and 5,336 required web entries verified,
+native image Config/permissions preserved. App-only replacement and gateway reload;
+no migration. Schema/source/draft, identity/roles, roster/progress/academic evidence,
+environment/mounts and non-app container IDs preserved, except native role startup
+timestamps and intentional source-menu URL. Never restore older academic evidence
+for a code rollback. See [school-academic-calendar.md](school-academic-calendar.md).
+Evidence: `calendar-pdf-preview-20261017/`, `calendar-pdf-preview-web-20261017/`, and
+`releases/calendar-pdf-preview-20261017/`.
+
+## Previous: automatic NRRU PDF reading — deployed 2026-10-17
 
 Live source `91a2c629c797dd352ba554f2c2a06a9e2a5afcbe`, image
 `coursemax-learnhouse:calendar-upload-repair-20261017`, ID

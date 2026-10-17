@@ -1,20 +1,42 @@
 # Shared school academic calendar
 
 Status: deployed to LearnHouse staging, 2026-10-17; not institutional acceptance.
-Live source `91a2c629c797dd352ba554f2c2a06a9e2a5afcbe`, image
-`coursemax-learnhouse:calendar-upload-repair-20261017`. Assignment work remains excluded.
+Live source `f8bf0e11728fc15f9e7fa7bbbbce686a4c7a5d70`, image
+`coursemax-learnhouse:calendar-pdf-preview-20261017`. Assignment work remains excluded.
 Claude Code's Opus 5.5 completed backend work in the separate `school-calendar`
 Herdr session; Impeccable-guided upload/review corrections and desktop/mobile task
 confirmation are complete.
 
-Use **My classes → School calendars** to upload/review/publish an official PDF
-(existing platform-superadmin permission). **Read PDF and review dates** reads it
-automatically; opening an existing empty draft also reads its retained source, with
-no re-upload. Then open your own NRRU class's **Schedule**, select its published
-calendar and teaching mode, preview and apply. A native course match is not required.
-No calendar facts are seeded; the official PDF and human review remain necessary.
+Use **My classes → School calendars → Upload academic calendar**, then choose the
+PDF. Its name, Buddhist academic year and program are filled from the document;
+there is no upfront metadata form. A read-only preview shows the teaching weeks,
+holidays and make-ups. Choose **Accept calendar** to publish the previewed proposals,
+or **Edit calendar** to change the filled metadata/dates and preview again. Acceptance
+saves edits and publishes atomically: no separate save or verification questionnaire.
+Source disagreements remain available as notes and acceptance is recorded; structural
+and date validation still applies. Existing superadmin/org/MFA/version gates remain.
 
-## Automatic reading correction — 2026-10-17
+An empty retained draft still reads its saved PDF on opening, with no re-upload.
+Publishing does not apply anything to a class. Open your own NRRU class's **Schedule**,
+select the published calendar and teaching mode, then separately preview/apply.
+A native course match is not required. No calendar facts are seeded. File-only upload
+requires a recognizable year/program header; unsupported metadata is rejected rather
+than invented. Explicit metadata remains supported by the existing API. Changing a
+draft's year/program retains its old source/revision and copies into the correct
+calendar scope; published bindings and class sessions are never reassigned.
+
+Current proof: 70 web tests, full bundle/generated-route TypeScript, 21 baked pure
+reader/planner tests, five focused PostgreSQL tests plus two focused compatibility/
+source-note checks (overlapping). Seven compiled EN1440/TH390 journeys cover file-only
+preview/accept, optional edits without a separate save, retained-draft failure/retry,
+stale-save recovery, and read-only student schedules/attendance. The protected source
+text yields year 2569, ภาคปกติ, 15 weeks and 11 closures. Two live fresh-login read-only
+calendar smokes pass; the agent did not parse/publish/apply the live institutional draft.
+Code-only, no migration; 1,022 API and 5,336 web entries verified. Schema, source/draft,
+identity, academic evidence, environment/mounts and non-app IDs preserved. Evidence:
+`calendar-pdf-preview-20261017/`, its web artifact directory and matching release.
+
+## Previous delivery: automatic reading correction — 2026-10-17
 
 The first release exposed an empty calendar builder while staging had organization
 AI disabled and no native provider key. Readable NRRU teaching-calendar announcements
@@ -214,15 +236,22 @@ All routes are composed through `src.route66_ext.bootstrap`, under
 `/api/v1/school-calendars`; native files are unchanged.
 
 - `GET ''`: published library (plus drafts for platform superadmins), `can_edit`.
-- Multipart `POST ''`: `name`, Buddhist `academic_year`, natural-language `track`,
-  `file`; retain a valid PDF up to 10 MB before any optional AI call.
+- Multipart `POST ''`: `file` (PDF up to 10 MB); optional `name`, Buddhist
+  `academic_year`, natural-language `track` override the detected document metadata.
+  Missing year/program is rejected without inventing facts. A valid calendar source
+  is retained before optional date-reading AI calls.
 - `GET /revisions/{id}` and private `GET /revisions/{id}/source`.
-- `PUT /revisions/{id}`: `{expected_version,payload}`; editable drafts only.
+- `PUT /revisions/{id}`: `{expected_version,payload,metadata?}`; editable drafts only.
+  Metadata supports `name`, `academic_year`, `track`; regrouping copies evidence into
+  a new draft instead of reassigning guarded source/revision identities.
 - `POST /revisions/{id}/parse`: `{expected_version}`; existing admin/org/MFA gates.
   Recognized NRRU text uses the local reader without AI; unknown layouts retain native
   AI feature/plan/credit/rate/model gates. Failure leaves source/draft intact.
-- `POST /revisions/{id}/publish`: `{expected_version,reviewed:true}`; unresolved or
-  uncertain facts prevent publication. Published JSON and source bytes are immutable.
+- `POST /revisions/{id}/publish`: `{expected_version,reviewed:true,payload?,metadata?,
+  accept_proposals?:true}`. Explicit proposal acceptance resolves review markers and
+  records their acceptance with the source notes, validates and publishes atomically.
+  Without it, unresolved/uncertain facts still prevent publication. Published JSON
+  and source bytes remain immutable.
 - `POST /{calendar_id}/draft`: `{from_revision_id}`; source-retaining draft clone.
 - `GET /schedules`: exact `registry_course_id,academic_year,semester,section` query.
 - `GET /schedules/by-class/{class_id}`: organization-bound teacher or active member.

@@ -478,6 +478,35 @@ class SchoolCalendarTests(AcademicRosterTests):
         self.assertEqual((await self.client.get(f"/api/v1/school-calendars/schedules/by-class/{schedule['class_id']}")).status_code, 403)
         self.assertEqual((await self.client.get(f"/api/v1/attendance/classes/{schedule['class_id']}/sessions")).status_code, 403)
 
+    async def test_past_semester_and_exam_dates_are_created_without_attendance_or_guessed_mode(self):
+        await self.make_admin()
+        data = calendar_payload(monday(-8), count=3)
+        for w, number, rotation in zip(data['terms'][0]['weeks'], (7, 8, 9), ('odd', 'midterm', 'even')):
+            w.update(number=number, rotation=rotation)
+        revision = await self.published(data)
+        await self.teacher(3)
+        self.actor = 3
+        meetings = [{**MEETINGS[1], 'details': 'W:(1-16) เข้าชั้นเรียนในสัปดาห์คู่/เรียนออนไลน์ในสัปดาห์คี่'}]
+        self.timetable[(3, '100', 'P9')] = {'course_code': '990001', 'title': 'Synthetic past semester', 'meetings': meetings}
+        args = {'section': self.section(), 'revision_id': revision['id'], 'pattern': 'even_onsite'}
+        response = await self.client.post('/api/v1/school-calendars/schedules/preview', json=args)
+        self.assertEqual(response.status_code, 200, response.text)
+        reviewed = response.json()
+        self.assertEqual(reviewed['errors'], [])
+        self.assertEqual(reviewed['warnings'], [])
+        self.assertEqual(reviewed['changes']['added'], 3)
+        self.assertEqual([s['mode'] for s in reviewed['sessions']], ['online', None, 'onsite'])
+        saved = await self.client.post('/api/v1/school-calendars/schedules/apply', json={**args, 'expected_version': 0,
+            'fingerprint': reviewed['fingerprint'], 'reviewed': True})
+        self.assertEqual(saved.status_code, 200, saved.text)
+        self.assertEqual(len(saved.json()['sessions']), 3)
+        async with self.sessions() as db:
+            self.assertEqual((await db.exec(select(AttendanceChallenge))).all(), [])
+            self.assertEqual((await db.get(SchoolCalendarRevision, revision['id'])).payload, revision['payload'])
+        repeated = await self.client.post('/api/v1/school-calendars/schedules/apply', json={**args, 'expected_version': 0,
+            'fingerprint': reviewed['fingerprint'], 'reviewed': True})
+        self.assertEqual(repeated.json(), saved.json())
+
     def gapped(self, closures=()):
         """Week 1 is last week (past); weeks 2-4 are upcoming."""
         starts = [monday(-1), monday(1), monday(2), monday(3)]
@@ -503,19 +532,17 @@ class SchoolCalendarTests(AcademicRosterTests):
         self.timetable[(3, '100', 'P9')] = {'course_code': '990001', 'title': 'วิชาตัวอย่าง', 'meetings': MEETINGS[:1]}
         section = self.section()
         preview = await self.preview(base['id'], section)
-        self.assertEqual((preview['changes']['added'], preview['changes']['skipped_past']), (3, 1))
-        self.assertEqual([s['action'] for s in preview['sessions']], ['skipped_past', 'added', 'added', 'added'])
+        self.assertEqual((preview['changes']['added'], preview['changes']['skipped_past']), (4, 0))
+        self.assertEqual([s['action'] for s in preview['sessions']], ['added'] * 4)
         schedule = (await self.apply(base['id'], section, preview)).json()
         by_week = {s['week_number']: s for s in schedule['sessions']}
-        self.assertEqual(sorted(by_week), [2, 3, 4])
+        self.assertEqual(sorted(by_week), [1, 2, 3, 4])
+        self.assertEqual(len((await self.apply(base['id'], section, preview)).json()['sessions']), 4)
         async with self.sessions.begin() as db:
-            # Synthetic evidence on week 2, and a week 1 meeting saved earlier that is now in the past.
+            # Synthetic evidence on week 2; week 1 was backfilled without attendance.
             now = datetime.now(timezone.utc)
             db.add(AttendanceChallenge(session_id=by_week[2]['id'], token_hash='e' * 64, session_version=0, kind='entry',
                 created_at=now, expires_at=now + timedelta(minutes=1), created_by=3))
-            past = now - timedelta(days=2)
-            db.add(AttendanceSession(class_id=schedule['class_id'], title='past', starts_at=past, ends_at=past + timedelta(hours=3),
-                created_by=3, calendar_kind='regular', academic_week=1, slot_key='mon-0900-1200', nominal_on=monday(-1)))
         newer = await self.republish(base['calendar_id'], base['id'], self.gapped([
             {'affected_on': monday(-1).isoformat(), 'makeup_on': None, 'note': 'past closure'},
             {'affected_on': monday(1).isoformat(), 'makeup_on': None, 'note': 'evidence week'},
@@ -535,7 +562,8 @@ class SchoolCalendarTests(AcademicRosterTests):
         async with self.sessions() as db:
             rows = {r.id: r for r in (await db.exec(select(AttendanceSession))).all()}
         self.assertEqual(rows[by_week[2]['id']].state, 'scheduled')  # evidence-bearing: unchanged
-        self.assertEqual(next(r for r in rows.values() if r.title == 'past').state, 'scheduled')  # past: unchanged
+        self.assertEqual(rows[by_week[1]['id']].state, 'scheduled')  # backfilled past: unchanged
+        self.assertEqual(rows[by_week[1]['id']].starts_at, datetime.fromisoformat(by_week[1]['starts_at']))
         self.assertEqual((rows[by_week[3]['id']].state, rows[by_week[3]['id']].version), ('no_class', 1))
         makeup = [r for r in rows.values() if r.calendar_kind == 'makeup']
         self.assertEqual([(m.academic_week, m.nominal_on, m.starts_at.astimezone(timezone(timedelta(hours=7))).date()) for m in makeup],
@@ -1023,7 +1051,9 @@ END; $$"""))
         self.assertTrue(any('Review the dated' in w for w in preview['warnings']))
         self.assertEqual({(s['week_number'], s['mode']) for s in preview['sessions']}, {(1, 'online'), (2, 'onsite'), (3, 'online')})
         missing_start = await self.client.post('/api/v1/school-calendars/schedules/preview', json={**body, 'hybrid_start': None})
-        self.assertTrue(missing_start.json()['errors'])
+        self.assertEqual(missing_start.json()['errors'], [])
+        self.assertEqual(len(missing_start.json()['sessions']), 7)
+        self.assertTrue(all(s['mode'] is None for s in missing_start.json()['sessions']))
         invalid_start = await self.client.post('/api/v1/school-calendars/schedules/preview', json={**body, 'hybrid_start': 'unknown'})
         self.assertEqual(invalid_start.status_code, 422)
         apply = {**body, 'expected_version': preview['version'], 'fingerprint': preview['fingerprint'], 'reviewed': True}

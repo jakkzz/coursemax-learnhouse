@@ -36,7 +36,9 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual([(r['academic_week'], r['mode']) for r in rows], [(1, 'online'), (2, 'onsite'), (3, 'onsite')])
         self.assertEqual([r['location'] for r in rows], [None, '27.03.03', '27.03.03'])
         self.assertTrue(p.plan(source, 1, meetings, 'onsite', 'fixture')[2])
-        self.assertTrue(p.plan(payload([week(1)]), 1, meetings, 'even_onsite', 'fixture', 'online')[2])
+        unlabelled, _, errors = p.plan(payload([week(1)]), 1, meetings, 'even_onsite', 'fixture', 'online')
+        self.assertEqual(errors, [])
+        self.assertIsNone(unlabelled[0]['mode'])
         self.assertNotIn('teaching_pattern', p.official_course_facts(MEETINGS))
 
     def test_course_policy_override_is_explicit_and_never_changes_school_rotation(self):
@@ -50,7 +52,7 @@ class PlannerTests(unittest.TestCase):
             self.assertEqual([r['mode'] for r in rows], ['online', 'onsite'] if override == 'even_onsite' else [override, override])
         self.assertTrue(p.plan(source, 1, meetings, 'onsite', 'fixture', policy_override='online')[2])
         self.assertTrue(p.plan(source, 1, meetings, 'onsite', 'fixture', policy_override='invalid')[2])
-        self.assertTrue(p.plan(payload([week(1)]), 1, meetings, 'even_onsite', 'fixture', 'onsite', 'even_onsite')[2])
+        self.assertIsNone(p.plan(payload([week(1)]), 1, meetings, 'even_onsite', 'fixture', 'onsite', 'even_onsite')[0][0]['mode'])
         self.assertEqual(source.model_dump(mode='json'), before)
         self.assertEqual(p.official_course_facts(meetings)['teaching_pattern'], 'even_onsite')
 
@@ -82,6 +84,11 @@ class PlannerTests(unittest.TestCase):
         self.assertIn('รูปแบบเรียนที่ใช้เฉพาะรายวิชา', override)
         self.assertIn('รูปแบบเรียนจากทะเบียน', override)
         self.assertNotIn('29/6/2569 · 09.00–12.00 · ที่มหาวิทยาลัย', override)
+        source.terms[0].weeks[1].rotation = 'midterm'
+        exam = p.canonical(document(cls, SimpleNamespace(name='Synthetic calendar', track='regular'),
+            SimpleNamespace(number=1, payload=source.model_dump(mode='json')), None, True, '', meetings))
+        self.assertIn('29/6/2569 · 09.00–12.00 · มหาวิทยาลัยยังไม่ระบุรูปแบบเรียน', exam)
+        self.assertNotIn('29/6/2569 · 09.00–12.00 · ออนไลน์', exam)
 
     def test_multiple_slots_and_dates(self):
         rows, warnings, errors = self.run_plan(payload([week(1), week(2)]))
@@ -103,10 +110,13 @@ class PlannerTests(unittest.TestCase):
         rows, _, _ = self.run_plan(payload([week(1), week(2, 'midterm', True)]), meetings=MEETINGS[:1])
         self.assertEqual([r['academic_week'] for r in rows], [1, 2])
 
-    def test_alternating_pattern_requires_explicit_rotation(self):
-        rows, _, errors = self.run_plan(payload([week(1, 'teaching')]), 'even_onsite')
-        self.assertTrue(errors)
-        self.assertEqual(rows, [])
+    def test_unlabelled_and_exam_weeks_keep_dates_without_inventing_a_mode(self):
+        for rotation in ('teaching', 'midterm', 'final'):
+            rows, _, errors = self.run_plan(payload([week(1, rotation)]), 'even_onsite')
+            self.assertEqual(errors, [])
+            self.assertEqual(len(rows), 2)
+            self.assertEqual({r['rotation'] for r in rows}, {rotation})
+            self.assertTrue(all(r['mode'] is None and r['location'] is None for r in rows))
 
     def test_hybrid_first_mode_generates_weekly_dates_and_keeps_makeup_mode(self):
         source = payload([week(n) for n in range(1, 5)], [
@@ -217,7 +227,7 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual([(r['academic_week'], r['calendar_kind'], r['state']) for r in rows],
                          [(3, 'regular', 'no_class'), (3, 'makeup', 'scheduled')])
         _, warnings, _ = self.run_plan(payload(weeks), meetings=[dict(meetings[0], details='W:(1-16)')])
-        self.assertTrue(any('not teaching weeks' in w for w in warnings))
+        self.assertFalse(any('not teaching weeks' in w for w in warnings))  # W is an allowed range, not a requirement to teach during breaks.
 
     def test_unrecognized_official_week_syntax_requires_review(self):
         for details in ('W:(1-16 odd)', 'W:(8-1)', 'W:()', 'W:1-16', 'W:(1-8) W:(10-16)', 'W:(0-3)', 'W:(1-99)'):
@@ -269,7 +279,8 @@ class CoursePlanningTests(unittest.TestCase):
         self.assertEqual(draft.terms[0].weeks[-1].ends_on, plan.ends_on)
         self.assertEqual(source.model_dump(mode='json'), before)
         self.assertEqual(p.issues(draft), [])
-        self.assertTrue(self.run_errors(draft, 'even_onsite'))
+        self.assertEqual(self.run_errors(draft, 'even_onsite'), [])
+        self.assertTrue(all(r['mode'] is None for r in p.plan(draft, 1, MEETINGS, 'even_onsite', 'fixture')[0]))
 
     def run_errors(self, draft, mode):
         return p.plan(draft, 1, MEETINGS, mode, 'fixture')[2]

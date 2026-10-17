@@ -385,11 +385,9 @@ def plan(payload: Payload, semester: int, meetings, pattern, label, hybrid_start
                     base = hybrid_start
                     elapsed_weeks = (week.starts_on - anchor).days // 7
                 mode = base if elapsed_weeks % 2 == 0 else opposite(base)
-            if mode is None:
-                errors.append(f'Calendar week {week.number} needs its reviewed odd/even rotation. Open the full teaching calendar PDF and review this week before saving. / โปรดตรวจสอบสัปดาห์คี่หรือคู่ของสัปดาห์ที่ {week.number} จากปฏิทินฉบับเต็มก่อนบันทึก' if official else 'Choose how the first hybrid week meets, or use a reviewed school rotation / เลือกรูปแบบการเรียนของสัปดาห์แรก หรือใช้รอบสัปดาห์ที่ตรวจสอบจากปฏิทินแล้ว')
-                continue
+            # Keep dated meetings even in exam/unlabelled weeks; an unknown mode stays unknown.
             if closure is None:
-                rows.append(row('regular', week, slot, day, day, 'scheduled', mode, None))
+                rows.append(row('regular', week, slot, day, day, 'scheduled', mode, week.note))
                 continue
             rows.append(row('regular', week, slot, day, day, 'no_class', mode, closure.note))
             if closure.makeup_on is None:
@@ -403,11 +401,6 @@ def plan(payload: Payload, semester: int, meetings, pattern, label, hybrid_start
                 warnings.append(f'Make-up for {day.isoformat()} is on a weekend ({makeup.isoformat()})')
             if not term.starts_on <= makeup <= term.ends_on:
                 warnings.append(f'Make-up for {day.isoformat()} is outside the term ({makeup.isoformat()})')
-    teaching = {w.number for w in term.weeks if w.teaching}
-    for slot in slot_rows:
-        if slot['weeks'] is not None and not slot['weeks'] <= teaching:
-            missing = ', '.join(str(n) for n in sorted(slot['weeks'] - teaching))
-            warnings.append(f"Official weeks {missing} for {slot['slot_key']} are not teaching weeks in this calendar")
     active = sorted((r for r in rows if r['state'] == 'scheduled'), key=lambda r: (r['starts_at'], r['slot_key']))
     for before, after in zip(active, active[1:]):
         if after['starts_at'] < before['ends_at']:

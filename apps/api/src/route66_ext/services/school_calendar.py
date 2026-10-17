@@ -198,7 +198,7 @@ async def preview(db, cls, schedule, revision, payload, facts, pattern, now, hyb
         planned_keys.add(key)
         head = current.get(key)
         if head is None:
-            action = 'skipped_past' if row['starts_at'] <= now else 'added'
+            action = 'added'  # Backdated calendar entries do not fabricate attendance.
         elif _same(head, row):
             action = 'unchanged'
         elif head.starts_at <= now or head.id in evidence or row['starts_at'] <= now:
@@ -221,9 +221,6 @@ async def preview(db, cls, schedule, revision, payload, facts, pattern, now, hyb
             for other in manual:
                 if row['starts_at'] < other.ends_at and other.starts_at < row['ends_at']:
                     warnings = sorted({*warnings, f"Week {row['academic_week']} meeting overlaps saved session #{other.id} \"{other.title}\""})
-    skipped = sum(a == 'skipped_past' for a, _, _ in actions)
-    if skipped:
-        warnings = sorted({*warnings, f'{skipped} meetings are already in the past and will not be created'})
     protected = sum(a == 'protected' for a, _, _ in actions)
     if protected:
         warnings = sorted({*warnings, f'{protected} past or recorded meetings are kept unchanged'})
@@ -258,7 +255,7 @@ async def preview(db, cls, schedule, revision, payload, facts, pattern, now, hyb
     return {'fingerprint': planner.fingerprint(material), 'sessions': sessions, 'warnings': warnings,
             'errors': errors, 'protected_count': protected,
             'changes': {'added': count('added'), 'replaced': count('replaced'), 'cancelled': count('cancelled'),
-                        'unchanged': count('unchanged'), 'skipped_past': skipped},
+                        'unchanged': count('unchanged'), 'skipped_past': 0},
             'version': version}, actions
 
 

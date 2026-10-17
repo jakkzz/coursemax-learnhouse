@@ -63,7 +63,7 @@ def document(cls, calendar, revision, planning, th=False, course_name='', meetin
                 continue
             start = session['starts_at'].astimezone(planner.ZoneInfo(payload.timezone))
             end = session['ends_at'].astimezone(planner.ZoneInfo(payload.timezone))
-            mode = t('On campus', 'ที่มหาวิทยาลัย') if session['mode'] == 'onsite' else t('Online', 'ออนไลน์')
+            mode = t('On campus', 'ที่มหาวิทยาลัย') if session['mode'] == 'onsite' else t('Online', 'ออนไลน์') if session['mode'] == 'online' else t('Mode not specified by school', 'มหาวิทยาลัยยังไม่ระบุรูปแบบเรียน')
             state = t('No class', 'งดเรียน') if session['state'] == 'no_class' else mode
             makeup = f' · {t("Make-up for", "ชดเชยวันที่")} {day(session["makeup_for"])}' if session['makeup_for'] else ''
             clock = '%H.%M' if th else '%H:%M'

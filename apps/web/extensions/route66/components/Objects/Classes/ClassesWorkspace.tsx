@@ -15,7 +15,6 @@ import ClassSchedule from './calendar/ClassSchedule'
 import palette from './class-colors.module.css'
 import school from './school-classes.module.css'
 import styles from '../Account/subpages/school-identity.module.css'
-import SchoolWorkspaceNav from '../Account/subpages/SchoolWorkspaceNav'
 import TeacherTimetable from './TeacherTimetable'
 import { linkedTeachingClass, nativeCoursePath, type RegistrarClassContext } from './real-teaching/model'
 import RealTeachingWorkspace from './real-teaching/RealTeachingWorkspace'
@@ -32,8 +31,8 @@ const copy={
 }
 const attendanceLabel={en:'Attendance',th:'การเข้าเรียน'}
 const workspaceCopy = {
- en: { intro: 'Your official school classes and LearnHouse learning workspaces.', linked: 'LearnHouse classes', linkedHelp: 'Your saved classes and student rosters.', emptyHelp: 'Your official sections are available in the separate NRRU classes view.' },
- th: { intro: 'ชั้นเรียนจากทะเบียนของคุณและพื้นที่เรียนรู้ใน LearnHouse', linked: 'ชั้นเรียนในระบบ', linkedHelp: 'ชั้นเรียนและรายชื่อนักศึกษาที่บันทึกไว้', emptyHelp: 'ดูชั้นเรียนจากทะเบียนได้ในมุมมองชั้นเรียน NRRU ที่แสดงแยกไว้' },
+ en: { linked: 'LearnHouse classes', linkedHelp: 'Your saved classes and student rosters.', emptyHelp: 'Your official sections are available in the separate NRRU classes view.' },
+ th: { linked: 'ชั้นเรียนในระบบ', linkedHelp: 'ชั้นเรียนและรายชื่อนักศึกษาที่บันทึกไว้', emptyHelp: 'ดูชั้นเรียนจากทะเบียนได้ในมุมมองชั้นเรียน NRRU ที่แสดงแยกไว้' },
 }
 const control='min-h-11 min-w-0 max-w-full rounded-lg border border-neutral-300 bg-white px-3 text-sm text-neutral-900'
 export default function ClassesWorkspace(){
@@ -57,26 +56,28 @@ export default function ClassesWorkspace(){
  function openCalendars(){setSourceView('school');setCalendarVisited(true);setCalendarOpen(true)}
  function closeCalendars(){setCalendarOpen(false);setCalendarRefresh(n=>n+1)}
  function showClassList(){closeCalendars();setWorkspaceClass(null);setStudentClass(null)}
+ function selectView(value:string){
+  if(value==='calendar'){openCalendars();return}
+  setSourceView(value==='learnhouse'?'learnhouse':'school')
+  if(value==='classes')setSelected(null)
+  showClassList()
+ }
  return <div className={interior.scope}>
  <div hidden={calendarOpen}>
  {studentClass&&<section className="space-y-6"><Button variant="ghost" className="min-h-11" onClick={()=>setStudentClass(null)}>{th?'ชั้นเรียนของฉัน':'My classes'}</Button><h1 className="text-2xl font-semibold">{studentClass.course_name} · {studentClass.section}</h1><ClassSchedule classId={studentClass.id} th={th}/></section>}
  {workspaceClass && <RealTeachingWorkspace calendarRefresh={calendarRefresh} onOpenCalendars={openCalendars} context={workspaceClass} linked={workspaceLink} linksKnown={data!==null} th={th} onClose={() => { const id=workspaceClass.returnFocusId; setWorkspaceClass(null); requestAnimationFrame(() => { if(id)document.getElementById(id)?.focus() }) }} onChanged={() => setRefresh(n => n + 1)} onOpenRoster={() => { if(workspaceLink?.manageable===true){setSourceView('learnhouse');setSelected(workspaceLink.id);setWorkspaceClass(null)} }} />}
  </div>
- <section hidden={!calendarOpen&&(Boolean(workspaceClass)||Boolean(studentClass))} className={`${styles.workspace} ${palette.workspace} space-y-6 pb-24`} aria-labelledby="classes-title">
- <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 id="classes-title" className="text-3xl font-semibold tracking-tight">{t.title}</h1><p className="mt-2 max-w-prose text-sm leading-relaxed text-neutral-600">{workspace.intro}</p></div></header>
- <SchoolWorkspaceNav active="classes" th={th} />
- <nav className={`${school.sources} ${interior.navigation}`} aria-label={th ? 'แหล่งชั้นเรียน' : 'Class source'}><button type="button" aria-pressed={sourceView==='school'} onClick={()=>{setSourceView('school');setSelected(null);showClassList()}}>{th ? 'ชั้นเรียน NRRU' : 'NRRU classes'}</button><button type="button" aria-pressed={sourceView==='learnhouse'} onClick={()=>{setSourceView('learnhouse');showClassList()}}>{th ? 'ชั้นเรียน LearnHouse' : 'LearnHouse classes'}</button></nav>
- <div hidden={sourceView!=='school'}>
- <Tabs value={calendarOpen?'calendar':'classes'} onValueChange={value=>value==='calendar'?openCalendars():showClassList()}>
- <TabsList className="h-auto max-w-full flex-wrap justify-start gap-1" aria-label={th?'ชั้นเรียน NRRU':'NRRU classes'}>
- <TabsTrigger value="classes" className="min-h-11 whitespace-normal">{th?'รายชื่อชั้นเรียน NRRU':'NRRU class list'}</TabsTrigger>
- <TabsTrigger value="calendar" className="min-h-11 whitespace-normal">{th?'ปฏิทินการศึกษา':'School calendar'}</TabsTrigger>
+ <section hidden={!calendarOpen&&(Boolean(workspaceClass)||Boolean(studentClass))} className={`${styles.workspace} ${palette.workspace} space-y-4 pb-24`} aria-labelledby="classes-title">
+ <header><h1 id="classes-title" className="text-3xl font-semibold tracking-tight">{t.title}</h1></header>
+ <Tabs value={sourceView==='learnhouse'?'learnhouse':calendarOpen?'calendar':'classes'} onValueChange={selectView}>
+ <TabsList className={school.workspaceTabs} aria-label={th?'พื้นที่ชั้นเรียน':'Class workspace'}>
+ <TabsTrigger value="classes">{th?'ชั้นเรียน NRRU':'NRRU classes'}</TabsTrigger>
+ <TabsTrigger value="learnhouse">{th?'ชั้นเรียน LearnHouse':'LearnHouse classes'}</TabsTrigger>
+ <TabsTrigger value="calendar">{th?'ปฏิทินการศึกษา':'School calendar'}</TabsTrigger>
  </TabsList>
- <TabsContent value="calendar" forceMount hidden={!calendarOpen} className="mt-6">{calendarVisited&&<CalendarLibrary th={th} embedded onClose={closeCalendars} />}</TabsContent>
- <TabsContent value="classes" forceMount hidden={calendarOpen} className="mt-6">{mounted&&<TeacherTimetable th={th} onStaffStatus={setIsSchoolStaff} onOpenClass={setWorkspaceClass} linkedClasses={nativeClasses} linksKnown={data!==null} />}{data?.classes.some(c=>c.course_id===null||!c.manageable)&&<section className="mt-6 space-y-4" aria-label={th?'ชั้นเรียนที่บันทึกไว้':'Saved school classes'}><h2 className="text-xl font-semibold">{th?'วันเรียนและการเข้าเรียน':'Sessions and attendance'}</h2>{data.classes.filter(c=>c.course_id===null||!c.manageable).map(c=><article key={c.id} className="flex flex-wrap items-center justify-between gap-4 border-t border-neutral-300 py-4"><div><h3 className="font-semibold">{c.course_name}</h3><p className="text-sm text-neutral-600">{c.semester}/{c.academic_year} · {c.section}</p></div><Button variant="outline" className="min-h-11" onClick={()=>setStudentClass(c)}>{th?'เปิดตารางเรียน':'Open schedule'}</Button></article>)}</section>}</TabsContent>
- </Tabs>
- </div>
- <div hidden={sourceView!=='learnhouse'} className="space-y-6">
+ <TabsContent value="calendar" forceMount hidden={sourceView!=='school'||!calendarOpen} className="mt-6">{calendarVisited&&<CalendarLibrary th={th} embedded onClose={closeCalendars} />}</TabsContent>
+ <TabsContent value="classes" forceMount hidden={sourceView!=='school'||calendarOpen} className="mt-6">{mounted&&<TeacherTimetable th={th} onStaffStatus={setIsSchoolStaff} onOpenClass={setWorkspaceClass} linkedClasses={nativeClasses} linksKnown={data!==null} />}{data?.classes.some(c=>c.course_id===null||!c.manageable)&&<section className="mt-6 space-y-4" aria-label={th?'ชั้นเรียนที่บันทึกไว้':'Saved school classes'}><h2 className="text-xl font-semibold">{th?'วันเรียนและการเข้าเรียน':'Sessions and attendance'}</h2>{data.classes.filter(c=>c.course_id===null||!c.manageable).map(c=><article key={c.id} className="flex flex-wrap items-center justify-between gap-4 border-t border-neutral-300 py-4"><div><h3 className="font-semibold">{c.course_name}</h3><p className="text-sm text-neutral-600">{c.semester}/{c.academic_year} · {c.section}</p></div><Button variant="outline" className="min-h-11" onClick={()=>setStudentClass(c)}>{th?'เปิดตารางเรียน':'Open schedule'}</Button></article>)}</section>}</TabsContent>
+ <TabsContent value="learnhouse" forceMount hidden={sourceView!=='learnhouse'} className="mt-6 space-y-6">
  {!current&&catalog&&<ConnectionsInbox th={th} courses={catalog.courses} refresh={refresh} onChanged={()=>setRefresh(n=>n+1)} onOpenClass={id=>{setSelected(id);setWorkspaceClass(null);window.scrollTo(0,0)}}/>}
  {!current&&data&&(isSchoolStaff||data.can_create)&&<div className="space-y-1"><h2 className="text-xl font-semibold tracking-tight">{workspace.linked}</h2><p className="text-sm leading-relaxed text-neutral-600">{workspace.linkedHelp}</p></div>}
  {error&&<div role="alert" data-state="error" className={`${palette.status} space-y-3`}><p className="text-sm text-red-800">{error}</p><Button variant="outline" className="min-h-11" onClick={()=>setRefresh(n=>n+1)} disabled={busy}>{t.retry}</Button></div>}
@@ -106,6 +107,7 @@ export default function ClassesWorkspace(){
   </div>}
  <details className="border-t border-neutral-200 pt-4"><summary className="min-h-11 cursor-pointer text-sm font-medium">{t.evidence}</summary><ol className="mt-3 space-y-3 text-xs text-neutral-600">{roster.events.map(e=><li key={e.id}><p>{e.created_at}</p><p>{e.kind}</p><pre className="mt-1 whitespace-pre-wrap break-words">{JSON.stringify(e.details,null,2)}</pre></li>)}</ol></details></>}
  </>}
- </div>
+ </TabsContent>
+ </Tabs>
  </section></div>
 }

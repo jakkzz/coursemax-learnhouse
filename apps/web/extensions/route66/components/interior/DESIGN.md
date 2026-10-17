@@ -15,6 +15,8 @@ Ink `#131313`, secondary `#454545`, muted `#6e6e6e`; focus `#4568ff` and selecti
 
 Native Button, Input, Radix tabs and dialogs remain the behavioral authorities. The material layer adds no request state, controller, timer or dependency. Existing NRRU panels remain mounted so navigation preserves search and unsaved drafts. Pressed controls move 1px; reduced-motion removes travel and transitions. Forced-color mode retains outlines, selection cues and control boundaries. Theme text selection, caret and scrollbars inside the scope only.
 
-Add `scope` to an active custom root, `navigation` to its existing plain-button/link navigation, and `panel`/`well` only where those materials clarify the task. Never apply it to an ancestor of native account navigation, the whole document, retired preview fixtures or organization administration. Do not override `[hidden]`, native disabled state, fieldset behavior or academic confirmation gates.
+The classes landing page has one compact native tab rail for NRRU classes, LearnHouse classes and School calendar. Never stack account links, source selection and a second class/calendar rail. Account settings remain in the native sidebar/mobile navigation. Keep desktop labels on one line; mobile labels may wrap inside their touch targets, not onto additional control rows.
+
+Add `scope` to an active custom root, `navigation` only where a routing layer genuinely needs it, and `panel`/`well` only where those materials clarify the task. Never apply it to an ancestor of native account navigation, the whole document, retired preview fixtures or organization administration. Do not override `[hidden]`, native disabled state, fieldset behavior or academic confirmation gates.
 
 No shipping raster assets were added. Isolated fixture screenshots are validation evidence, not institutional or provider acceptance.

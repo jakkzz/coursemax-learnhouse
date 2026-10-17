@@ -21,5 +21,6 @@ test('Authenticated class route supplies org context; native delegates stay unto
  assert.doesNotMatch(page,/GeneralWrapperStyled/)
  const workspace=read('../components/Objects/Classes/ClassesWorkspace.tsx')
  assert.doesNotMatch(workspace,/space-y-6 px-4 pb-24 pt-8 md:px-8/)
- assert.match(workspace,/SchoolWorkspaceNav active="classes"/)
+ assert.doesNotMatch(workspace,/SchoolWorkspaceNav/)
+ assert.match(workspace, /Class workspace/)
 })

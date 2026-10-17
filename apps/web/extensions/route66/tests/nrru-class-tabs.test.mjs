@@ -3,14 +3,15 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 const source = file => readFileSync(new URL('../' + file, import.meta.url), 'utf8')
 
-test('NRRU classes owns separate class-list and calendar panels with persistent navigation', () => {
+test('one workspace rail owns separate mounted school, LearnHouse and calendar panels', () => {
  const workspace = source('components/Objects/Classes/ClassesWorkspace.tsx')
- assert.match(workspace, /NRRU class list/)
- assert.match(workspace, /School calendar/)
- assert.match(workspace, /รายชื่อชั้นเรียน NRRU/)
- assert.match(workspace, /<TabsList[^>]+aria-label=\{th\?'ชั้นเรียน NRRU':'NRRU classes'\}/)
- assert.match(workspace, /<TabsContent value="calendar" forceMount hidden=\{!calendarOpen\}/)
- assert.match(workspace, /<TabsContent value="classes" forceMount hidden=\{calendarOpen\}/)
+ assert.equal((workspace.match(/<TabsList /g) ?? []).length, 1)
+ assert.equal((workspace.match(/<TabsTrigger /g) ?? []).length, 3)
+ assert.doesNotMatch(workspace, /SchoolWorkspaceNav|school\.sources|NRRU class list|workspace\.intro/)
+ assert.match(workspace, /<TabsList[^>]+aria-label=\{th\?'พื้นที่ชั้นเรียน':'Class workspace'\}/)
+ assert.match(workspace, /<TabsContent value="calendar" forceMount hidden=\{sourceView!=='school'\|\|!calendarOpen\}/)
+ assert.match(workspace, /<TabsContent value="classes" forceMount hidden=\{sourceView!=='school'\|\|calendarOpen\}/)
+ assert.match(workspace, /<TabsContent value="learnhouse" forceMount hidden=\{sourceView!=='learnhouse'\}/)
  assert.match(workspace, /calendarVisited&&<CalendarLibrary th=\{th\} embedded/)
  assert.match(workspace, /onOpenCalendars=\{openCalendars\}/)
  assert.match(workspace, /function openCalendars\(\)\{setSourceView\('school'\);setCalendarVisited\(true\);setCalendarOpen\(true\)\}/)

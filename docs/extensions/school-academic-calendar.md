@@ -2,8 +2,11 @@
 
 ## Teacher-private calendars and proposal evidence
 
-Implemented and dry-run on isolated PostgreSQL; staging rollout pending.
-Migration `c4fa25e2b813` follows `b3e9c4d1a702` in the existing composed graph.
+Deployed to LearnHouse staging, 2026-10-17, source `256bc802`, image
+`coursemax-learnhouse:private-calendars-20261017`. Migration `c4fa25e2b813`
+follows `b3e9c4d1a702` in the existing composed graph. Synthetic dry runs and
+an exact-candidate protected restore rehearsal passed before live application.
+Existing rows/source bytes and class pins were preserved; no native Alembic stamp.
 
 - Existing calendars retain their IDs and become organization-scoped. Shared
   year/program uniqueness remains; each private upload gets its own calendar.
@@ -42,6 +45,9 @@ proposal attachment/review and explicit school-copy publication complete without
 schedule/course-approval writes, page errors or horizontal overflow. Synthetic
 fixtures are not institutional/provider acceptance. Existing Interior materials and
 native controls are reused; no dependency or replacement interaction was needed.
+Two live fresh-native-login read-only navigation/calendar tasks, private capability/
+mutation denial probes, native guards and health passed. No real calendar was parsed,
+accepted, shared, attached or applied by this rollout.
 
 ## Earlier delivery history
 

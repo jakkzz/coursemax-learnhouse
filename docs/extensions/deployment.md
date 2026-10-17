@@ -1,6 +1,42 @@
 # Internal extension deployment records
 
-## Latest: remove stacked class navigation — deployed 2026-10-17
+## Latest: teacher-private calendars and proposal attachments — deployed 2026-10-17
+
+Source `256bc80293fd47648b17dc5313d5b37f34207f42`, healthy image
+`coursemax-learnhouse:private-calendars-20261017`, ID
+`sha256:2796b829c59de838b877634ec9ce0d70dc2c82b7f2d3cabe6fde8b67aed3f8d2`.
+Teacher-private PDF/URL intake, frozen proposal evidence and explicit administrator
+school-copy publication reuse the current calendar/connection authorities and native
+UI. Existing school calendars, sources, class pins and academic/identity rows remain.
+Migration `c4fa25e2b813` applied once through the named bootstrap runner, no native
+Alembic stamp, after fresh protected backup and exact-candidate isolated restore.
+
+17 calendar/PG tests, four strengthened overlapping private cases, 54 native-access/
+policy checks, 80 web checks, composed migration graph, bundle/TypeScript and eight
+compiled native-shell EN1060/TH390 teacher/admin/student tasks pass. Two live fresh-
+login read-only calendar tasks, capability/private-source denial checks and native
+health/session guards pass. No institutional parsing/publication/application by the
+agent. 1,028 API files and 5,466 web entries/permissions/Config/in-flight assets verified;
+newer unrelated offline-mapping source remains excluded from the API overlay.
+
+Recovery `coursemax-learnhouse:private-calendars-recovery-20261017`, ID
+`sha256:03ed2f2b87f2d80c74b34d0baea19e752e12b76a9f82af873544cda771610ce7`,
+keeps this API and the exact preceding web runtime (7,477 entries). Both images
+read/isolate new private evidence on the restored database. **The preceding backend
+is unsafe for private ownership; never use it or restore academic data for rollback.**
+Both images have 127 layers, using the verified shallower packaging ancestor/full overlay.
+
+Only the app was replaced and gateway reloaded. Environment/mounts, protected rows,
+source bytes and LearnHouse DB/Redis/gateway IDs preserved; schema DDL delta exactly
+matches rehearsal. Full-schema comparison initially flagged pre-existing PostgreSQL
+constraint deparser differences introduced by restore, not new changes; exact before/
+after migration deltas resolve that without ignoring changed DDL. A concurrent external
+Vibewording redeployment changed three unrelated container IDs after initial verification;
+recorded separately, no command here targeted those services. Private evidence
+`private-calendars-20261017/`, `private-calendars-web-confirmed-20261017/`, and
+`releases/private-calendars-20261017/`.
+
+## Previous: remove stacked class navigation — deployed 2026-10-17
 
 Frontend `5c8007aead666301f8ad591bdbd181a30587e5aa`, healthy image
 `coursemax-learnhouse:classes-navigation-20261017`, ID

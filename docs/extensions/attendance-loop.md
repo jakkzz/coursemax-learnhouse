@@ -14,6 +14,13 @@ The deployment capacity check failed: 2.31 GiB free, subsequently below 1 GiB, t
 No build/restart/prune was attempted in this task. Finish calendar bundle/types, focused desktop/mobile flows and the routine
 app-only deployment once adequate headroom exists; do not package failed artifacts.
 
+## Calendar deployment prerequisite completed — 2026-10-17
+
+Pending calendar UI `9fc87afb` is now deployed and verified in
+`calendar-ui-owner-20261017` / `e3914821…`, with the current API unchanged. See the
+latest deployment record. The capacity-blocked dry-run checkpoint below is historical;
+attendance arrival-loop application implementation is now next, not yet deployed.
+
 ## Dry run — implementation request, 2026-10-17
 
 The follow-up request is deploy calendar first, then implement this plan. A fresh

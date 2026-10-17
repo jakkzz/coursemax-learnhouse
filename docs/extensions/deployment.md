@@ -1,6 +1,44 @@
 # Internal extension deployment records
 
-## Latest: include past calendar dates and non-blocking exam modes — API deployed 2026-10-17
+## Latest: pending calendar UI deployed — 2026-10-17
+
+Calendar UI `9fc87afb` is now live at `https://learn.route66.click` in
+`coursemax-learnhouse:calendar-ui-owner-20261017`, image
+`sha256:e3914821528ae8cfd91a5b1d0a461968401b1b3760d27c350f0c8a01a2ac1077`.
+Build/source-menu input is `4f16ffd5`; all 1,030 API files remain byte-identical to
+`past-calendar-20261017` (`746c8aa2`). Date-only/hybrid calendars expose course dates
+without requiring invented rotations. Review includes past dates, compact totals,
+expandable localized notes and explicit unknown school modes.
+
+Full native Turbopack bundle and separate generated-route TypeScript check passed,
+as did 83 source checks, five compiled native-shell/editor journeys and four focused
+abridged/past/unknown-mode component journeys at desktop/mobile EN/TH. Two fresh-login
+live browser flows and live auth/privacy checks passed. Exact current UI and prior
+in-flight chunk bytes were fetched successfully from the live origin. All 5,594
+required web entries/node permissions verified. No institutional schedule was applied.
+
+Owner authorized lifting the fixed resource threshold for this release only; global
+preflight remains unchanged. Use disk-backed build scratch, no swap, one CPU and
+bounded memory. Earlier capped webpack attempts failed without touching live; native
+Turbopack with a 1,536 MiB heap and a separate 2,048 MiB type-check heap passed under a
+3 GiB container cap. Capacity recovered and standard preflight passed for final
+bundle/types, packaging, backup and activation. No failed artifact was deployed.
+
+The pruned packaging-only 126-layer prefix was restored from its retained archive and
+verified as exact `35704acf…`; it is not a runnable recovery image. The identical
+991-file Next 16.4 package retains the deployed `.build-deps/next` link layout. Final
+127-layer image preserves native Config and old hashed assets. Fresh backup archive
+checked; app-only recreate/gateway reload. Schema, protected identity/academic/native
+content/calendar/source state, environment, mounts and peer service IDs match before.
+No migration, data restore, old-artifact cleanup or unrelated restart. Compatible
+code-only recovery is the retained actual parent `past-calendar-20261017` / `74d6f5e6…`;
+never restore old academic data. Full restore/restart rehearsal not repeated for this
+web-only release. Attendance-loop implementation remains a separate next task.
+
+Evidence `calendar-ui-owner-override-20261017/`, `calendar-ui-owner-web-20261017/` and
+`releases/calendar-ui-owner-20261017/`; current release pointer updated.
+
+## Previous: include past calendar dates and non-blocking exam modes — API deployed 2026-10-17
 
 API source `746c8aa2`, healthy image `coursemax-learnhouse:past-calendar-20261017`, ID
 `sha256:74d6f5e627e7bd7f91cf3509f47a8f5d46c2129ca11b9f6dab146bfb65434900`.

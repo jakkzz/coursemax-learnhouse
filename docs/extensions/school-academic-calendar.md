@@ -1,6 +1,23 @@
 # School academic calendars
 
-## Past dates and exam weeks — API fix deployed 2026-10-17
+## Dated review UI — deployed 2026-10-17
+
+UI `9fc87afb` is now deployed in `calendar-ui-owner-20261017` / `e3914821…`,
+with the existing `746c8aa2` API unchanged. Abridged/date-only calendars now expose
+course-date controls even for school hybrid policy; missing rotations do not block
+review/save or invent a delivery mode. Review totals include past dates, notes are
+expandable/localized, and unlabelled meetings say the school has not specified a mode.
+School policy remains read-only unless the teacher explicitly chooses a course-only
+exception; there is still no first-week selector.
+
+Full production bundle/generated-route types, 83 source checks, five compiled
+native-shell teacher/student/editor journeys, four focused component journeys and
+two live desktop/mobile login/calendar flows passed. The focused cases save/reload
+past dates and unknown modes without inventing attendance. Real calendars, syllabus
+content and attendance evidence were not changed. See the latest deployment record
+for image, backup, preservation, compatible recovery and bounded-build details.
+
+## Previous: past dates and exam weeks — API fix deployed 2026-10-17
 
 Source `746c8aa2` / image `past-calendar-20261017` creates missing dated entries
 regardless of whether their dates have passed. This creates calendar sessions, not

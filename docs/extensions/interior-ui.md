@@ -15,6 +15,12 @@ rail for NRRU classes, LearnHouse classes and School calendar, with mounted pane
 the existing selection/refresh behavior retained. Duplicate account links and generic
 intro copy are removed; identity access remains in the native sidebar/mobile navigation.
 
+Correction deployed as `5c8007ae` / `coursemax-learnhouse:classes-navigation-20261017`.
+78 source checks, confirmed production bundle/types, four teacher/student journeys in
+the actual compiled Next account shell at EN1060/TH390 (including empty term), and two
+live read-only login/navigation journeys pass. Native API and protected evidence remain
+unchanged; no institution/provider acceptance is implied.
+
 ## Direction contract
 
 **THESIS** One tactile, task-first custom interface, preserving the working school/class/calendar organization.

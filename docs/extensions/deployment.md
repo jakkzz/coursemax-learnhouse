@@ -1,6 +1,30 @@
 # Internal extension deployment records
 
-## Latest: Interior custom UI and retained NRRU subtabs — deployed 2026-10-17
+## Latest: remove stacked class navigation — deployed 2026-10-17
+
+Frontend `5c8007aead666301f8ad591bdbd181a30587e5aa`, healthy image
+`coursemax-learnhouse:classes-navigation-20261017`, ID
+`sha256:ce0553080411ca5da9a9400a179ca33bbbe2f1418125d654878d2bbb0663f3c6`.
+Replaces three competing navigation rails with one native three-option rail. Removes
+duplicate account links/intro; preserves mounted drafts/search, calendar lazy loading,
+retry and Schedule handoff. Desktop labels stay on one line; mobile controls remain
+in one row. Native sidebar/mobile account navigation and term facts stay unchanged.
+
+78 source checks and confirmed production build/generated-route TypeScript pass.
+Four teacher/student EN1060/TH390 journeys passed against the actual compiled Next
+account shell with synthetic APIs, including the empty-semester state from the owner
+screenshot. This closes the earlier isolated-control composition gap; two live fresh-
+login read-only navigation/calendar smokes also pass. Not institutional/provider acceptance.
+
+Fresh backup, app-only replacement/gateway reload; no migration. All 1,027 actual-
+parent API files remain byte-identical; 5,443 web entries/Config/permissions/assets
+verified. Protected schema/data, environment, mounts and peer IDs preserved, apart
+from permitted role timestamps/source-menu URL. Exact previous Interior image retained
+for compatible code rollback; no academic data restore. Evidence
+`classes-navigation-20261017/`, `classes-navigation-web-confirmed-20261017/` and
+`releases/classes-navigation-20261017/` in private launch state.
+
+## Previous: Interior custom UI and retained NRRU subtabs — deployed 2026-10-17
 
 Frontend source `7c483a0171ab9210a4ed4d5f909dab18485a0630`, healthy image
 `coursemax-learnhouse:interior-ui-20261017`, ID

@@ -51,6 +51,40 @@ class PlannerTests(unittest.TestCase):
         self.assertTrue(errors)
         self.assertEqual(rows, [])
 
+    def test_hybrid_first_mode_generates_weekly_dates_and_keeps_makeup_mode(self):
+        source = payload([week(n) for n in range(1, 5)], [
+            {'affected_on': MON.isoformat(), 'makeup_on': (MON + timedelta(weeks=5, days=5)).isoformat(), 'note': 'closed'}])
+        before = source.model_dump(mode='json')
+        for start in ('onsite', 'online'):
+            rows, _, errors = p.plan(source, 1, MEETINGS, 'even_onsite', 'fixture', start)
+            self.assertEqual(errors, [])
+            other = 'online' if start == 'onsite' else 'onsite'
+            self.assertEqual({(r['academic_week'], r['mode']) for r in rows},
+                             {(1, start), (2, other), (3, start), (4, other)})
+            makeup = next(r for r in rows if r['calendar_kind'] == 'makeup')
+            self.assertEqual((makeup['academic_week'], makeup['makeup_for'], makeup['mode']), (1, MON, start))
+            self.assertEqual({r['rotation'] for r in rows}, {'teaching'})  # no invented school rotation
+        self.assertEqual(source.model_dump(mode='json'), before)
+        self.assertTrue(p.plan(source, 1, MEETINGS, 'even_onsite', 'fixture', 'other')[2])
+
+    def test_hybrid_respects_reviewed_school_rotation_instead_of_week_number_parity(self):
+        source = payload([week(7, 'odd'), week(8, 'midterm', False), week(9, 'even')])
+        rows, _, errors = p.plan(source, 1, MEETINGS[:1], 'even_onsite', 'fixture', 'online')
+        self.assertEqual(errors, [])
+        self.assertEqual([(r['academic_week'], r['mode']) for r in rows], [(7, 'online'), (9, 'onsite')])
+        inverse, _, _ = p.plan(source, 1, MEETINGS[:1], 'even_onsite', 'fixture', 'onsite')
+        self.assertEqual([(r['academic_week'], r['mode']) for r in inverse], [(7, 'onsite'), (9, 'online')])
+        self.assertNotEqual(p.fingerprint(rows), p.fingerprint(inverse))
+
+    def test_hybrid_does_not_restart_after_a_filtered_or_cancelled_week(self):
+        source = payload([week(n) for n in range(1, 5)],
+                         [{'affected_on': (MON + timedelta(weeks=1)).isoformat(), 'note': 'holiday'}])
+        meetings = [dict(MEETINGS[0], details='W:(2-4)')]
+        rows, _, errors = p.plan(source, 1, meetings, 'even_onsite', 'fixture', 'online')
+        self.assertEqual(errors, [])
+        self.assertEqual([(r['academic_week'], r['mode'], r['state']) for r in rows],
+                         [(2, 'onsite', 'no_class'), (3, 'online', 'scheduled'), (4, 'onsite', 'scheduled')])
+
     def test_closure_without_and_with_makeup_keeps_original_week(self):
         saturday = MON + timedelta(weeks=5, days=5)  # outside week 1, a weekend
         data = payload([week(1), week(2)], [

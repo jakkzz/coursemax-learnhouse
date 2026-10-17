@@ -1,5 +1,62 @@
 # School academic calendars
 
+## Assigned-teacher syllabi and automatic hybrid weeks
+
+The reported resource-owner CREATE error came from native **syllabus preparation**,
+not attendance-schedule saving. An active, explicitly assigned course teacher who
+remains a native organization member can now prepare and edit that course's syllabus
+without becoming an organization admin or general native course author. One exact
+six-line native RBAC delegate runs only after the native decision and MFA checks.
+Its extension-owned policy permits READ/CREATE/UPDATE at the class syllabus factory
+and READ/UPDATE at the particular native activity/editor/version routes. Existing
+native author/admin grants remain unchanged; unrelated activities/courses, general
+course editing and deletion remain denied. Immutable `class_syllabus_prepared`
+evidence binds the activity and course; mutable activity metadata cannot grant access
+or make reuse return an unbound draft. Assignment or membership revocation is checked
+fresh. No native roles, resource-author rows, enrollments or progress are added.
+
+Hybrid is available for date-only course plans **and** reviewed school-week calendars.
+The teacher chooses on-campus-first or online-first once. Course dates alternate in
+seven-day blocks; reviewed school rotation takes precedence where available, including
+an exam pause whose week 9 resumes as even. School rotation labels and source JSON
+never change. Missing/filtered/cancelled meetings do not restart the cycle; make-ups
+retain their original week's mode. Dated previews and existing past/attendance
+protections remain authoritative. Syllabus drafts can be prepared before this mode
+choice or attendance saving and existing authored content is never rewritten.
+
+The compatible wire pattern remains `even_onsite`; optional
+`hybrid_start: 'onsite' | 'online'` supplies the reviewed first mode. Missing values
+retain the previous explicitly reviewed rotation behavior. The choice participates
+in preview fingerprints and idempotency, is stored in the existing append-only
+schedule-applied event, and reloads through the schedule DTO. No migration, school
+publication change, implicit holiday or universal exam closure is introduced.
+
+Validation covers 19 calendar/PostgreSQL cases (plus one opt-in real-PDF skip),
+two strengthened focused cases, 54 native-access/policy regressions, 20 pure planner
+cases plus one static scope case, 81 web checks, 25 tooling/four overlay checks and
+the production bundle/generated-route TypeScript. Five compiled native-shell journeys
+cover non-admin teacher EN/TH desktop and Thai mobile, independent native draft
+editing/save/reload, both first modes, date review/save/reload/cancel and read-only
+student online/on-campus make-ups. No page errors or horizontal overflow. These are
+synthetic checks, not institutional/provider or owner-browser acceptance. Native
+rich-text editing remains desktop-only. Finish review is inline, not independent.
+
+### Direction contract
+
+**THESIS** Choose the first hybrid mode once; review actual dates rather than calculate
+odd/even week numbers or acquire an admin role to write a syllabus.
+**OWN-WORLD** Preserve native LearnHouse and the pinned Interior material layer;
+existing select/button behavior, typography and restrained neutral surfaces.
+**STORY** Select the accepted calendar/program, choose hybrid and its first mode,
+review dated sessions and save; prepare the syllabus independently in the native editor.
+**FIRST VIEWPORT** Retain the existing class task rail and calendar/mode fields;
+reveal one first-mode select for hybrid, not a week-by-week configuration wall.
+**FORM** Ordinary Operate extension of the incumbent surface, not a new visual world;
+no concept roll, dependency, font, animation or shipping raster.
+**FINISH** unreviewed and undocumented is unfinished; this build ends with the finish
+review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
+Existing DESIGN.md/Interior rules remain unchanged.
+
 ## Course planning from a published semester calendar
 
 Deployed to LearnHouse staging, 2026-10-17, source `df75ce08`, image
@@ -11,7 +68,8 @@ teaching dates and adds course-specific no-class/make-up exceptions before previ
 The proposed end precedes that program's first final-exam/closing date; it is not a
 new official calendar fact. Missing boundaries stay empty. Teacher-confirmed seven-day
 course weeks are distinct from institution-authored weeks. No inferred odd/even
-rotation; alternating mode still requires explicit reviewed rotation.
+rotation; at that release alternating mode still required explicit reviewed rotation
+(superseded by the course-specific hybrid choice above).
 
 Preview/apply reuse the existing attendance planner, fingerprint/version check and
 past/evidence protections. Source bytes, school payload/publication and other classes
@@ -502,7 +560,8 @@ Payload: `timezone:'Asia/Bangkok'`, up to three terms, explicit numbered week ra
 rotation and `teaching` boolean, dated closures with nullable make-ups, optional page/
 uncertainty and `unresolved` questions. Unknown keys are rejected. Teaching ranges
 longer than seven days must be split. Exam labels alone never suppress meetings.
-Patterns: `onsite`, `online`, `even_onsite`; no inferred parity. Recognized official
+Patterns: `onsite`, `online`, `even_onsite`, with optional course-specific `hybrid_start`
+as described above; no inferred school parity. Recognized official
 `W:(start-end)` restrictions apply to original academic weeks, including make-ups;
 unsupported syntax is not silently treated as unrestricted.
 

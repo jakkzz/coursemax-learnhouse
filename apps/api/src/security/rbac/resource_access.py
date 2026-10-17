@@ -1059,6 +1059,12 @@ async def check_resource_access(
     checker = _get_request_checker(request, db_session, current_user)
     decision = await checker.check_access(resource_uuid, action, context, require_ownership)
 
+    if not decision.allowed:
+        from src.route66_ext.adapters.native_course_syllabus import teacher_syllabus_access
+        if await teacher_syllabus_access(request, db_session, current_user, resource_uuid, action):
+            decision.allowed = True
+            decision.reason = "Assigned teacher access to this course syllabus"
+
     if not decision.allowed and raise_on_deny:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

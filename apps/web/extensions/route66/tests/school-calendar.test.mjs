@@ -109,6 +109,18 @@ test('academic dates are real calendar content without inventing teaching weeks'
  assert.match(source('calendar/CourseDatesForm.tsx'), /do not alter the school calendar/)
  assert.match(source('calendar/CourseDatesForm.tsx'), /Course holidays and make-ups/)
 })
+test('hybrid scheduling asks for a first mode, not odd/even arithmetic, without coupling syllabus creation', () => {
+ const s = source('calendar/ClassSchedule.tsx')
+ assert.match(s, /Hybrid · alternate campus and online/)
+ assert.match(s, /First hybrid week/)
+ assert.match(s, /hybrid_start: pattern === 'even_onsite'/)
+ assert.match(s, /setHybridStart\(schedule.hybrid_start/)
+ assert.doesNotMatch(s, /even_onsite" disabled|setPattern\(''\)\s*\n/)
+ assert.doesNotMatch(s, /Even: campus|สัปดาห์คู่เรียนที่มหาวิทยาลัย/)
+ assert.match(s, /Boolean\(incompleteDates\) \|\| incompleteHybrid/)
+ const syllabus = s.slice(s.indexOf("aria-label={t('Course syllabus'"))
+ assert.doesNotMatch(syllabus, /incompleteHybrid/)
+})
 test('PDF URL errors offer localized retry or file upload without claiming a source was saved', async () => {
  const original = globalThis.fetch
  try {

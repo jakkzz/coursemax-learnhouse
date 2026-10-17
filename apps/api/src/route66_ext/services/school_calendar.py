@@ -145,19 +145,24 @@ async def heads(db, class_id):
     return result, evidence
 
 
-async def saved_planning(db, schedule):
+async def saved_configuration(db, schedule):
     if schedule is None:
-        return None
+        return {}
     event = (await db.exec(select(AcademicClassEvent).where(
         AcademicClassEvent.class_id == schedule.class_id,
         AcademicClassEvent.kind == 'class_schedule_applied',
         AcademicClassEvent.details['schedule_version'].astext == str(schedule.version)
     ).order_by(AcademicClassEvent.id.desc()))).first()
-    return event.details.get('planning') if event else None
+    return event.details if event else {}
+
+
+async def saved_planning(db, schedule):
+    return (await saved_configuration(db, schedule)).get('planning')
 
 
 async def schedule_dto(db, cls, schedule, manageable):
     rows, replaced = await class_sessions(db, cls.id) if cls else ([], set())
+    configuration = await saved_configuration(db, schedule)
     revision = await db.get(SchoolCalendarRevision, schedule.revision_id) if schedule else None
     calendar = await db.get(SchoolCalendar, revision.calendar_id) if revision else None
     newer = None
@@ -168,7 +173,8 @@ async def schedule_dto(db, cls, schedule, manageable):
     return {'class_id': cls.id if cls else None, 'version': schedule.version if schedule else 0,
             'manageable': manageable, 'revision_id': revision.id if revision else None,
             'calendar_name': calendar.name if calendar else None, 'pattern': schedule.pattern if schedule else '',
-            'newer_revision_id': newer, 'planning': await saved_planning(db, schedule),
+            'newer_revision_id': newer, 'planning': configuration.get('planning'),
+            'hybrid_start': configuration.get('hybrid_start'),
             'syllabus_available': bool(cls and cls.course_id),
             'sessions': [session_dto(r, r.id in replaced) for r in rows]}
 
@@ -177,10 +183,10 @@ def _same(head, row):
     return all(getattr(head, k) == row[k] for k in _COMPARED)
 
 
-async def preview(db, cls, schedule, revision, payload, facts, pattern, now):
+async def preview(db, cls, schedule, revision, payload, facts, pattern, now, hybrid_start=None):
     """Diff of the reviewed plan against saved sessions; never writes."""
     label = f"{facts['course_code']} {facts['section']}"
-    rows, warnings, errors = planner.plan(payload, facts['semester'], facts['meetings'], pattern, label)
+    rows, warnings, errors = planner.plan(payload, facts['semester'], facts['meetings'], pattern, label, hybrid_start)
     current, evidence = await heads(db, cls.id) if cls else ({}, set())
     planned_keys, actions = set(), []
     for row in rows:
@@ -223,6 +229,8 @@ async def preview(db, cls, schedule, revision, payload, facts, pattern, now):
                 'calendar_payload': revision.payload,
                 'source_id': revision.source_id, 'pattern': pattern, 'facts': facts,
                 'actions': [(a, r, h and (h.id, h.version, h.state, h.id in evidence)) for a, r, h in actions]}
+    if hybrid_start is not None:
+        material['hybrid_start'] = hybrid_start
     sessions = []
     for action, row, head in actions:
         # Show the actual post-apply result: kept heads stay as saved; cancelled become no_class.

@@ -20,6 +20,16 @@
     ".impeccable/"
   ],
   "exceptions": {
+    "apps/api/src/security/rbac/resource_access.py": {
+      "reason": "Exact six-line denied-decision delegate for approved course teachers to create/read/edit only their native syllabus activity, bound by immutable class preparation evidence; native MFA, membership, roles and unrelated resource decisions remain native.",
+      "approval_reference": "Owner request to fix course-owning teachers' schedule creation permission failure, traced to native syllabus creation; no organization role or general native authorship is granted.",
+      "tests": [
+        "PostgreSQL assigned non-admin teacher creation/editor/save, immutable binding, revocation, MFA, other-course/activity and delete denials",
+        "native access regressions and compiled full-shell EN/TH teacher/student tasks"
+      ],
+      "replacement_plan": "Keep this single explicit delegate until upstream offers a native activity-scoped teacher capability hook; do not widen to course-wide edit access.",
+      "sha256": "4563cb49110ad07c3782592b9827e460f8ed177b7d18b9bf802a677237cd68b5"
+    },
     "apps/api/src/db/academic_classes.py": {
       "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
       "approval_reference": "Owner request: migrate to isolated pattern, rebuild/redeploy, commit/push and rehearse upstream; resumed after approved cleanup.",

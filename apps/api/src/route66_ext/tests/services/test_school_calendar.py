@@ -1014,13 +1014,18 @@ END; $$"""))
         planning = {'program': 'A', 'starts_on': str(first), 'ends_on': str(first + timedelta(days=20)),
                     'closures': [{'affected_on': str(first + timedelta(days=3)), 'makeup_on': str(first + timedelta(days=5)), 'note': 'Course holiday'}]}
         planning = api.planner.CoursePlanning.model_validate(planning).model_dump(mode='json')
-        body = {'section': self.section(), 'revision_id': published['id'], 'pattern': 'onsite', 'planning': planning}
+        body = {'section': self.section(), 'revision_id': published['id'], 'pattern': 'even_onsite', 'hybrid_start': 'online', 'planning': planning}
         response = await self.client.post('/api/v1/school-calendars/schedules/preview', json=body)
         self.assertEqual(response.status_code, 200, response.text)
         preview = response.json()
         self.assertEqual(preview['errors'], [])
         self.assertEqual(preview['changes']['added'], 7)
-        self.assertTrue(any('Teacher-reviewed' in w for w in preview['warnings']))
+        self.assertTrue(any('Review the dated' in w for w in preview['warnings']))
+        self.assertEqual({(s['week_number'], s['mode']) for s in preview['sessions']}, {(1, 'online'), (2, 'onsite'), (3, 'online')})
+        missing_start = await self.client.post('/api/v1/school-calendars/schedules/preview', json={**body, 'hybrid_start': None})
+        self.assertTrue(missing_start.json()['errors'])
+        invalid_start = await self.client.post('/api/v1/school-calendars/schedules/preview', json={**body, 'hybrid_start': 'unknown'})
+        self.assertEqual(invalid_start.status_code, 422)
         apply = {**body, 'expected_version': preview['version'], 'fingerprint': preview['fingerprint'], 'reviewed': True}
         changed = {**apply, 'planning': {**planning, 'ends_on': str(first + timedelta(days=27))}}
         self.assertEqual((await self.client.post('/api/v1/school-calendars/schedules/apply', json=changed)).status_code, 409)
@@ -1028,23 +1033,37 @@ END; $$"""))
         self.assertEqual(saved.status_code, 200, saved.text)
         saved = saved.json()
         self.assertEqual(saved['planning'], planning)
+        self.assertEqual(saved['hybrid_start'], 'online')
+        wrong_mode = await self.client.post('/api/v1/school-calendars/schedules/apply', json={**apply, 'hybrid_start': 'onsite'})
+        self.assertEqual(wrong_mode.status_code, 409)
         repeated = await self.client.post('/api/v1/school-calendars/schedules/apply', json=apply)
         self.assertEqual((repeated.status_code, repeated.json()['version']), (200, 1))
         loaded = (await self.client.get('/api/v1/school-calendars/schedules', params=self.section())).json()
         self.assertEqual(loaded['planning'], planning)
+        self.assertEqual(loaded['hybrid_start'], 'online')
         self.assertEqual(len(loaded['sessions']), 7)
+        self.assertEqual({(s['week_number'], s['mode']) for s in loaded['sessions']}, {(1, 'online'), (2, 'onsite'), (3, 'online')})
         self.assertFalse(loaded['syllabus_available'])  # no inferred native course or authoring rights
         original = (await self.client.get(f"/api/v1/school-calendars/revisions/{published['id']}")).json()
         self.assertEqual(original['payload'], published['payload'])
         self.assertEqual(original['payload']['terms'], [])
         self.assertEqual((await self.client.post(f"/api/v1/school-calendars/schedules/by-class/{saved['class_id']}/syllabus", json={'expected_version': 1})).status_code, 409)
+        await self.claim()
+        async with self.sessions.begin() as db:
+            await roster.serialize(db)
+            await roster.apply_roster(db, await db.get(AcademicClass, saved['class_id']), self.rows('6900000001'), 'c' * 64, 3)
+            user = await db.get(User, 1); user.is_superadmin = False; db.add(user)
+        self.actor = 1
+        own = await self.client.get(f"/api/v1/school-calendars/schedules/by-class/{saved['class_id']}")
+        self.assertEqual((own.status_code, own.json()['manageable']), (200, False))
+        self.assertEqual(own.json()['sessions'], loaded['sessions'])
 
     async def test_native_syllabus_draft_is_course_owned_unpublished_and_not_overwritten(self):
         from src.route66_ext.adapters import native_course_syllabus as native
-        from src.route66_ext.adapters.native_learning_access_test_support import CourseChapter, ChapterActivity, ResourceAuthor, UserGroup, UserGroupResource, UserGroupUser, PublicUser, read_native_activity
+        from src.route66_ext.adapters.native_learning_access_test_support import CourseChapter, ChapterActivity, ResourceAuthor, UserGroup, UserGroupResource, UserGroupUser, PublicUser, read_native_activity, ActivityVersion, ActivityUpdate, update_activity, get_editor_bootstrap, check_resource_access, AccessAction, ResourceAccessChecker, UserOrganization
         from src.route66_ext.tests.services.test_native_google_sessions import request as native_request
         async with self.engine.begin() as conn:
-            for table in (native.Chapter.__table__, native.Activity.__table__, CourseChapter.__table__, ChapterActivity.__table__, ResourceAuthor.__table__, UserGroup.__table__, UserGroupResource.__table__, UserGroupUser.__table__):
+            for table in (native.Chapter.__table__, native.Activity.__table__, CourseChapter.__table__, ChapterActivity.__table__, ResourceAuthor.__table__, UserGroup.__table__, UserGroupResource.__table__, UserGroupUser.__table__, ActivityVersion.__table__):
                 await conn.run_sync(table.create)
         await self.make_admin()
         revision = await self.published(calendar_payload(monday(2)))
@@ -1053,11 +1072,13 @@ END; $$"""))
             course = await db.get(Course, 10); course.public = True; course.published = True; db.add(course)
         path = '/api/v1/school-calendars/schedules/by-class/20/syllabus'
         body = {'expected_version': 0, 'revision_id': revision['id']}
-        self.actor = 2  # can read the course and manage its class, not author it
+        self.actor = 3  # not an assigned teacher or native author
         denied = await self.client.post(path, json=body)
         self.assertEqual(denied.status_code, 403, denied.text)
-        async with self.sessions.begin() as db:
-            db.add(ResourceAuthor(user_id=2, resource_uuid='course_fixture_10', authorship='CREATOR', authorship_status='ACTIVE'))
+        self.actor = 2  # approved course teacher, no native author/admin grant
+        def activity_request(uuid, suffix=''):
+            req = native_request(); req.scope['path'] = '/api/v1/activities/' + uuid + suffix
+            return req
         with patch('src.services.courses.chapters.index_course'), patch.object(native, 'create_activity', AsyncMock(side_effect=HTTPException(503, 'Synthetic creation failure'))):
             failed = await self.client.post(path, json=body)
         self.assertEqual(failed.status_code, 503)
@@ -1085,9 +1106,20 @@ END; $$"""))
                 await read_native_activity(native_request(), created.json()['activity_uuid'], learner, db)
             self.assertEqual(denied.exception.status_code, 404)
         authored = {'type': 'doc', 'content': [{'type': 'paragraph', 'content': [{'type': 'text', 'text': 'Teacher-authored syllabus'}]}]}
-        async with self.sessions.begin() as db:
-            activity = (await db.exec(select(native.Activity))).one()
-            activity.content = authored; activity.published = True; db.add(activity)
+        async with self.sessions() as db:
+            teacher = PublicUser.model_validate(await db.get(User, 2))
+            self.assertFalse(teacher.is_superadmin)
+            bootstrap = await get_editor_bootstrap(activity_request(created.json()['activity_uuid'], '/editor-bootstrap'), created.json()['activity_uuid'], teacher, db)
+            self.assertEqual(bootstrap.activity.content, activity.content)
+            with patch('src.services.courses.activities.activities.index_activity'), patch('src.services.courses.activities.versioning.dispatch_webhooks', AsyncMock()):
+                updated = await update_activity(activity_request(created.json()['activity_uuid']), ActivityUpdate(content=authored, published=True), created.json()['activity_uuid'], teacher, db)
+            self.assertEqual(updated.content, authored)
+            self.assertTrue(updated.published)
+            previous = (await db.exec(select(ActivityVersion))).one()
+            self.assertEqual((previous.created_by_id, previous.version_number), (2, 1))
+            self.assertEqual(previous.content, bootstrap.activity.content)
+            self.assertEqual(updated.current_version, 2)
+            self.assertEqual((await db.exec(select(ResourceAuthor))).all(), [])
         repeated = await self.client.post(path, json=body)
         self.assertEqual((repeated.status_code, repeated.json()['created']), (200, False))
         self.assertEqual(created.json()['activity_uuid'], repeated.json()['activity_uuid'])
@@ -1118,6 +1150,58 @@ END; $$"""))
             new = next(a for a in activities if a.activity_uuid == different.json()['activity_uuid'])
             self.assertIn(new.extra_metadata['route66_syllabus']['program'], new.name)
             self.assertFalse(new.published)
+            self.timetable[(2, '100', 'P1')] = {'course_code': '990001', 'title': 'Synthetic course 10', 'meetings': MEETINGS}
+            hybrid = {'section': self.section('P1'), 'revision_id': revision['id'], 'pattern': 'even_onsite', 'hybrid_start': 'onsite'}
+            reviewed = await self.client.post('/api/v1/school-calendars/schedules/preview', json=hybrid)
+            self.assertEqual(reviewed.status_code, 200, reviewed.text)
+            self.assertEqual(reviewed.json()['errors'], [])
+            applied = await self.client.post('/api/v1/school-calendars/schedules/apply', json={**hybrid,
+                'expected_version': reviewed.json()['version'], 'fingerprint': reviewed.json()['fingerprint'], 'reviewed': True})
+            self.assertEqual(applied.status_code, 200, applied.text)
+            self.assertEqual((applied.json()['class_id'], applied.json()['manageable'], applied.json()['hybrid_start']), (20, True, 'onsite'))
+            self.assertEqual({(s['week_number'], s['mode']) for s in applied.json()['sessions']},
+                             {(1, 'onsite'), (2, 'online'), (3, 'onsite'), (4, 'online')})
+            self.assertEqual(original.content, authored)
+            teacher = PublicUser.model_validate(await db.get(User, 2))
+            req = activity_request(new.activity_uuid)
+            # Ordinary course authoring remains denied, as do other-course and delete access.
+            ordinary = native_request(); ordinary.scope['path'] = '/api/v1/courses/course_fixture_10'
+            for request, uuid, action in [(ordinary, 'course_fixture_10', AccessAction.UPDATE),
+                (req, 'course_fixture_11', AccessAction.UPDATE), (req, 'course_fixture_10', AccessAction.DELETE),
+                (req, 'course_fixture_10', AccessAction.CREATE)]:
+                self.assertFalse((await check_resource_access(request, db, teacher, uuid, action, raise_on_deny=False)).allowed)
+            with patch.object(ResourceAccessChecker, '_enforce_org_mfa_policy', AsyncMock(side_effect=HTTPException(403, 'MFA required'))):
+                with self.assertRaises(HTTPException) as mfa:
+                    await check_resource_access(activity_request(new.activity_uuid), db, teacher, 'course_fixture_10', AccessAction.UPDATE)
+                self.assertEqual(mfa.exception.detail, 'MFA required')
+            # Client metadata cannot turn an ordinary activity into a teacher-owned syllabus.
+            unrelated = native.Activity(name='Unrelated draft', org_id=1, course_id=10, activity_uuid='activity_unrelated',
+                activity_type='TYPE_DYNAMIC', activity_sub_type='SUBTYPE_DYNAMIC_PAGE', extra_metadata=new.extra_metadata)
+            db.add(unrelated); await db.commit()
+            with self.assertRaises(HTTPException) as unrelated_denial:
+                await get_editor_bootstrap(activity_request(unrelated.activity_uuid, '/editor-bootstrap'), unrelated.activity_uuid, teacher, db)
+            self.assertEqual(unrelated_denial.exception.status_code, 403)
+            # Reuse cannot offer that unbound tagged activity as an unopenable syllabus either.
+            new.extra_metadata = {**new.extra_metadata, 'route66_syllabus': {
+                **new.extra_metadata['route66_syllabus'], 'program': 'Moved synthetic program'}}
+            db.add(new); await db.commit()
+            with patch('src.services.courses.chapters.index_course'), patch('src.services.courses.activities.activities.index_activity'):
+                recovered = await self.client.post(path, json={**body, 'expected_version': 1})
+            self.assertEqual((recovered.status_code, recovered.json()['created']), (200, True))
+            self.assertNotIn(recovered.json()['activity_uuid'], (unrelated.activity_uuid, new.activity_uuid))
+            # Revocation is fresh; neither a role nor a persistent native author grant was added.
+            assignment = (await db.exec(select(TeachingAssignment).where(TeachingAssignment.course_id == 10, TeachingAssignment.user_id == 2))).one()
+            assignment.active = False; db.add(assignment); await db.commit()
+            with self.assertRaises(HTTPException) as revoked:
+                await get_editor_bootstrap(activity_request(new.activity_uuid, '/editor-bootstrap'), new.activity_uuid, teacher, db)
+            self.assertEqual(revoked.exception.status_code, 403)
+            assignment.active = True; db.add(assignment)
+            member = (await db.exec(select(UserOrganization).where(UserOrganization.user_id == 2, UserOrganization.org_id == 1))).one()
+            await db.delete(member); await db.commit()
+            with self.assertRaises(HTTPException) as removed_member:
+                await get_editor_bootstrap(activity_request(new.activity_uuid, '/editor-bootstrap'), new.activity_uuid, teacher, db)
+            self.assertEqual(removed_member.exception.status_code, 403)
+            self.assertEqual((await db.exec(select(ResourceAuthor))).all(), [])
 
 
 def static_scope():

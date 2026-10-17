@@ -298,10 +298,12 @@ def _mode(pattern, rotation):
     return {'even': 'onsite', 'odd': 'online'}.get(rotation)
 
 
-def plan(payload: Payload, semester: int, meetings, pattern, label):
+def plan(payload: Payload, semester: int, meetings, pattern, label, hybrid_start=None):
     """Planned calendar meetings for one class; returns (rows, warnings, errors)."""
     if pattern not in PATTERNS:
         return [], [], ['Choose a meeting pattern']
+    if hybrid_start not in (None, 'onsite', 'online'):
+        return [], [], ['Choose on campus or online for the first hybrid week']
     term = next((t for t in payload.terms if t.semester == semester), None)
     if term is None:
         return [], [], [f'This calendar has no semester {semester}']
@@ -311,6 +313,13 @@ def plan(payload: Payload, semester: int, meetings, pattern, label):
         errors.append('The official timetable has no meeting times for this section')
     closures = {c.affected_on: c for c in term.closures}
     rows, warnings = [], []
+    anchor = term.weeks[0].starts_on if term.weeks else term.starts_on
+    rotated = [w for w in term.weeks if w.rotation in ('odd', 'even')]
+    def opposite(mode):
+        return 'online' if mode == 'onsite' else 'onsite'
+    reference_mode = hybrid_start
+    if hybrid_start and rotated and ((rotated[0].starts_on - anchor).days // 7) % 2:
+        reference_mode = opposite(hybrid_start)
 
     def row(kind, week, slot, day, nominal, state, mode, note):
         starts = datetime.combine(day, slot['start'], zone).astimezone(timezone.utc)
@@ -336,8 +345,17 @@ def plan(payload: Payload, semester: int, meetings, pattern, label):
             if closure is None and not week.teaching:
                 continue  # A non-teaching week only carries its explicit closures and their make-ups.
             mode = _mode(pattern, week.rotation)
+            if pattern == 'even_onsite' and hybrid_start in ('onsite', 'online'):
+                reference = next((w for w in reversed(rotated) if w.starts_on <= week.starts_on), rotated[0] if rotated else None)
+                if reference:
+                    base = reference_mode if reference.rotation == rotated[0].rotation else opposite(reference_mode)
+                    elapsed_weeks = (week.starts_on - reference.starts_on).days // 7
+                else:
+                    base = hybrid_start
+                    elapsed_weeks = (week.starts_on - anchor).days // 7
+                mode = base if elapsed_weeks % 2 == 0 else opposite(base)
             if mode is None:
-                errors.append(f'Week {week.number} needs an explicit odd or even rotation for the alternating pattern')
+                errors.append('Choose how the first hybrid week meets, or use a reviewed school rotation / เลือกรูปแบบการเรียนของสัปดาห์แรก หรือใช้รอบสัปดาห์ที่ตรวจสอบจากปฏิทินแล้ว')
                 continue
             if closure is None:
                 rows.append(row('regular', week, slot, day, day, 'scheduled', mode, None))

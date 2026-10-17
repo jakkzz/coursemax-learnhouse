@@ -67,6 +67,7 @@ class SchedulePreview(_Body):
     section: Section
     revision_id: StrictInt = Field(gt=0)
     pattern: Literal['onsite', 'online', 'even_onsite']
+    hybrid_start: Literal['onsite', 'online'] | None = None
     planning: planner.CoursePlanning | None = None
     expected_version: StrictInt | None = Field(default=None, ge=0)
 
@@ -534,15 +535,16 @@ async def _prepare(db, user, config, evidence, body, request):
     return facts, revision
 
 
-async def _state(db, user, config, facts, revision, pattern, planning=None):
+async def _state(db, user, config, facts, revision, pattern, planning=None, hybrid_start=None):
     cls = await service.section_class(db, facts, config.org_id)
     if cls is not None:
         await roster.can_manage(db, user, cls, config.org_id)
     schedule = await db.get(ClassSchedule, cls.id) if cls else None
     payload = planner.course_payload(service.payload_model(revision.payload), facts['semester'], planning)
-    result, actions = await service.preview(db, cls, schedule, revision, payload, facts, pattern, datetime.now(timezone.utc))
+    hybrid_start = hybrid_start if pattern == 'even_onsite' else None
+    result, actions = await service.preview(db, cls, schedule, revision, payload, facts, pattern, datetime.now(timezone.utc), hybrid_start)
     if planning is not None:
-        result['warnings'].append('Teacher-reviewed course weeks, not school-wide teaching weeks. Review holidays, exam periods and the registrar’s listed week numbers before saving. / สัปดาห์นี้ใช้วางแผนรายวิชา ไม่ใช่สัปดาห์เรียนส่วนกลาง โปรดตรวจสอบวันหยุด ช่วงสอบ และเลขสัปดาห์จากทะเบียนก่อนบันทึก')
+        result['warnings'].append('Review the dated on-campus/online sessions, holidays, exams and make-ups before saving. Course planning does not change the school calendar. / โปรดตรวจสอบวันเรียนที่มหาวิทยาลัยและออนไลน์ วันหยุด ช่วงสอบ และวันชดเชยก่อนบันทึก การวางแผนรายวิชาไม่เปลี่ยนปฏิทินส่วนกลาง')
     return cls, schedule, result, actions
 
 
@@ -551,7 +553,7 @@ async def schedule_preview(body: SchedulePreview, request: Request, response: Re
                            db: AsyncSession = Depends(get_db_session)):
     private(response); user, config, evidence = await context(request, db)
     facts, revision = await _prepare(db, user, config, evidence, body, request)
-    _, schedule, result, _ = await _state(db, user, config, facts, revision, body.pattern, body.planning)
+    _, schedule, result, _ = await _state(db, user, config, facts, revision, body.pattern, body.planning, body.hybrid_start)
     if body.expected_version is not None and body.expected_version != result['version']:
         raise HTTPException(409, 'This class schedule changed. Reload it before reviewing')
     return result
@@ -565,11 +567,12 @@ async def schedule_apply(body: ScheduleApply, request: Request, response: Respon
         raise HTTPException(400, 'Review the dated meetings before saving this schedule')
     facts, revision = await _prepare(db, user, config, evidence, body, request)
     await roster.serialize(db)
-    cls, schedule, result, actions = await _state(db, user, config, facts, revision, body.pattern, body.planning)
+    cls, schedule, result, actions = await _state(db, user, config, facts, revision, body.pattern, body.planning, body.hybrid_start)
     planning = body.planning.model_dump(mode='json') if body.planning else None
+    configuration = await service.saved_configuration(db, schedule)
     if (schedule is not None and schedule.applied_fingerprint == body.fingerprint
         and schedule.revision_id == revision.id and schedule.pattern == body.pattern
-        and await service.saved_planning(db, schedule) == planning):
+        and configuration.get('planning') == planning and configuration.get('hybrid_start') == body.hybrid_start):
         return await service.schedule_dto(db, cls, schedule, True)
     if body.expected_version != result['version'] or body.fingerprint != result['fingerprint']:
         raise HTTPException(409, 'The schedule, calendar, roster or attendance changed. Preview it again; nothing was saved.')
@@ -598,7 +601,7 @@ async def schedule_apply(body: ScheduleApply, request: Request, response: Respon
         cls.version += 1; db.add(cls)
     roster.event(db, user.id, 'class_schedule_applied', {'revision_id': revision.id, 'pattern': body.pattern,
         'fingerprint': body.fingerprint, 'changes': result['changes'], 'protected': result['protected_count'],
-        'schedule_version': schedule.version, 'planning': planning}, cls)
+        'schedule_version': schedule.version, 'planning': planning, 'hybrid_start': body.hybrid_start}, cls)
     await commit(db)
     return await service.schedule_dto(db, cls, schedule, True)
 

@@ -1,6 +1,37 @@
 # Internal extension deployment records
 
-## Latest: shared school calendars — deployed 2026-10-17
+## Latest: automatic NRRU PDF reading — deployed 2026-10-17
+
+Live source `91a2c629c797dd352ba554f2c2a06a9e2a5afcbe`, image
+`coursemax-learnhouse:calendar-upload-repair-20261017`, ID
+`sha256:53272e01444bd1221098323226eb6689307bea506659e26ea523808444a64f3e`.
+Upload and opening an empty retained draft now read dates automatically. Recognized
+NRRU calendars use a local text reader, not an AI feature/key setup dependency.
+Unknown layouts keep native AI gates. No AI flags, secrets, roles or security headers
+changed. Source conflicts/uncertain weeks have focused review actions; publication
+is still explicit. No assignments or institutional publication/application by agent.
+See [school-academic-calendar.md](school-academic-calendar.md).
+
+69 web checks, full bundle/types, 195 PostgreSQL harness and 20 final pure cases
+(overlapping), nine compiled teacher/student EN1440/TH390 tasks, retained-source
+parser proof and two live fresh-native-login read-only calendar smokes pass. This is
+not provider, human institutional or broader PDF/OCR acceptance.
+
+Fresh protected DB backup; exact current calendar parent retained for code rollback.
+One code-only layer (127 total), 1,022 API and 5,311 desired web entries verified;
+old in-flight assets kept. An initial candidate was rejected by baked-byte checks:
+PAX long-path headers needed rebasing along with archive names. Corrected/verified
+before app replacement. No migration; app-only restart/gateway reload. All schema
+DDL is identical (random pg_dump restrict tokens excluded), source bytes/draft,
+identity/roles, roster/progress/academic evidence, environment/mounts and non-app IDs
+preserved, except expected native role startup timestamps and the source-menu URL.
+Never restore old academic evidence for a code rollback. The 127-layer packaging
+limit still requires a shallower fully verified context for future layers.
+Evidence: `calendar-upload-repair-20261017/`,
+`calendar-upload-repair-web-confirmed-20261017/`, and
+`releases/calendar-upload-repair-20261017/`.
+
+## Previous: shared school calendars — deployed 2026-10-17
 
 Live source `32df4935eed6b582085935f994ef7ef3328cee69`, image
 `coursemax-learnhouse:school-calendar-20261016`, ID

@@ -1,17 +1,55 @@
 # Shared school academic calendar
 
 Status: deployed to LearnHouse staging, 2026-10-17; not institutional acceptance.
-Live source `32df4935eed6b582085935f994ef7ef3328cee69`, image
-`coursemax-learnhouse:school-calendar-20261016`. Assignment work remains excluded.
-Claude Code's Opus 5.5 completed the backend in the separate `school-calendar`
-Herdr session. Connected desktop/mobile task checks, restored-database migration,
-calendar-compatible recovery and live calendar navigation pass.
+Live source `91a2c629c797dd352ba554f2c2a06a9e2a5afcbe`, image
+`coursemax-learnhouse:calendar-upload-repair-20261017`. Assignment work remains excluded.
+Claude Code's Opus 5.5 completed backend work in the separate `school-calendar`
+Herdr session; Impeccable-guided upload/review corrections and desktop/mobile task
+confirmation are complete.
 
 Use **My classes → School calendars** to upload/review/publish an official PDF
-(existing platform-superadmin permission). Then open your own NRRU class's
-**Schedule**, select its published calendar and teaching mode, preview and apply.
-A native course match is not required. No calendar facts are seeded or fabricated;
-the official PDF and its reviewed dates remain necessary user input.
+(existing platform-superadmin permission). **Read PDF and review dates** reads it
+automatically; opening an existing empty draft also reads its retained source, with
+no re-upload. Then open your own NRRU class's **Schedule**, select its published
+calendar and teaching mode, preview and apply. A native course match is not required.
+No calendar facts are seeded; the official PDF and human review remain necessary.
+
+## Automatic reading correction — 2026-10-17
+
+The first release exposed an empty calendar builder while staging had organization
+AI disabled and no native provider key. Readable NRRU teaching-calendar announcements
+now use a deterministic text reader before any AI fallback. It recognizes the school
+and primary semester/year, explicit odd/even week-table labels, teaching boundaries,
+closures and make-ups. It never infers rotation from week parity, imports a next-term
+opening reference as another complete semester, or treats an exam label as no-class.
+A closed teaching week still carries its explicit closure/makeup sessions, without
+ordinary scheduled teaching. Original PDF bytes/page evidence remain untouched.
+
+Conflicting announcement/appendix dates become a concise review question; detailed
+comparisons remain available. Uncertain fields have direct inspector actions.
+Publication stays disabled until questions/uncertainty are resolved and edits saved.
+The default is upload → automatic reading → focused review, not manual construction.
+Manual regeneration/full week lists are disclosed only when needed. Reading failure
+keeps the PDF/draft and retries reading; a newer saved version is loaded rather than
+overwritten. Empty AI output fails/refunds instead of saving an empty success.
+
+The local reader makes no AI call or credit reservation. Unknown layouts still use
+native AI feature/usage/rate/model/MFA rules and need a configured provider; no AI
+flags, secrets, permission gates or security headers were changed. Scanned-PDF OCR
+is not included. The retained real-source text yielded 15 weeks and 11 closure/makeup
+pairs, with source conflict and midterm questions; this is parser proof, not a human
+institutional publication, provider trial or broad PDF-format acceptance.
+
+Correction proof: 69 frontend checks, full isolated bundle/types, 195 PostgreSQL
+harness checks and 20 final pure reader/planner checks (overlapping counts). Nine
+compiled EN1440/TH390 tasks cover automatic upload, retained-draft failure/retry,
+review/publication/class apply, student read-only attendance links, and source-based
+review without publication. Two live fresh-native-login read-only calendar smokes
+pass. Code-only app replacement: fresh protected DB backup, retained exact parent,
+1,022 API and 5,311 desired web entries verified, in-flight assets kept; no migration.
+Schema/source/draft, identity, roster, progress, environment/mounts and unrelated
+service IDs remain unchanged. Only source-menu URL and native role startup timestamps
+change. Evidence: `calendar-upload-repair-20261017/` and its matching release directory.
 
 ## Product outcome
 
@@ -180,8 +218,9 @@ All routes are composed through `src.route66_ext.bootstrap`, under
   `file`; retain a valid PDF up to 10 MB before any optional AI call.
 - `GET /revisions/{id}` and private `GET /revisions/{id}/source`.
 - `PUT /revisions/{id}`: `{expected_version,payload}`; editable drafts only.
-- `POST /revisions/{id}/parse`: `{expected_version}`; native AI feature/plan/credit,
-  rate, model-selection and MFA gates. Failure leaves the source and draft intact.
+- `POST /revisions/{id}/parse`: `{expected_version}`; existing admin/org/MFA gates.
+  Recognized NRRU text uses the local reader without AI; unknown layouts retain native
+  AI feature/plan/credit/rate/model gates. Failure leaves source/draft intact.
 - `POST /revisions/{id}/publish`: `{expected_version,reviewed:true}`; unresolved or
   uncertain facts prevent publication. Published JSON and source bytes are immutable.
 - `POST /{calendar_id}/draft`: `{from_revision_id}`; source-retaining draft clone.
@@ -222,14 +261,14 @@ and never guesses or stamps an Alembic head. Run it from a verified candidate **
 starting the new app, after the relevant backup/restore checks. Startup table creation
 alone cannot add the necessary class/session columns.
 
-Isolated proof: 113 affected PostgreSQL/native/boundary tests passed after correcting
+Initial-release proof: 113 affected PostgreSQL/native/boundary tests passed after correcting
 two legacy-fixture assertions from an earlier 235-test run; frozen historical SQL and
 migrations were not rewritten. Eight calendar PostgreSQL tests include mocked typed-AI
 success/failure and preserved source/draft state; 13 final pure planner cases include
 strict official week ranges. No real provider/model call or institutional PDF acceptance
 is claimed. Two final focused PG tests verify warnings for overlapping manual meetings
 without modifying them and preserve unmatched apply. Counts overlap; do not add them.
-Frontend: 67 checks pass; full isolated Next bundle/TypeScript passes at
+Initial frontend proof: 67 checks passed; full isolated Next bundle/TypeScript passed at
 `school-calendar-web-release-20261016`. Five compiled teacher/student EN1440/TH390
 journeys cover PDF/manual repair/publication, unmatched apply, identical table/calendar/
 attendance IDs, matched/unmatched student reading, and publish-return refresh without

@@ -299,6 +299,118 @@ def abridged(pages):
             'title': line[:index[head.end(1)]].strip(), 'programs': programs}
 
 
+TABLE_METHOD = 'nrru_abridged_table_v1'
+_ABBREVIATIONS = {'มค': 1, 'กพ': 2, 'มีค': 3, 'เมย': 4, 'พค': 5, 'มิย': 6, 'กค': 7, 'สค': 8, 'กย': 9, 'ตค': 10, 'พย': 11, 'ธค': 12}
+_AM = '(?:' + '|'.join(sorted(_ABBREVIATIONS, key=len, reverse=True)) + ')'
+_CELL = re.compile(rf'^(\d{{1,2}})({_AM})?(\d{{2}}|\d{{4}})?(?:[–—-](\d{{1,2}})({_AM})(\d{{2}}|\d{{4}}))?$')
+_KINDS = (('วนเปดภาค', 'opening'), ('ระหวางภาค', 'midterm'), ('สอบปลายภาค', 'final'),
+          ('วนปดภาค', 'closing'), ('สงผลการเรยน', 'grades'))
+
+
+def _table_year(text):
+    """Buddhist-era year in an abridged table cell ("69" or "2569") as a Gregorian year."""
+    year = int(text)
+    return (year + 2500 if year < 100 else year) - 543
+
+
+def cell_dates(text):
+    """(start, end, uncertain) for one abridged-table date cell, or None when it is not one date/range."""
+    compact = re.sub(r'[\s.]', '', text.translate(_DIGITS))
+    found = _CELL.match(compact)
+    if not found:
+        return None
+    try:
+        return _range(*found.groups())
+    except ValueError:  # not a real calendar date, e.g. 31 ก.พ.
+        return None
+
+
+def _range(d1, m1, y1, d2, m2, y2):
+    if d2 is None:
+        if not (m1 and y1):
+            return None
+        day = date(_table_year(y1), _ABBREVIATIONS[m1], int(d1))
+        return day, day, False
+    end = date(_table_year(y2), _ABBREVIATIONS[m2], int(d2))
+    start = date(_table_year(y1) if y1 else end.year, _ABBREVIATIONS[m1 or m2], int(d1))
+    if start > end and not y1:  # e.g. "20 ธ.ค. – 5 ม.ค. 70": one stated year, crossing new year
+        return start.replace(year=start.year - 1), end, True
+    return (start, end, start > end)
+
+
+def _join(label, more):
+    return f'{label} {more}' if label.endswith(')') else label + more  # wrapped Thai label lines
+
+
+def read_table(tables, source):
+    """Program-separated academic dates from the abridged calendar's own table cells.
+
+    Each cell date or range becomes one event for its column's printed program
+    label. Rows/cells that are not a single readable date stay review questions.
+    Nothing is read into teaching weeks, closures or make-ups.
+    """
+    events, unresolved, pending, programs_of, semester = [], [], [], {}, source['semester']
+    for table in tables:
+        lines, page = table['lines'], table['page']
+        header = next((line['cells'] for line in lines if any(_sk(t) == 'กจกรรม' for t in line['cells'].values())), None)
+        if header is None:
+            continue
+        number_col = min(header)
+        activity = next(c for c, t in header.items() if _sk(t) == 'กจกรรม')
+        programs, item, started = {}, None, False
+        programs_of[page] = programs
+        for line in lines:
+            cells = {c: t.translate(_GLYPHS) for c, t in line['cells'].items()}
+            if any('ปฏทน' in _sk(t) for t in cells.values()):
+                continue  # the page title line
+            first = cells.get(number_col, '')
+            label = cells.get(activity, '').strip()
+            if re.fullmatch(r'\d{1,2}', first):
+                started = True
+                item = {'row': int(first), 'head': label, 'title': label, 'qualifier': '', 'sub': None, 'notes': {}}
+            elif not started:  # column header: each program's printed label, possibly wrapped
+                for c, t in cells.items():
+                    if c > activity:
+                        programs[c] = _join(programs.get(c, ''), t)
+                continue
+            elif first or item is None:
+                item = None  # a footnote below the table
+                continue
+            elif label.startswith('-'):
+                item['sub'] = {'text': label.lstrip('-').strip()}
+            elif label and item['sub'] is None:
+                item['title'] += ' ' + label  # wrapped activity text, e.g. who the dates apply to
+            elif label:
+                item['qualifier'] += ' ' + label  # a condition printed under the sub-items: applies to the row
+            for column, text in sorted(cells.items()):
+                if column not in programs or re.fullmatch(r'[–—-]', text.strip()):
+                    continue  # not a program column, or no date for this program
+                read = cell_dates(text)
+                if read is None:
+                    if re.search(r'\d', text):
+                        unresolved.append(f'หน้า {page} แถว {item["row"]} ({programs[column]}): อ่านวันที่ "{text}" ไม่ได้ โปรดตรวจสอบ / '
+                                          f'Page {page} row {item["row"]}: check the date "{text}"')
+                    else:  # a printed qualifier such as "ภาคปกติ เรียนกับ ภาคกศ.ปช."
+                        item['notes'][column] = _join(item['notes'].get(column, ''), text)
+                    continue
+                pending.append((item, item['sub'], column, page, read))
+    # Titles/notes are completed only after each row ends, so wrapped conditions reach every date in it.
+    for item, sub, column, page, (start, end, uncertain) in pending:
+        title = ' '.join((item['title'] + (' – ' + sub['text'] if sub else '')).split())
+        note = ' '.join(' '.join(filter(None, (item['notes'].get(column), item['qualifier']))).split()) or None
+        events.append({'semester': semester, 'program': programs_of[page][column][:120],
+                       'kind': next((k for key, k in _KINDS if key in _sk(item['head'])), 'other'),  # the row's own name
+                       'title': title[:300], 'starts_on': start, 'ends_on': end, 'page': page,
+                       'uncertain': uncertain, 'note': note[:300] if note else None})
+    if not events:
+        return None
+    payload = planner.Payload.model_validate({'events': events, 'unresolved': unresolved})
+    names = list(dict.fromkeys(e['program'] for e in events))
+    notes = [f'Imported {len(events)} academic dates for {len(names)} programs, semester {semester}/{source["academic_year"]}',
+             'Teaching weeks are not stated in this calendar, so no class sessions are generated']
+    return {'method': TABLE_METHOD, 'payload': payload, 'notes': notes}
+
+
 def metadata(pages, filename=None):
     """Calendar year/group/name stated in the first-page header; None where it is not stated.
 
@@ -331,4 +443,4 @@ def metadata(pages, filename=None):
     return {'academic_year': year, 'track': track, 'name': name}
 
 
-__all__ = ['ABRIDGED', 'COMBINED_TRACK', 'METHOD', 'abridged', 'dates', 'metadata', 'read', 'thai']
+__all__ = ['ABRIDGED', 'COMBINED_TRACK', 'METHOD', 'TABLE_METHOD', 'abridged', 'cell_dates', 'read_table', 'dates', 'metadata', 'read', 'thai']

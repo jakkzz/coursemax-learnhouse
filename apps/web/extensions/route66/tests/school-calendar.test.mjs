@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import { calendarRequest, localDay, monthDays, moveMonth } from '../components/Objects/Classes/calendar/model.ts'
+import { calendarRequest, formatCalendarDate, hasCalendarDates, localDay, monthDays, moveMonth } from '../components/Objects/Classes/calendar/model.ts'
 const source = file => fs.readFileSync(new URL('../components/Objects/Classes/' + file, import.meta.url), 'utf8')
 test('month view uses complete Monday-first months, leap days and year boundaries', () => {
  assert.equal(monthDays('2028-02').days.length, 29)
@@ -48,7 +48,7 @@ test('calendar upload/review remains separate from publishing or changing classe
 test('PDF upload and reopening an empty saved draft read dates automatically without exposing blank validation forms', () => {
  const s = source('calendar/CalendarLibrary.tsx')
  assert.match(s, /setFile\(null\); await openRevision\(value\)/)
- assert.match(s, /value\.state === 'draft' && value\.payload\.terms\.length === 0 && !value\.source_kind\) await readPdf\(value\)/)
+ assert.match(s, /value\.state === 'draft' && !hasCalendarDates\(value\.payload\)\) await readPdf\(value\)/)
  assert.match(s, /openRevision\(await calendarRequest<Revision>\(`\/revisions\/\$\{c\.latest_revision_id\}/)
  assert.match(s, /reading \? .*Reading your calendar PDF/)
  assert.match(s, /!hasDates && !manual/)
@@ -84,8 +84,22 @@ test('PDF URL uses the same authenticated import and never downloads in the brow
  assert.match(s, /onSubmit=.*void importUrl\(\)/)
  assert.match(s, /setUrlEntry\(false\); await openRevision\(value\)/)
  assert.doesNotMatch(s, /fetch\(url|iframe/)
- assert.match(s, /revision.source_kind === 'abridged_multi_program' && !hasDates/)
- assert.match(s, /Upload full calendar PDF/)
+ assert.doesNotMatch(s, /!value.source_kind|Document preview · abridged calendar|Upload full calendar PDF/)
+ assert.match(s, /hasDates = hasCalendarDates\(payload\)/)
+})
+test('academic dates are real calendar content without inventing teaching weeks', () => {
+ const event = { semester: 1, program: 'Example program', kind: 'opening', title: 'Opening', starts_on: '2027-01-31', ends_on: '2027-01-31', page: 1 }
+ assert.equal(hasCalendarDates({ timezone: 'Asia/Bangkok', terms: [], events: [] }), false)
+ assert.equal(hasCalendarDates({ timezone: 'Asia/Bangkok', terms: [], events: [event] }), true)
+ assert.equal(formatCalendarDate(event.starts_on, false), '31 Jan 2027')
+ assert.match(formatCalendarDate(event.starts_on, true), /2570/)
+ const view = source('calendar/CalendarDates.tsx'), lib = source('calendar/CalendarLibrary.tsx')
+ assert.match(view, /All programs/)
+ assert.match(view, /visible.filter\(\(\{ event \}\) => event.program === name\)/)
+ assert.match(view, /onChange \?/)
+ assert.match(view, /Academic date to edit/)
+ assert.match(lib, /events => \{ setPayload/)
+ assert.match(source('calendar/ClassSchedule.tsx'), /r.has_teaching_weeks !== false/)
 })
 test('PDF URL errors offer localized retry or file upload without claiming a source was saved', async () => {
  const original = globalThis.fetch

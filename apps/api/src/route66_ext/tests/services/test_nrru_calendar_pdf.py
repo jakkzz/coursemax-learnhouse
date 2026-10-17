@@ -55,6 +55,24 @@ ABRIDGED = """ปฏิทินการศึกษาระดับปริ
 2 สอบปลายภาค – 1 – 5 มี.ค. 72 8 – 9 มี.ค. 72"""
 
 
+EDGES = [30, 50, 300, 390, 480, 570]
+ABRIDGED_TABLE = [  # (x, y, text): one synthetic page laid out like the abridged program table
+    (60, 734, 'ปฏิทินการศึกษาระดับปริญญาตรี มหาวิทยาลัยสมมุติ ภาคเรียนที่'), (400, 734, '2/2571'), (500, 734, '(ฉบับย่อ)'),
+    (310, 703, 'ภาคปกติ (ค.บ.)'),
+    (35, 687, 'ที่'), (150, 687, 'กิจกรรม'), (305, 687, 'ลงทะเบียนปฏิบัติ'), (400, 687, 'ภาคพิเศษ'), (490, 687, 'ภาค กศ.ปช.'),
+    (310, 672, 'การวิชาชีพ'),
+    (35, 656, '1'), (55, 656, 'วันเปิดภาคการศึกษา'), (310, 656, '3 ธ.ค. 71'), (400, 656, '10 ธ.ค. 71'), (490, 656, '17 ธ.ค.71'),
+    (35, 640, '2'), (55, 640, 'ระยะเวลาการยื่นคำร้อง'),
+    (55, 625, '-คำร้องขอเรียนร่วม'), (310, 625, '–'), (400, 625, '10 – 24 ธ.ค. 71'), (490, 625, '20 ธ.ค. –5 ม.ค. 72'),
+    (55, 610, '(ยื่นทางเว็บไซต์)'),
+    (35, 595, '3'), (55, 595, 'สอบปลายภาค'), (310, 595, '–'), (400, 595, '1 – 5 มี.ค. 72'), (490, 595, '8 – 9 มี.ค. 72'),
+    (400, 580, '12 มี.ค . 72'),
+    (35, 565, '4'), (55, 565, 'ส่งผลการเรียน'), (310, 565, '31 ก.พ. 72'), (400, 565, '20 มี.ค. 72'), (490, 565, '–'),
+    (35, 550, '5'), (55, 550, 'กิจกรรมทดสอบผู้เรียนระหว่างภาค'), (310, 550, '–'), (400, 550, '5 ก.พ. 72'), (490, 550, '–'),
+    (55, 535, 'เฉพาะรายวิชาที่หลักสูตรกำหนด'), (400, 535, '6 – 7 ก.พ. 72'), (55, 520, 'ให้จัดสอบ'),
+    (35, 500, 'หมายเหตุ'), (55, 500, 'ดูฉบับเต็ม 1 ม.ค. 72')]
+
+
 def abridged_pages():
     return [{'page': 1, 'text': ABRIDGED}, {'page': 2, 'text': 'ปฏิทินการศึกษา (ต่อ)\n3 วันปิดภาคการศึกษา – 12 มี.ค. 72'}]
 
@@ -160,6 +178,45 @@ class ReaderTests(unittest.TestCase):
                    .replace('ภาคปกติ (ค.บ.)\nลงทะเบียนปฏิบัติ\nการวิชาชีพ\n', 'ภาคปกติ\n')}]
         self.assertIsNone(reader.abridged(single))
         self.assertNotEqual(reader.metadata(single)['track'], 'ฉบับรวมหลายรูปแบบ')
+
+    def test_abridged_table_gives_program_separated_dates_without_weeks(self):
+        from src.route66_ext.services import pdf_cells
+        from src.route66_ext.tests.services.test_pdf_cells import thai_table_pdf
+        pdf = thai_table_pdf([(EDGES, ABRIDGED_TABLE)])
+        found = reader.read_table(pdf_cells.tables(pdf), reader.abridged(abridged_pages()))
+        self.assertEqual(found['method'], 'nrru_abridged_table_v1')
+        payload = found['payload']
+        practicum, special, evening = 'ภาคปกติ (ค.บ.) ลงทะเบียนปฏิบัติการวิชาชีพ', 'ภาคพิเศษ', 'ภาค กศ.ปช.'
+        rows = [(e.program, e.kind, e.title, e.starts_on.isoformat(), e.ends_on.isoformat(), e.uncertain, e.note) for e in payload.events]
+        request = 'ระยะเวลาการยื่นคำร้อง – คำร้องขอเรียนร่วม'
+        midterm = 'กิจกรรมทดสอบผู้เรียนระหว่างภาค เฉพาะรายวิชาที่หลักสูตรกำหนด ให้จัดสอบ'
+        self.assertEqual(payload.terms, [])
+        self.assertEqual(rows, [
+            (practicum, 'opening', 'วันเปิดภาคการศึกษา', '2028-12-03', '2028-12-03', False, None),
+            (special, 'opening', 'วันเปิดภาคการศึกษา', '2028-12-10', '2028-12-10', False, None),
+            (evening, 'opening', 'วันเปิดภาคการศึกษา', '2028-12-17', '2028-12-17', False, None),
+            # A condition printed under the sub-items stays on each of the row's dates.
+            (special, 'other', request, '2028-12-10', '2028-12-24', False, '(ยื่นทางเว็บไซต์)'),
+            (evening, 'other', request, '2028-12-20', '2029-01-05', True, '(ยื่นทางเว็บไซต์)'),  # one stated year across new year
+            (special, 'final', 'สอบปลายภาค', '2029-03-01', '2029-03-05', False, None),
+            (evening, 'final', 'สอบปลายภาค', '2029-03-08', '2029-03-09', False, None),
+            (special, 'final', 'สอบปลายภาค', '2029-03-12', '2029-03-12', False, None),  # each printed range stays separate
+            (special, 'grades', 'ส่งผลการเรียน', '2029-03-20', '2029-03-20', False, None),
+            # Wrapped qualification (printed after the first date) reaches every date of that row.
+            (special, 'midterm', midterm, '2029-02-05', '2029-02-05', False, None),
+            (special, 'midterm', midterm, '2029-02-06', '2029-02-07', False, None)])
+        self.assertTrue(all(e.semester == 2 and e.page == 1 for e in payload.events))
+        self.assertEqual(len(payload.unresolved), 1)  # "31 ก.พ." is not a real date: asked, never guessed
+        self.assertIn('31 ก.พ. 72', payload.unresolved[0])
+        self.assertFalse(planner.has_teaching_weeks(payload))
+
+    def test_cell_dates(self):
+        d = lambda text: reader.cell_dates(text) and tuple(x.isoformat() if hasattr(x, 'isoformat') else x for x in reader.cell_dates(text))
+        self.assertEqual(d('14พ.ย. –13 . ธ.ค72'), ('2029-11-14', '2029-12-13', False))
+        self.assertEqual(d('๒๓ ก.ย.–๑๑ต.ค. ๗๑'), ('2028-09-23', '2028-10-11', False))
+        self.assertEqual(d('5 มิ.ย. 2571'), ('2028-06-05', '2028-06-05', False))
+        for text in ('–', 'ภาคปกติ', '13 ก.ค.', '31 ก.พ. 72', '1 – 2'):
+            self.assertIsNone(reader.cell_dates(text), text)
 
     def test_date_lists(self):
         self.assertEqual(reader.dates('10 – 11, 13 – 14 สิงหาคม 2569'),

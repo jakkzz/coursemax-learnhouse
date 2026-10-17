@@ -90,6 +90,7 @@ elif not only:
     from src.route66_ext.tests.services import test_school_calendar as c
     suite.addTests(c.SchoolCalendarTests(name) for name in c.SchoolCalendarTests.__dict__ if name.startswith("test_"))
     suite.addTests(loader.loadTestsFromNames(["src.route66_ext.tests.services.test_calendar_plan", "src.route66_ext.tests.services.test_nrru_calendar_pdf",
+        "src.route66_ext.tests.services.test_pdf_cells", "src.route66_ext.tests.services.test_calendar_url",
         "src.route66_ext.tests.services.test_school_calendar.ScopeTests"]))
 if extra and not names:
     from src.route66_ext.tests.services.test_learning_access import LearningAccessTests

@@ -15,7 +15,7 @@ from sqlmodel import select
 from src.route66_ext.tests.services.test_academic_rosters import AcademicRosterTests
 from src.route66_ext.db.academic_classes import AcademicClass, AcademicRosterEntry, TeachingAssignment
 from src.route66_ext.db.class_attendance import AttendanceSession, AttendanceChallenge
-from src.route66_ext.db.school_calendar import CALENDAR_TABLES, SchoolCalendarSource
+from src.route66_ext.db.school_calendar import CALENDAR_TABLES, ClassSchedule, SchoolCalendarSource
 from src.route66_ext.db.school_identity import SchoolGoogleEvidence, NrruTeacherIdentity
 from src.db.users import User
 from src.db.user_organizations import UserOrganization
@@ -733,11 +733,67 @@ END; $$"""))
             for item in reversed(patches):
                 item.stop()
 
-    async def test_url_upload_retains_source_and_abridged_source_stays_source_only(self):
-        from src.route66_ext.tests.services.test_nrru_calendar_pdf import abridged_pages
+    async def upload_both(self, data, pages, url):
+        """The same bytes as a file and as a link; returns both drafts (the source row is shared)."""
+        from src.route66_ext.adapters import services_ai_rag_formats as formats
+        with patch.object(formats, 'pdf_pages', lambda *a, **k: list(pages)):
+            by_file = await self.client.post('/api/v1/school-calendars', files={'file': (url.rsplit('/', 1)[-1], data, 'application/pdf')})
+        by_link = await self.post_link(url, data, pages)
+        self.assertEqual((by_file.status_code, by_link.status_code), (200, 200), by_file.text + by_link.text)
+        return by_file.json(), by_link.json()
+
+    async def read_both(self, drafts):
+        self.ai(AsyncMock())
+        try:
+            read = [await self.client.post(f"/api/v1/school-calendars/revisions/{d['id']}/parse", json={'expected_version': 0}) for d in drafts]
+        finally:
+            self.stop_ai()
+        self.assertEqual([r.status_code for r in read], [200, 200], [r.text for r in read])
+        self.reserve.assert_not_awaited(); self.generate.assert_not_awaited(); self.model.assert_not_awaited()
+        read = [r.json() for r in read]
+        self.assertEqual(read[0]['payload'], read[1]['payload'])  # same bytes by file or link: same dates
+        self.assertEqual({r['read_method'] for r in read}, {'nrru_abridged_table_v1'})
+        return read
+
+    async def date_calendar_boundaries(self, draft, accept):
+        """Stale versions refused, publication as dates only, and no class schedule or session change."""
+        publish = f"/api/v1/school-calendars/revisions/{draft['id']}/publish"
+        stale = await self.client.post(publish, json={'expected_version': 0, 'reviewed': True, 'accept_proposals': accept})
+        self.assertEqual(stale.status_code, 409)
+        done = await self.client.post(publish, json={'expected_version': 1, 'reviewed': True, 'accept_proposals': accept})
+        self.assertEqual(done.status_code, 200, done.text)
+        published = done.json()
+        self.assertEqual((published['state'], published['issues'], published['payload']['terms']), ('published', [], []))
+        self.assertFalse(any(e['uncertain'] for e in published['payload']['events']))
+        again = await self.client.post(f"/api/v1/school-calendars/revisions/{draft['id']}/parse", json={'expected_version': 1})
+        self.assertEqual(again.status_code, 409)  # a published calendar never changes
+        await self.teacher(3); self.actor = 3
+        self.timetable[(3, '100', 'P9')] = {'course_code': '990001', 'title': 'วิชาตัวอย่าง', 'meetings': MEETINGS}
+        listing = (await self.client.get('/api/v1/school-calendars')).json()['calendars']
+        self.assertEqual([(c['published_revision_id'], c['has_teaching_weeks']) for c in listing if c['id'] == draft['calendar_id']],
+                         [(published['id'], False)])  # readable in the library, not offered as a timetable
+        self.assertEqual((await self.client.get(f"/api/v1/school-calendars/revisions/{draft['id']}")).json()['payload'], published['payload'])
+        async def rows():
+            async with self.sessions() as db:
+                return [len((await db.exec(select(model))).all()) for model in (AcademicClass, ClassSchedule, AttendanceSession)]
+        before = await rows()
+        section = self.section()
+        for step in ('preview', 'apply'):
+            body = {'section': section, 'revision_id': published['id'], 'pattern': 'onsite'}
+            if step == 'apply':
+                body.update(expected_version=0, fingerprint='0' * 64, reviewed=True)
+            planned = await self.client.post(f'/api/v1/school-calendars/schedules/{step}', json=body)
+            self.assertEqual((planned.status_code, planned.json()['detail']['code']), (422, 'teaching_weeks_required'), step)
+        self.assertEqual(await rows(), before)  # no class, schedule or session created or changed
+        self.actor = 1
+        return published
+
+    async def test_url_upload_gates_and_abridged_table_dates_publish_without_weeks(self):
+        from src.route66_ext.tests.services.test_nrru_calendar_pdf import ABRIDGED_TABLE, EDGES, abridged_pages
+        from src.route66_ext.tests.services.test_pdf_cells import thai_table_pdf
         from src.route66_ext.adapters import security_org_auth as mfa
         url = 'https://files.example/cal/MIX%202-71.pdf'
-        data, pages = blank_pdf(2), [(p['page'], p['text']) for p in abridged_pages()]
+        data, pages = thai_table_pdf([(EDGES, ABRIDGED_TABLE)]), [(p['page'], p['text']) for p in abridged_pages()]
         order = []
         guard = AsyncMock(side_effect=lambda *a: order.append('mfa'))
         with patch.object(mfa, 'enforce_org_mfa', guard):
@@ -750,61 +806,48 @@ END; $$"""))
             both = await self.client.post('/api/v1/school-calendars', data={'url': url}, files={'file': ('a.pdf', data, 'application/pdf')})
             neither = await self.client.post('/api/v1/school-calendars', data={'name': 'x'})
             self.assertEqual([(r.status_code, r.json()['detail']['code']) for r in (both, neither)], [(422, 'file_or_url')] * 2)
-            for bad, code in (('http://files.example/a.pdf', 'invalid_pdf_url'), (url, 'url_not_pdf')):
+            for bad, code in (('http://files.example/a.pdf', 'invalid_pdf_url'), ('https://[', 'invalid_pdf_url'), (url, 'url_not_pdf')):
                 failed = await self.post_link(bad, b'<html>sign in</html>', pages)
                 self.assertEqual((failed.status_code, failed.json()['detail']['code']), (422, code))
-            self.assertEqual(order, ['mfa', 'mfa'])  # MFA ran before each authorized fetch attempt
+            self.assertEqual(order, ['mfa'] * 3)  # MFA ran before each authorized fetch attempt
             async with self.sessions() as db:
                 self.assertEqual((await db.exec(select(SchoolCalendarSource))).all(), [])
-            created = await self.post_link(url, data, pages, track='ภาคปกติ')  # a named program cannot claim a combined source
-        self.assertEqual(created.status_code, 200, created.text)
-        draft = created.json()
-        self.assertEqual((draft['source_kind'], draft['source_programs'], draft['source_name'], draft['source_hash']),
-                         ('abridged_multi_program', ['ภาคปกติ (ค.บ.) ลงทะเบียนปฏิบัติการวิชาชีพ', 'ภาคพิเศษ', 'ภาค กศ.ปช.'],
-                          'MIX 2-71.pdf', sha256(data).hexdigest()))
-        self.assertEqual((draft['calendar']['academic_year'], draft['calendar']['track']), (2571, 'ฉบับรวมหลายรูปแบบ'))
-        self.assertIn('(ฉบับย่อ รวมหลายรูปแบบ)', draft['calendar']['name'])
-        self.assertIn('Upload the full calendar', draft['parse_note'])
-        self.assertEqual((await self.client.get(f"/api/v1/school-calendars/revisions/{draft['id']}/source")).content, data)
-        self.ai(AsyncMock())
-        try:
-            read = await self.client.post(f"/api/v1/school-calendars/revisions/{draft['id']}/parse", json={'expected_version': 0})
-        finally:
-            self.stop_ai()
-        self.assertEqual(read.status_code, 200, read.text)
-        read = read.json()
-        self.mfa.assert_awaited_once(); self.reserve.assert_not_awaited(); self.generate.assert_not_awaited()
-        self.assertEqual((read['read_method'], read['version'], read['payload'], read['source_kind']),
-                         ('source_only', 0, draft['payload'], 'abridged_multi_program'))
-        publish = f"/api/v1/school-calendars/revisions/{draft['id']}/publish"
-        for extra in ({}, {'accept_proposals': True}):
-            blocked = await self.client.post(publish, json={'expected_version': 0, 'reviewed': True, **extra})
-            self.assertEqual(blocked.status_code, 422)  # no terms or weeks: structurally not publishable
-        kept = (await self.client.get(f"/api/v1/school-calendars/revisions/{draft['id']}")).json()
-        self.assertEqual((kept['state'], kept['version']), ('draft', 0))
+            drafts = await self.upload_both(data, pages, url)
+        self.assertEqual({(d['calendar_id'], d['source_id'], d['source_hash']) for d in drafts}, {(drafts[0]['calendar_id'], drafts[0]['source_id'], sha256(data).hexdigest())})
+        self.assertEqual((drafts[1]['source_kind'], drafts[1]['calendar']['academic_year'], drafts[1]['calendar']['track']),
+                         ('abridged_multi_program', 2571, 'ฉบับรวมหลายรูปแบบ'))
+        self.assertEqual((await self.client.get(f"/api/v1/school-calendars/revisions/{drafts[1]['id']}/source")).content, data)
+        read = await self.read_both(drafts)
+        events = read[0]['payload']['events']
+        self.assertEqual((len(events), len(read[0]['payload']['unresolved']), read[0]['version']), (11, 1, 1))
+        self.assertEqual({e['kind'] for e in events}, {'opening', 'other', 'final', 'grades', 'midterm'})
+        self.assertIn('Imported 11 academic dates', read[0]['parse_note']); self.assertIn('no class sessions are generated', read[0]['parse_note'])
+        legacy = await self.client.post(f"/api/v1/school-calendars/revisions/{drafts[0]['id']}/publish", json={'expected_version': 1, 'reviewed': True})
+        self.assertEqual(legacy.status_code, 422)  # the unreadable "31 ก.พ." question blocks until accepted
+        await self.date_calendar_boundaries(drafts[0], accept=True)
 
     async def test_private_actual_link_source_proof(self):
-        """Opt-in: the actual fetched bytes, kept privately, through the same upload path (real text extraction)."""
+        """Opt-in: the live-retained MIX bytes and page text (exported read-only), by file and by link."""
         import json, os
         folder = os.getenv('LEARNHOUSE_TEST_PRIVATE_SOURCE')
         if not folder:
             self.skipTest('private source not mounted')
-        data = Path(folder, 'source.pdf').read_bytes()
+        data = Path(folder, 'live-source-3.pdf').read_bytes()
+        pages = [(p['page'], p['text']) for p in json.loads(Path(folder, 'live-source-3-pages.json').read_text())]
         url = Path(folder, 'url.txt').read_text().strip()
         await self.make_admin(); self.actor = 1
         with patch('src.route66_ext.adapters.security_org_auth.enforce_org_mfa', AsyncMock()):
-            created = await self.post_link(url, data)
-        self.assertEqual(created.status_code, 200, created.text)
-        draft = created.json()
-        stored = (await self.client.get(f"/api/v1/school-calendars/revisions/{draft['id']}/source")).content
-        self.assertEqual((stored, draft['source_hash'], self.fetched), (data, sha256(data).hexdigest(), [url]))
-        self.ai(AsyncMock())
-        try:
-            read = (await self.client.post(f"/api/v1/school-calendars/revisions/{draft['id']}/parse", json={'expected_version': 0})).json()
-        finally:
-            self.stop_ai()
-        self.generate.assert_not_awaited()
-        Path(folder, 'pg-dto-proof.json').write_text(json.dumps({'upload': draft, 'parse': read}, ensure_ascii=False, indent=1, default=str))
+            drafts = await self.upload_both(data, pages, url)
+        self.assertEqual(self.fetched, [url])
+        stored = (await self.client.get(f"/api/v1/school-calendars/revisions/{drafts[1]['id']}/source")).content
+        self.assertEqual((stored, drafts[0]['source_hash']), (data, sha256(data).hexdigest()))
+        read = await self.read_both(drafts)
+        expected = json.loads(Path(folder, 'actual-events-proof.json').read_text())
+        self.assertEqual(read[0]['payload']['events'], expected['payload']['events'])
+        self.assertEqual(len(read[0]['payload']['events']), 75)
+        published = await self.date_calendar_boundaries(drafts[0], accept=False)
+        Path(folder, 'pg-dto-proof.json').write_text(json.dumps({'upload': drafts, 'parse': read, 'published': published},
+                                                                ensure_ascii=False, indent=1, default=str))
 
 
 def static_scope():

@@ -32,9 +32,11 @@ def payload_model(data):
 async def calendar_summary(db, calendar):
     rows = (await db.exec(select(SchoolCalendarRevision.id, SchoolCalendarRevision.state).where(
         SchoolCalendarRevision.calendar_id == calendar.id))).all()
-    published = [i for i, state in rows if state == 'published']
+    published = max((i for i, state in rows if state == 'published'), default=None)
+    payload = await db.get(SchoolCalendarRevision, published) if published else None
     return {'id': calendar.id, 'name': calendar.name, 'academic_year': calendar.academic_year,
-            'track': calendar.track, 'published_revision_id': max(published, default=None),
+            'track': calendar.track, 'published_revision_id': published,
+            'has_teaching_weeks': bool(payload and planner.has_teaching_weeks(planner.Payload.model_validate(payload.payload))),
             'latest_revision_id': max((i for i, _ in rows), default=None)}
 
 

@@ -1,20 +1,19 @@
 'use client'
 
 import { useState } from 'react'
-import type { CalendarPayload, Rotation } from './model'
+import { formatCalendarDate, type CalendarPayload, type Rotation } from './model'
+import CalendarDates from './CalendarDates'
 import styles from './calendar.module.css'
 
 export default function CalendarPreview({ payload, th }: { payload: CalendarPayload; th: boolean }) {
   const [semester, setSemester] = useState(0), [view, setView] = useState<'weeks' | 'closures'>('weeks')
   const t = (en: string, thai: string) => th ? thai : en
   const term = payload.terms[semester] ?? payload.terms[0]
-  const day = (value: string) => {
-    const date = new Date(value + 'T00:00:00Z')
-    return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(th ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(date)
-  }
+  const day = (value: string) => formatCalendarDate(value, th)
   const rotation = (value: Rotation) => ({ odd: t('Odd', 'คี่'), even: t('Even', 'คู่'), teaching: t('Teaching', 'เรียนปกติ'), midterm: t('Midterm', 'กลางภาค'), final: t('Final', 'ปลายภาค') })[value]
-  if (!term) return null
+  if (!term) return payload.events?.length ? <section aria-label={t('Calendar preview', 'ตัวอย่างปฏิทิน')}><CalendarDates events={payload.events} th={th} /></section> : null
   return <section aria-label={t('Calendar preview', 'ตัวอย่างปฏิทิน')}>
+    {Boolean(payload.events?.length) && <CalendarDates events={payload.events!} th={th} />}
     {payload.terms.length > 1 && <label className={styles.toolbar}>{t('Semester', 'ภาคเรียน')}<select value={semester} onChange={e => setSemester(Number(e.target.value))}>{payload.terms.map((item, i) => <option key={i} value={i}>{item.semester}</option>)}</select></label>}
     <h2 className={styles.sectionTitle}>{t('Semester', 'ภาคเรียนที่')} {term.semester}</h2>
     <p className={styles.muted}>{day(term.starts_on)} – {day(term.ends_on)}</p>

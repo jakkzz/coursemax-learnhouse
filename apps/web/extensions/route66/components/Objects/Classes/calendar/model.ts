@@ -3,8 +3,14 @@ type Evidence = { page?: number | null; uncertain?: boolean }
 export type CalendarWeek = Evidence & { number: number; starts_on: string; ends_on: string; rotation: Rotation; teaching: boolean; note?: string | null }
 export type Closure = Evidence & { affected_on: string; makeup_on: string | null; note: string }
 export type CalendarTerm = Evidence & { semester: number; starts_on: string; ends_on: string; weeks: CalendarWeek[]; closures: Closure[] }
-export type CalendarPayload = { timezone: string; terms: CalendarTerm[]; unresolved?: string[] }
-export type CalendarSummary = { id: number; name: string; academic_year: number; track: string; published_revision_id: number | null; latest_revision_id: number }
+export type AcademicDate = Evidence & { semester: number; program: string; kind: 'opening' | 'midterm' | 'final' | 'closing' | 'grades' | 'other'; title: string; starts_on: string; ends_on: string; note?: string | null }
+export type CalendarPayload = { timezone: string; terms: CalendarTerm[]; events?: AcademicDate[]; unresolved?: string[] }
+export function hasCalendarDates(payload: CalendarPayload) { return payload.terms.length > 0 || Boolean(payload.events?.length) }
+export function formatCalendarDate(value: string, th: boolean) {
+  const date = new Date(value + 'T00:00:00Z')
+  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(th ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(date)
+}
+export type CalendarSummary = { id: number; name: string; academic_year: number; track: string; published_revision_id: number | null; latest_revision_id: number; has_teaching_weeks?: boolean }
 export type Revision = { id: number; calendar_id: number; version: number; state: 'draft' | 'published'; payload: CalendarPayload; source_name: string; source_hash: string; parse_note: string | null; calendar: CalendarSummary; issues?: string[]; source_pages?: { page: number; text: string }[]; source_truncated?: boolean; source_page_count?: number | null; source_kind?: 'abridged_multi_program' | null }
 export type MeetingSession = { id?: number; slot_key: string | null; superseded?: boolean; action?: string; starts_at: string; ends_at: string; title: string; state: 'scheduled' | 'no_class'; week_number: number | null; rotation: Rotation | null; nominal_date: string | null; makeup_for: string | null; mode: string | null; location: string | null; note: string | null; attendance_url?: string | null }
 export type Schedule = { class_id: number | null; version: number; manageable: boolean; revision_id: number | null; calendar_name: string | null; pattern: string; sessions: MeetingSession[]; newer_revision_id?: number | null }

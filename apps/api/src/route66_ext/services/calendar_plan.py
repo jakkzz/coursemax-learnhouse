@@ -57,11 +57,36 @@ class Term(_Model):
     uncertain: bool = False
 
 
+EventKind = Literal['opening', 'midterm', 'final', 'closing', 'grades', 'other']
+
+
+class Event(_Model):
+    """One academic date or range exactly as a source states it, for one program.
+
+    Events are shown and published as dates; they never create teaching weeks,
+    closures or class meetings.
+    """
+    semester: int = Field(ge=1, le=3)
+    program: str = Field(min_length=1, max_length=120)
+    kind: EventKind
+    title: str = Field(min_length=1, max_length=300)
+    starts_on: date
+    ends_on: date
+    page: int | None = Field(default=None, ge=1, le=500)
+    uncertain: bool = False
+    note: str | None = Field(default=None, max_length=300)
+
+
 class Payload(_Model):
     # First release: NRRU calendars and every UI date use Bangkok time.
     timezone: Literal['Asia/Bangkok'] = 'Asia/Bangkok'
     terms: list[Term] = Field(default_factory=list, max_length=3)
+    events: list[Event] = Field(default_factory=list, max_length=300)
     unresolved: list[str] = Field(default_factory=list, max_length=50)
+
+
+def has_teaching_weeks(payload):
+    return any(term.weeks for term in payload.terms)
 
 
 def empty_payload():
@@ -71,8 +96,16 @@ def empty_payload():
 def issues(payload: Payload, page_count: int | None = None):
     """Every reason this reviewed calendar cannot be published yet (empty = publishable)."""
     found = []
-    if not payload.terms:
-        found.append('Add at least one term')
+    if not payload.terms and not payload.events:
+        found.append('Add at least one term or academic date')
+    for event in payload.events:
+        label = f'{event.program}: {event.title}'[:120]
+        if event.starts_on > event.ends_on:
+            found.append(f'{label}: ends before it starts')
+        if event.uncertain:
+            found.append(f'{label}: marked uncertain')
+        if page_count is not None and event.page is not None and event.page > page_count:
+            found.append(f'{label}: page {event.page} is not in the source PDF')
     if len({t.semester for t in payload.terms}) != len(payload.terms):
         found.append('Each semester can appear only once')
     for text in payload.unresolved:

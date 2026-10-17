@@ -175,9 +175,8 @@ async def _store(db, user, config, data, filename, name, academic_year, track):
     note = (f'{len(pages)} of {page_count} pages have selectable text. Read it automatically or complete the calendar manually.'
             if pages else 'No selectable text was found (scanned PDF?). Complete the calendar manually; the original PDF is kept.')
     if combined:
-        note = (f"Abridged calendar (ฉบับย่อ) comparing {len(combined['programs'])} programs, kept as the original source. "
-                'It has no teaching weeks, holidays or make-ups, so it cannot plan class sessions. '
-                'Upload the full calendar (ฉบับเต็ม) for that.')
+        note = (f"Abridged calendar (ฉบับย่อ) for {len(combined['programs'])} programs; its academic dates are read for review. "
+                'Teaching weeks are not stated in it, so no class sessions are generated.')
     if truncated:
         note += ' Text was shortened for very long documents; check the PDF itself.'
     revision = SchoolCalendarRevision(calendar_id=calendar.id, number=await service.next_number(db, calendar.id),
@@ -290,12 +289,20 @@ async def parse(revision_id: int, body: Versioned, request: Request, response: R
     from src.route66_ext.adapters.security_org_auth import enforce_org_mfa
     await enforce_org_mfa(user.id, config.org_id, db)
     if combined := nrru_calendar_pdf.abridged(document.pages):
-        # Source only: nothing to read into weeks/dates, no AI; the draft is left as it is.
-        return {**await service.revision_dto(db, row), 'read_method': 'source_only', 'read_notes': [
-            f"Abridged multi-program calendar (ฉบับย่อ), semester {combined['semester']}/{combined['academic_year']}: "
-            'no teaching weeks, holidays or make-ups to read. Upload the full calendar (ฉบับเต็ม).']}
-    # Known NRRU layout: read deterministically, with no AI call or credit.
-    known = nrru_calendar_pdf.read(document.pages, calendar.academic_year)
+        # Abridged multi-program table: program dates from the retained PDF's own cell positions, no AI.
+        from src.route66_ext.services import pdf_cells
+        try:
+            cells = await asyncio.to_thread(pdf_cells.tables, document.content)
+        except Exception:
+            log.warning('abridged calendar table could not be read', exc_info=True)
+            cells = []
+        known = nrru_calendar_pdf.read_table(cells, combined)
+        if known is None:
+            raise HTTPException(422, {'code': 'no_dates_found', 'message':
+                'ไม่พบวันที่ในตารางของไฟล์นี้ / No dates could be read from this table. Check the PDF or add the dates manually; the PDF is kept.'})
+    else:
+        # Known NRRU layout: read deterministically, with no AI call or credit.
+        known = nrru_calendar_pdf.read(document.pages, calendar.academic_year)
     if known is None:
         payload, credited = await _ai_payload(db, user, config, calendar, document, revision_id), True
         method, notes = 'ai', []
@@ -310,7 +317,8 @@ async def parse(revision_id: int, body: Versioned, request: Request, response: R
         raise HTTPException(409, 'This draft changed while it was being read. Reload it; nothing was overwritten.')
     found = planner.issues(payload, document.page_count)
     row.payload = payload.model_dump(mode='json'); row.version += 1
-    reader = 'with the NRRU calendar reader (no AI)' if known else 'with AI'
+    reader = ('with the NRRU abridged table reader (no AI)' if method == nrru_calendar_pdf.TABLE_METHOD
+              else 'with the NRRU calendar reader (no AI)' if known else 'with AI')
     row.parse_note = (f'Read automatically {reader} from {len(document.pages)} pages. '
                       + ''.join(n.rstrip('.') + '. ' for n in notes)
                       + 'Check every date against the PDF before publishing'
@@ -384,6 +392,9 @@ def _accept(payload):
                             *((c, f'closure {c.affected_on.isoformat()}') for c in term.closures)]:
             if item.uncertain:
                 accepted.append(label); item.uncertain = False
+    for event in payload.events:
+        if event.uncertain:
+            accepted.append(f'{event.program}: {event.title}'); event.uncertain = False
     payload.unresolved = []
     return payload, accepted
 
@@ -448,6 +459,10 @@ async def _prepare(db, user, config, evidence, body, request):
     facts = await verified_section(db, user, config, evidence, body.section, request, meetings=True)
     facts.pop('org_id', None)
     revision, calendar = await service.revision_in_org(db, body.revision_id, config.org_id)
+    if not planner.has_teaching_weeks(service.payload_model(revision.payload)):
+        raise HTTPException(422, {'code': 'teaching_weeks_required', 'message':
+            'ปฏิทินนี้มีเฉพาะวันสำคัญ ยังไม่มีสัปดาห์การสอนที่ตรวจสอบแล้ว / This calendar has academic dates only. '
+            'Class schedules need a calendar with reviewed teaching weeks; nothing was changed.'})
     if calendar.academic_year != facts['academic_year']:
         raise HTTPException(409, f"Choose a calendar for academic year {facts['academic_year']}")
     return facts, revision

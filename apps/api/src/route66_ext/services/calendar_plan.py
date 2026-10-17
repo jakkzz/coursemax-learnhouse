@@ -1,7 +1,8 @@
 """Pure academic-calendar payload validation and deterministic meeting planner.
 
 No database, network or clock access. Rotations, teaching weeks and make-up
-dates come only from the reviewed payload; nothing is inferred from week-number
+dates come only from the reviewed payload (a non-teaching week plans only its
+explicit closures and their make-ups); nothing is inferred from week-number
 parity, exam labels or weekday guesses.
 """
 from datetime import date, datetime, time, timedelta, timezone
@@ -235,9 +236,7 @@ def plan(payload: Payload, semester: int, meetings, pattern, label):
                 'note': note, 'title': title[:160], 'makeup_for': nominal if kind == 'makeup' else None}
 
     for week in term.weeks:
-        if not week.teaching:
-            continue
-        if (week.ends_on - week.starts_on).days > 6:
+        if week.teaching and (week.ends_on - week.starts_on).days > 6:
             errors.append(f'Week {week.number} spans more than 7 days; split it before scheduling')
             continue
         for slot in slot_rows:
@@ -247,11 +246,13 @@ def plan(payload: Payload, semester: int, meetings, pattern, label):
             day = week.starts_on + timedelta(days=(slot['weekday'] - week.starts_on.weekday()) % 7)
             if day > week.ends_on:
                 continue
+            closure = closures.get(day)
+            if closure is None and not week.teaching:
+                continue  # A non-teaching week only carries its explicit closures and their make-ups.
             mode = _mode(pattern, week.rotation)
             if mode is None:
                 errors.append(f'Week {week.number} needs an explicit odd or even rotation for the alternating pattern')
                 continue
-            closure = closures.get(day)
             if closure is None:
                 rows.append(row('regular', week, slot, day, day, 'scheduled', mode, None))
                 continue

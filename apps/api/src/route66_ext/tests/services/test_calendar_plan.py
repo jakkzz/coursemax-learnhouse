@@ -68,6 +68,21 @@ class PlannerTests(unittest.TestCase):
         self.assertTrue(any('weekend' in w for w in warnings))
         self.assertTrue(any('outside the term' in w for w in warnings))
 
+    def test_non_teaching_week_plans_only_explicit_closures_and_their_makeups(self):
+        closed = MON + timedelta(weeks=1)  # Monday of week 2, which has no teaching
+        makeup = MON + timedelta(weeks=2, days=2)
+        data = payload([week(1), week(2, 'even', False), week(3)],
+                       [{'affected_on': closed.isoformat(), 'makeup_on': makeup.isoformat(), 'note': 'งดการเรียนการสอน'}])
+        rows, _, errors = self.run_plan(data)
+        self.assertEqual(errors, [])
+        self.assertEqual([(r['slot_key'][:3], r['calendar_kind'], r['state'], r['starts_at'].date()) for r in rows
+                          if r['academic_week'] == 2],
+                         [('mon', 'regular', 'no_class', closed), ('mon', 'makeup', 'scheduled', makeup)])
+        # The official W: filter still applies by original week: outside it, no closure or make-up row.
+        outside = [dict(MEETINGS[0], details='W:(1,3)')]
+        rows, _, _ = self.run_plan(data, meetings=outside)
+        self.assertEqual({r['academic_week'] for r in rows}, {1, 3})
+
     def test_closure_on_non_meeting_weekday_does_not_apply(self):
         data = payload([week(1)], [{'affected_on': (MON + timedelta(days=1)).isoformat(), 'note': 'Tuesday'}])
         rows, _, _ = self.run_plan(data)

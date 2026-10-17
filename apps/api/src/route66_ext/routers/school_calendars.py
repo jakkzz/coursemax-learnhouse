@@ -24,6 +24,7 @@ from src.route66_ext.routers.google_subject_auth import boundary
 from src.route66_ext.routers.class_connections import Section, SectionQuery, verified_section
 from src.route66_ext.services import academic_rosters as roster
 from src.route66_ext.services import calendar_plan as planner
+from src.route66_ext.services import nrru_calendar_pdf
 from src.route66_ext.services import class_attendance as attendance
 from src.route66_ext.services import school_calendar as service
 
@@ -197,11 +198,38 @@ async def parse(revision_id: int, body: Versioned, request: Request, response: R
     document = await db.get(SchoolCalendarSource, row.source_id) if row.source_id else None
     if document is None or not document.pages:
         raise HTTPException(422, {'code': 'no_text', 'message': 'This PDF has no selectable text to read automatically. Complete the calendar manually; the PDF is kept.'})
+    from src.route66_ext.adapters.security_org_auth import enforce_org_mfa
+    await enforce_org_mfa(user.id, config.org_id, db)
+    # Known NRRU layout: read deterministically, with no AI call or credit.
+    known = nrru_calendar_pdf.read(document.pages, calendar.academic_year)
+    if known is None:
+        payload, credited = await _ai_payload(db, user, config, calendar, document, revision_id), True
+        method, notes = 'ai', []
+    else:
+        payload, credited, method, notes = known['payload'], False, known['method'], known['notes']
+    await roster.serialize(db)
+    await db.refresh(row)
+    if row.state != 'draft' or row.version != body.expected_version:
+        if credited:
+            from src.route66_ext.adapters.security_features_utils_usage import refund_ai_credit
+            refund_ai_credit(config.org_id, 1)
+        raise HTTPException(409, 'This draft changed while it was being read. Reload it; nothing was overwritten.')
+    found = planner.issues(payload, document.page_count)
+    row.payload = payload.model_dump(mode='json'); row.version += 1
+    reader = 'with the NRRU calendar reader (no AI)' if known else 'with AI'
+    row.parse_note = (f'Read automatically {reader} from {len(document.pages)} pages. '
+                      + ''.join(n.rstrip('.') + '. ' for n in notes)
+                      + 'Check every date against the PDF before publishing'
+                      + (f'; {len(found)} items need review.' if found else '.'))[:1000]
+    db.add(row)
+    await commit(db)
+    return {**await service.revision_dto(db, row), 'read_method': method, 'read_notes': notes}
+
+
+async def _ai_payload(db, user, config, calendar, document, revision_id):
     from src.route66_ext.adapters.security_features_utils_usage import reserve_ai_credit, refund_ai_credit
     from src.route66_ext.adapters.services_security_rate_limiting import enforce_ai_rate_limit
-    from src.route66_ext.adapters.security_org_auth import enforce_org_mfa
     from src.route66_ext.adapters.services_ai_llm import generate, resolve_model_for_org
-    await enforce_org_mfa(user.id, config.org_id, db)
     enforce_ai_rate_limit(user.id, config.org_id)
     try:
         await reserve_ai_credit(config.org_id, db, amount=1)
@@ -215,24 +243,15 @@ async def parse(revision_id: int, body: Versioned, request: Request, response: R
         result = await generate(model_name=model, system_prompt=_PARSE_PROMPT, output_type=planner.Payload,
             user_prompt=f'Academic year (BE): {calendar.academic_year}. Calendar track: {calendar.track}.\n\n{text}', timeout=180)
         payload = planner.Payload.model_validate(result.model_dump() if hasattr(result, 'model_dump') else result)
+        if not payload.terms:
+            raise ValueError('AI result has no terms')  # never save (or charge for) an empty reading
+        return payload
     except Exception as error:
         refund_ai_credit(config.org_id, 1)
         if type(error).__name__ == 'AINotConfiguredError':
             raise HTTPException(403, {'code': 'ai_unavailable', 'message': 'Automatic reading is not configured. Complete the calendar manually; the PDF and draft are kept.'}) from None
         log.warning('Academic calendar parse failed for revision %s', revision_id, exc_info=True)
         raise HTTPException(502, {'code': 'parse_failed', 'message': 'Automatic reading failed. Retry, or complete the calendar manually; the PDF and draft are unchanged.'}) from None
-    await roster.serialize(db)
-    await db.refresh(row)
-    if row.state != 'draft' or row.version != body.expected_version:
-        refund_ai_credit(config.org_id, 1)
-        raise HTTPException(409, 'This draft changed while it was being read. Reload it; nothing was overwritten.')
-    found = planner.issues(payload, document.page_count)
-    row.payload = payload.model_dump(mode='json'); row.version += 1
-    row.parse_note = (f'Read automatically from {len(document.pages)} pages. Check every date against the PDF before publishing'
-                      + (f'; {len(found)} items need review.' if found else '.'))[:1000]
-    db.add(row)
-    await commit(db)
-    return await service.revision_dto(db, row)
 
 
 @router.post('/revisions/{revision_id}/publish')

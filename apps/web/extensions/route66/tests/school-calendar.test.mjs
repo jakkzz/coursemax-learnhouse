@@ -36,13 +36,42 @@ test('calendar upload/review remains separate from publishing or changing classe
  assert.match(s, /new FormData/)
  assert.match(s, /accept="application\/pdf"/)
  assert.match(s, /expected_version: revision.version, payload/)
- assert.match(s, /disabled=\{busy \|\| dirty \|\| !reviewed\}/)
+ assert.match(s, /disabled=\{busy \|\| dirty \|\| !reviewed \|\| !hasDates \|\| needsReview\}/)
  assert.match(s, /\/source`/)
  assert.match(s, /teaching: e.target.checked/)
  assert.match(s, /aria-label=\{t\('Teaching week to inspect'/)
  assert.match(s, /Extracted text below is a reading aid/)
  assert.doesNotMatch(s, /<iframe/)
  assert.doesNotMatch(s, /assignments\/|\/schedules\/apply|localStorage/)
+})
+test('PDF upload and reopening an empty saved draft read dates automatically without exposing blank validation forms', () => {
+ const s = source('calendar/CalendarLibrary.tsx')
+ assert.match(s, /setUploading\(false\); setFile\(null\); await openRevision\(value\)/)
+ assert.match(s, /value\.state === 'draft' && value\.payload\.terms\.length === 0\) await readPdf\(value\)/)
+ assert.match(s, /openRevision\(await calendarRequest<Revision>\(`\/revisions\/\$\{c\.latest_revision_id\}/)
+ assert.match(s, /reading \? .*Reading your calendar PDF/)
+ assert.match(s, /!hasDates && !manual/)
+ assert.match(s, /hasDates && !dirty && Boolean\(revision\.issues/)
+ assert.match(s, /Retry reading PDF/)
+ assert.match(s, /readFailed && dirty/)
+ assert.match(s, /saved\.version !== revision\.version/)
+ assert.doesNotMatch(s, /Extract dates from PDF/)
+ assert.match(s, /Dates or teaching status to check/)
+ assert.match(s, /setTermIndex\(check\.ti\); setTab\(check\.tab\)/)
+ assert.match(s, /setWeekIndex\(check\.index\)/)
+ assert.match(s, /checks\.length > 0 \|\| Boolean\(payload\.unresolved/)
+ assert.match(s, /PDF reading details/)
+ assert.match(s, /<details open=\{term\.weeks\.length === 0\}/)
+ assert.match(s, /See all \$\{term\.weeks\.length\} weeks/)
+})
+test('PDF reading errors describe recovery and preserve the uploaded source in both languages', async () => {
+ const original = globalThis.fetch
+ try {
+  for (const th of [false, true]) {
+   globalThis.fetch = async () => ({ ok: false, json: async () => ({ detail: { code: 'ai_unavailable', message: 'AI is not enabled for this organization' } }) })
+   await assert.rejects(calendarRequest('/revisions/1/parse', th), th ? /ไฟล์ต้นฉบับและฉบับร่างยังคงอยู่/ : /Your PDF and draft are saved/)
+  }
+ } finally { globalThis.fetch = original }
 })
 test('calendar selection and preview do not automatically mutate sessions or student membership', () => {
  const s = source('calendar/ClassSchedule.tsx')

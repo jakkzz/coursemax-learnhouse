@@ -209,13 +209,13 @@ class SchoolCalendarTests(AcademicRosterTests):
         self.assertEqual([(c['published_revision_id'], c['latest_revision_id']) for c in listing['calendars']], [(rid, again['id'])])
         self.assertEqual((await self.client.get(f'/api/v1/school-calendars/revisions/{rid}')).status_code, 200)
 
-    async def text_draft(self):
+    async def text_draft(self, pages=((1, 'ปฏิทินการศึกษา ภาคเรียนที่ 1/2569 สัปดาห์ที่ 1 ...'),), year='2569'):
         """Upload with mocked native text extraction; the PDF bytes are still stored as-is."""
         await self.make_admin(); self.actor = 1
         data = blank_pdf()
         from src.route66_ext.adapters import services_ai_rag_formats as formats
-        with patch.object(formats, 'pdf_pages', lambda *a, **k: [(1, 'ปฏิทินการศึกษา ภาคเรียนที่ 1/2569 สัปดาห์ที่ 1 ...')]):
-            created = await self.client.post('/api/v1/school-calendars', data={'name': 'ปฏิทิน', 'academic_year': '2569', 'track': 'ภาคปกติ'},
+        with patch.object(formats, 'pdf_pages', lambda *a, **k: list(pages)):
+            created = await self.client.post('/api/v1/school-calendars', data={'name': 'ปฏิทิน', 'academic_year': year, 'track': 'ภาคปกติ'},
                                              files={'file': ('calendar.pdf', data, 'application/pdf')})
         self.assertEqual(created.status_code, 200, created.text)
         return created.json(), data
@@ -272,6 +272,27 @@ class SchoolCalendarTests(AcademicRosterTests):
         reloaded = (await self.client.get(f"/api/v1/school-calendars/revisions/{draft['id']}")).json()
         self.assertEqual((reloaded['state'], reloaded['payload']), ('draft', saved['payload']))
 
+    async def test_known_nrru_calendar_is_read_without_ai_or_credit(self):
+        from src.route66_ext.tests.services.test_nrru_calendar_pdf import pages
+        draft, _ = await self.text_draft([(p['page'], p['text']) for p in pages()], year='2570')
+        self.ai(AsyncMock())
+        try:
+            response = await self.client.post(f"/api/v1/school-calendars/revisions/{draft['id']}/parse", json={'expected_version': 0})
+        finally:
+            self.stop_ai()
+        self.assertEqual(response.status_code, 200, response.text)
+        saved = response.json()
+        self.mfa.assert_awaited_once()
+        self.limit.assert_not_called(); self.reserve.assert_not_awaited(); self.refund.assert_not_called()
+        self.model.assert_not_awaited(); self.generate.assert_not_awaited()
+        self.assertEqual((saved['read_method'], saved['version']), ('nrru_calendar_text_v1', 1))
+        weeks = {w['number']: w for w in saved['payload']['terms'][0]['weeks']}
+        self.assertEqual((weeks[5]['teaching'], weeks[5]['uncertain'], weeks[8]['teaching']), (True, True, False))
+        self.assertEqual(len(saved['payload']['unresolved']), 1)
+        self.assertIn('NRRU calendar reader (no AI)', saved['parse_note'])
+        refused = await self.client.post(f"/api/v1/school-calendars/revisions/{draft['id']}/publish", json={'expected_version': 1, 'reviewed': True})
+        self.assertEqual(refused.status_code, 422)  # review questions block publishing until a person resolves them
+
     async def test_ai_provider_failures_keep_source_and_draft_and_refund_credit(self):
         draft, data = await self.text_draft()
         AINotConfiguredError = type('AINotConfiguredError', (Exception,), {})
@@ -288,6 +309,16 @@ class SchoolCalendarTests(AcademicRosterTests):
             after = (await self.client.get(f"/api/v1/school-calendars/revisions/{draft['id']}")).json()
             self.assertEqual((after['version'], after['payload'], after['parse_note']), (0, draft['payload'], draft['parse_note']))
             self.assertEqual((await self.client.get(f"/api/v1/school-calendars/revisions/{draft['id']}/source")).content, data)
+        # An empty AI reading is a failure: refunded, nothing saved.
+        from src.route66_ext.services.calendar_plan import Payload
+        self.ai(AsyncMock(return_value=Payload()))
+        try:
+            response = await self.client.post(f"/api/v1/school-calendars/revisions/{draft['id']}/parse", json={'expected_version': 0})
+        finally:
+            self.stop_ai()
+        self.assertEqual((response.status_code, response.json()['detail']['code']), (502, 'parse_failed'))
+        self.refund.assert_called_once_with(1, 1)
+        self.assertEqual((await self.client.get(f"/api/v1/school-calendars/revisions/{draft['id']}")).json()['version'], 0)
         # A disabled/over-quota native AI gate is reported precisely, before any model call.
         from fastapi import HTTPException as Denied
         self.ai(AsyncMock())

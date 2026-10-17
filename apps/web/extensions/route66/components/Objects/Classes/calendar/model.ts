@@ -18,8 +18,9 @@ export async function calendarRequest<T>(path: string, th: boolean, options: Req
     const issues = body?.detail?.issues as unknown
     const validation = Array.isArray(body?.detail) ? body.detail : body?.detail?.errors
     const fix = Array.isArray(issues) ? issues.filter((x): x is string => typeof x === 'string').join(' · ') : Array.isArray(validation) ? validation.map(e => e.msg).filter(Boolean).join(' · ') : ''
-    const thai: Record<string, string> = { invalid_pdf: 'ไฟล์นี้อ่านเป็น PDF ไม่ได้ โปรดเลือกไฟล์ต้นฉบับอีกครั้ง', too_large: 'ไฟล์เกิน 10 MB โปรดเลือกไฟล์ที่มีขนาดเล็กกว่า', no_text: 'เอกสารไม่มีข้อความที่ดึงได้ โปรดเปิดต้นฉบับและกรอกวันที่เอง ระบบเก็บไฟล์ไว้แล้ว', ai_unavailable: 'ยังใช้ระบบดึงวันที่ไม่ได้ โปรดกรอกวันที่เอง ไฟล์ต้นฉบับและฉบับร่างยังคงอยู่', parse_failed: 'ดึงวันที่จากเอกสารไม่สำเร็จ ลองอีกครั้งหรือกรอกข้อมูลเองได้ ไฟล์ต้นฉบับและฉบับร่างยังคงอยู่' }
-    const localized = th ? thai[body?.detail?.code] : undefined
+    const thai: Record<string, string> = { invalid_pdf: 'อ่านไฟล์นี้ไม่ได้ โปรดเลือกไฟล์ PDF ต้นฉบับอีกครั้ง', too_large: 'ไฟล์เกิน 10 MB โปรดเลือกไฟล์ที่มีขนาดเล็กกว่า', no_text: 'อ่านตัวอักษรจากไฟล์นี้ไม่ได้ โปรดใช้ไฟล์ต้นฉบับที่เลือกข้อความได้ ไฟล์ที่อัปโหลดยังคงอยู่', ai_unavailable: 'ยังไม่ได้ตั้งค่าระบบอ่านอัตโนมัติสำหรับเอกสารรูปแบบนี้ ไฟล์ต้นฉบับและฉบับร่างยังคงอยู่', parse_failed: 'อ่านวันที่จากเอกสารไม่สำเร็จ โปรดลองอ่านอีกครั้ง ไฟล์ต้นฉบับและฉบับร่างยังคงอยู่' }
+    const english: Record<string, string> = { no_text: 'This PDF has no readable text. Try a selectable-text original. Your uploaded file is saved.', ai_unavailable: 'Automatic reading is not configured for this document format. Your PDF and draft are saved.', parse_failed: 'Calendar dates could not be read. Retry reading; your PDF and draft are saved.' }
+    const localized = (th ? thai : english)[body?.detail?.code]
     throw new Error(localized || detail || fix || (th ? 'ดำเนินการไม่ได้ โปรดลองอีกครั้ง ข้อมูลที่บันทึกไว้ยังคงอยู่' : 'This action could not be completed. Retry; saved records are unchanged.'))
   }
   return response.json()

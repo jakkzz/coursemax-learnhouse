@@ -2,7 +2,8 @@
 
 ## Course planning from a published semester calendar
 
-Validated source; staging deployment pending. The earlier date-only exclusion
+Deployed to LearnHouse staging, 2026-10-17, source `df75ce08`, image
+`coursemax-learnhouse:course-calendar-planning-20261017`. The earlier date-only exclusion
 was a workflow discrepancy: a published academic-date calendar must remain selectable.
 The picker now scopes accepted calendars by academic year **and semester**, including
 date-only programs. A teacher chooses the program, reviews suggested first/last
@@ -42,6 +43,15 @@ schedule review/apply/reload and student read-only make-ups. No page errors or
 horizontal overflow. Native PostgreSQL tests cover authoring denial, draft reader
 404s, explicit publication, atomic failure, concurrent reuse, program separation and
 preserved edits. Synthetic checks are not institutional/provider acceptance.
+
+The live read-only check confirms the existing published school calendar now exposes
+three semester/program planning choices. Two fresh-native-login EN/TH navigation
+checks and syllabus origin/nonexistent-class denials pass. No live syllabus or
+attendance schedule was created. App-only replacement/gateway reload, no migration;
+exact schema, protected calendar/source/native-content/academic rows, environment,
+mounts and peer IDs preserved. 1,030 API files and 5,491 web entries/permissions verified.
+Fresh protected backup and exact preceding private-calendar image retained for code
+recovery; never restore old academic data. Finish review was inline, not independent.
 
 ### Direction contract
 

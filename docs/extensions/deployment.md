@@ -1,6 +1,40 @@
 # Internal extension deployment records
 
-## Latest: teacher-private calendars and proposal attachments — deployed 2026-10-17
+## Latest: course planning from published semester dates — deployed 2026-10-17
+
+Source `df75ce0887ade8089e9b64b67b7183dbd22b4d23`, healthy image
+`coursemax-learnhouse:course-calendar-planning-20261017`, ID
+`sha256:9d15059d042ac91da5db9f580e7910da086b4ab95c26a080bb5a9c3e10855d03`.
+Published date-only calendars remain selectable for their semester. Teacher-reviewed
+course periods/exceptions reuse existing schedule review, sessions and immutable
+calendar pins. Native unpublished syllabus drafts are separate from attendance,
+reused per course/semester/program without overwriting edits. Native authoring and
+publication permissions remain; rich-text editing uses the existing desktop editor.
+
+19 passing calendar/PostgreSQL cases plus one skipped opt-in source case, 17 pure
+planner/template cases, 80 web checks, production bundle/TypeScript, 25 tooling and
+four overlay checks pass. Five compiled native-shell EN/TH desktop/Thai-mobile tasks
+cover scheduling, draft creation, desktop editing/save/reload, mobile handoff and
+student make-ups. Atomic failure, concurrent reuse, native draft-reader denials and
+program separation tested. Detector clean; inline finish review, not independent.
+
+Two fresh-native-login live read-only navigation tasks and syllabus origin/missing-
+class denials pass. The existing published calendar exposes three program choices;
+no real calendar, syllabus or schedule was changed. App-only replace/gateway reload;
+no migration. Exact schema, protected source/calendar/native-content/identity/roster/
+progress rows, environment, mounts and all observed peer IDs preserved. 1,030 API
+files and 5,491 web entries/permissions/Config verified; in-flight assets retained.
+Only this feature's API changes were overlaid on the verified actual parent.
+
+Fresh protected archive checked; exact preceding `private-calendars-20261017` image
+`sha256:2796b829c59de838b877634ec9ce0d70dc2c82b7f2d3cabe6fde8b67aed3f8d2`
+retained for code recovery. It already enforces private ownership; never use the older
+organization-only backend or restore academic data for rollback. No new restore or
+institutional/provider acceptance is claimed for this code-only release. Evidence
+`course-calendar-planning-20261017/`, `course-calendar-planning-web-final-20261017/`
+and `releases/course-calendar-planning-20261017/` in private launch state.
+
+## Previous: teacher-private calendars and proposal attachments — deployed 2026-10-17
 
 Source `256bc80293fd47648b17dc5313d5b37f34207f42`, healthy image
 `coursemax-learnhouse:private-calendars-20261017`, ID

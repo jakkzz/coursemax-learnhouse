@@ -46,8 +46,13 @@ if [[ $READY != 1 ]]; then
   exit 1
 fi
 
+# Optional private source proof directory (never committed), mounted only when named.
+PRIVATE=()
+if [[ -n ${LEARNHOUSE_TEST_PRIVATE_SOURCE:-} ]]; then
+  PRIVATE=(-v "$LEARNHOUSE_TEST_PRIVATE_SOURCE:/private" -e LEARNHOUSE_TEST_PRIVATE_SOURCE=/private)
+fi
 docker run --rm --pull=never --network none --read-only \
-  --user "$(id -u):$(id -g)" --cap-drop ALL --security-opt no-new-privileges \
+  --user "$(id -u):$(id -g)" --cap-drop ALL --security-opt no-new-privileges "${PRIVATE[@]}" \
   --memory 384m --cpus 0.5 --pids-limit 64 --tmpfs /tmp:rw,size=16m \
   -v "$SCRATCH:/scratch" \
   -v "$ROOT/apps/api/src:/app/api/src:ro" \

@@ -116,19 +116,41 @@ def _pdf_facts(data):
 @router.post('')
 async def upload(request: Request, response: Response, name: str | None = Form(None, max_length=200),
                  academic_year: int | None = Form(None, ge=2500, le=2700), track: str | None = Form(None, max_length=40),
-                 file: UploadFile = File(...), db: AsyncSession = Depends(get_db_session)):
+                 file: UploadFile | None = File(None), url: str | None = Form(None, max_length=2048),
+                 db: AsyncSession = Depends(get_db_session)):
     private(response); user, config, _ = await context(request, db); boundary(request, config); administrator(user)
-    data = await file.read(service.MAX_PDF_BYTES + 1)
+    url = (url or '').strip() or None
+    if (file is None) == (url is None):
+        raise HTTPException(422, {'code': 'file_or_url', 'message':
+            'เลือกไฟล์ PDF หรือใส่ลิงก์อย่างใดอย่างหนึ่ง / Choose a PDF file or enter a link, not both'})
+    if url is None:
+        data = await file.read(service.MAX_PDF_BYTES + 1)
+        filename = file.filename
+    else:
+        from src.route66_ext.adapters.security_org_auth import enforce_org_mfa
+        from src.route66_ext.services import calendar_url
+        await enforce_org_mfa(user.id, config.org_id, db)
+        try:
+            data, filename, _ = await calendar_url.fetch(url, service.MAX_PDF_BYTES)
+        except calendar_url.UrlError as exc:
+            raise HTTPException(exc.status, {'code': exc.code, 'message': exc.message}) from None
+    return await _store(db, user, config, data, filename, name, academic_year, track)
+
+
+async def _store(db, user, config, data, filename, name, academic_year, track):
+    """One path for uploaded and linked PDFs: validate, keep the bytes, open an empty draft."""
     if len(data) > service.MAX_PDF_BYTES:
         raise HTTPException(413, {'code': 'too_large', 'message': 'Upload a PDF up to 10 MB'})
     if not data.startswith(b'%PDF-'):
         raise HTTPException(422, {'code': 'invalid_pdf', 'message': 'Upload the academic calendar as a PDF'})
     page_count, pages, truncated = await asyncio.to_thread(_pdf_facts, data)
     digest = sha256(data).hexdigest()
-    filename = PurePath(file.filename or 'calendar.pdf').name[:255] or 'calendar.pdf'
+    filename = PurePath(filename or 'calendar.pdf').name[:255] or 'calendar.pdf'
     # Explicit fields win; otherwise year/group/name come from the PDF header (never invented).
     stated = nrru_calendar_pdf.metadata(pages, filename)
-    track = ' '.join((track or '').split()) or stated['track']
+    combined = nrru_calendar_pdf.abridged(pages)
+    # A combined multi-program source is never filed under one program, even when one is named.
+    track = stated['track'] if combined else ' '.join((track or '').split()) or stated['track']
     name = ' '.join((name or '').split()) or stated['name']
     academic_year = academic_year or stated['academic_year']
     missing = [label for label, value in (('ปีการศึกษา / academic year', academic_year), ('กลุ่มนักศึกษา / calendar group', track)) if not value]
@@ -152,6 +174,10 @@ async def upload(request: Request, response: Response, name: str | None = Form(N
         db.add(source); await db.flush()
     note = (f'{len(pages)} of {page_count} pages have selectable text. Read it automatically or complete the calendar manually.'
             if pages else 'No selectable text was found (scanned PDF?). Complete the calendar manually; the original PDF is kept.')
+    if combined:
+        note = (f"Abridged calendar (ฉบับย่อ) comparing {len(combined['programs'])} programs, kept as the original source. "
+                'It has no teaching weeks, holidays or make-ups, so it cannot plan class sessions. '
+                'Upload the full calendar (ฉบับเต็ม) for that.')
     if truncated:
         note += ' Text was shortened for very long documents; check the PDF itself.'
     revision = SchoolCalendarRevision(calendar_id=calendar.id, number=await service.next_number(db, calendar.id),
@@ -263,6 +289,11 @@ async def parse(revision_id: int, body: Versioned, request: Request, response: R
         raise HTTPException(422, {'code': 'no_text', 'message': 'This PDF has no selectable text to read automatically. Complete the calendar manually; the PDF is kept.'})
     from src.route66_ext.adapters.security_org_auth import enforce_org_mfa
     await enforce_org_mfa(user.id, config.org_id, db)
+    if combined := nrru_calendar_pdf.abridged(document.pages):
+        # Source only: nothing to read into weeks/dates, no AI; the draft is left as it is.
+        return {**await service.revision_dto(db, row), 'read_method': 'source_only', 'read_notes': [
+            f"Abridged multi-program calendar (ฉบับย่อ), semester {combined['semester']}/{combined['academic_year']}: "
+            'no teaching weeks, holidays or make-ups to read. Upload the full calendar (ฉบับเต็ม).']}
     # Known NRRU layout: read deterministically, with no AI call or credit.
     known = nrru_calendar_pdf.read(document.pages, calendar.academic_year)
     if known is None:

@@ -707,13 +707,111 @@ END; $$"""))
                 await conn.execute(text("INSERT INTO attendancesession (class_id,title,starts_at,ends_at,timezone,grace_minutes,late_threshold_minutes,state,version,created_by) VALUES (20,'legacy',:s,:e,'Asia/Bangkok',10,20,'scheduled',0,2)"),
                                    {'s': now, 'e': now + timedelta(hours=1)})
 
+    def linked(self, body, peer='93.184.216.34'):
+        """Serve one https link through the real fetch helper and native SSRF guard, without network."""
+        import socket
+        from src.route66_ext.services import calendar_url
+        self.fetched = []
+
+        def handler(request):
+            self.fetched.append(str(request.url))
+            return httpx.Response(200, content=body, extensions={'network_stream': SimpleNamespace(
+                get_extra_info=lambda name: (peer, 443) if name == 'server_addr' else None)})
+
+        resolve = lambda host, *a, **k: [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (peer, 0))]
+        return [patch('src.services.utils.ssrf_guard.socket.getaddrinfo', resolve),
+                patch.object(calendar_url, '_transport', httpx.MockTransport(handler))]
+
+    async def post_link(self, url, body, pages=None, **form):
+        from src.route66_ext.adapters import services_ai_rag_formats as formats
+        patches = self.linked(body) + ([patch.object(formats, 'pdf_pages', lambda *a, **k: list(pages))] if pages else [])
+        for item in patches:
+            item.start()
+        try:
+            return await self.client.post('/api/v1/school-calendars', data={'url': url, **form})
+        finally:
+            for item in reversed(patches):
+                item.stop()
+
+    async def test_url_upload_retains_source_and_abridged_source_stays_source_only(self):
+        from src.route66_ext.tests.services.test_nrru_calendar_pdf import abridged_pages
+        from src.route66_ext.adapters import security_org_auth as mfa
+        url = 'https://files.example/cal/MIX%202-71.pdf'
+        data, pages = blank_pdf(2), [(p['page'], p['text']) for p in abridged_pages()]
+        order = []
+        guard = AsyncMock(side_effect=lambda *a: order.append('mfa'))
+        with patch.object(mfa, 'enforce_org_mfa', guard):
+            self.actor = 3  # not a platform administrator: refused before any network
+            refused = await self.post_link(url, data, pages)
+            self.assertEqual((refused.status_code, self.fetched), (403, []))
+            await self.make_admin(); self.actor = 1
+            stranger = await self.client.post('/api/v1/school-calendars', data={'url': url}, headers={'Origin': 'https://elsewhere.example'})
+            self.assertEqual(stranger.status_code, 403)
+            both = await self.client.post('/api/v1/school-calendars', data={'url': url}, files={'file': ('a.pdf', data, 'application/pdf')})
+            neither = await self.client.post('/api/v1/school-calendars', data={'name': 'x'})
+            self.assertEqual([(r.status_code, r.json()['detail']['code']) for r in (both, neither)], [(422, 'file_or_url')] * 2)
+            for bad, code in (('http://files.example/a.pdf', 'invalid_pdf_url'), (url, 'url_not_pdf')):
+                failed = await self.post_link(bad, b'<html>sign in</html>', pages)
+                self.assertEqual((failed.status_code, failed.json()['detail']['code']), (422, code))
+            self.assertEqual(order, ['mfa', 'mfa'])  # MFA ran before each authorized fetch attempt
+            async with self.sessions() as db:
+                self.assertEqual((await db.exec(select(SchoolCalendarSource))).all(), [])
+            created = await self.post_link(url, data, pages, track='ภาคปกติ')  # a named program cannot claim a combined source
+        self.assertEqual(created.status_code, 200, created.text)
+        draft = created.json()
+        self.assertEqual((draft['source_kind'], draft['source_programs'], draft['source_name'], draft['source_hash']),
+                         ('abridged_multi_program', ['ภาคปกติ (ค.บ.) ลงทะเบียนปฏิบัติการวิชาชีพ', 'ภาคพิเศษ', 'ภาค กศ.ปช.'],
+                          'MIX 2-71.pdf', sha256(data).hexdigest()))
+        self.assertEqual((draft['calendar']['academic_year'], draft['calendar']['track']), (2571, 'ฉบับรวมหลายรูปแบบ'))
+        self.assertIn('(ฉบับย่อ รวมหลายรูปแบบ)', draft['calendar']['name'])
+        self.assertIn('Upload the full calendar', draft['parse_note'])
+        self.assertEqual((await self.client.get(f"/api/v1/school-calendars/revisions/{draft['id']}/source")).content, data)
+        self.ai(AsyncMock())
+        try:
+            read = await self.client.post(f"/api/v1/school-calendars/revisions/{draft['id']}/parse", json={'expected_version': 0})
+        finally:
+            self.stop_ai()
+        self.assertEqual(read.status_code, 200, read.text)
+        read = read.json()
+        self.mfa.assert_awaited_once(); self.reserve.assert_not_awaited(); self.generate.assert_not_awaited()
+        self.assertEqual((read['read_method'], read['version'], read['payload'], read['source_kind']),
+                         ('source_only', 0, draft['payload'], 'abridged_multi_program'))
+        publish = f"/api/v1/school-calendars/revisions/{draft['id']}/publish"
+        for extra in ({}, {'accept_proposals': True}):
+            blocked = await self.client.post(publish, json={'expected_version': 0, 'reviewed': True, **extra})
+            self.assertEqual(blocked.status_code, 422)  # no terms or weeks: structurally not publishable
+        kept = (await self.client.get(f"/api/v1/school-calendars/revisions/{draft['id']}")).json()
+        self.assertEqual((kept['state'], kept['version']), ('draft', 0))
+
+    async def test_private_actual_link_source_proof(self):
+        """Opt-in: the actual fetched bytes, kept privately, through the same upload path (real text extraction)."""
+        import json, os
+        folder = os.getenv('LEARNHOUSE_TEST_PRIVATE_SOURCE')
+        if not folder:
+            self.skipTest('private source not mounted')
+        data = Path(folder, 'source.pdf').read_bytes()
+        url = Path(folder, 'url.txt').read_text().strip()
+        await self.make_admin(); self.actor = 1
+        with patch('src.route66_ext.adapters.security_org_auth.enforce_org_mfa', AsyncMock()):
+            created = await self.post_link(url, data)
+        self.assertEqual(created.status_code, 200, created.text)
+        draft = created.json()
+        stored = (await self.client.get(f"/api/v1/school-calendars/revisions/{draft['id']}/source")).content
+        self.assertEqual((stored, draft['source_hash'], self.fetched), (data, sha256(data).hexdigest(), [url]))
+        self.ai(AsyncMock())
+        try:
+            read = (await self.client.post(f"/api/v1/school-calendars/revisions/{draft['id']}/parse", json={'expected_version': 0})).json()
+        finally:
+            self.stop_ai()
+        self.generate.assert_not_awaited()
+        Path(folder, 'pg-dto-proof.json').write_text(json.dumps({'upload': draft, 'parse': read}, ensure_ascii=False, indent=1, default=str))
+
 
 def static_scope():
     """The calendar feature does not import native assignment/grading modules."""
     root = Path(__file__).resolve().parents[2]
     files = [root / 'routers/school_calendars.py', root / 'services/school_calendar.py', root / 'services/calendar_plan.py']
     return [f for f in files if 'assignment' in f.read_text().replace('TeachingAssignment', '')]
-
 
 class ScopeTests(__import__('unittest').TestCase):
     def test_no_native_assignment_integration(self):

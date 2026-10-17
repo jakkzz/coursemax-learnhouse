@@ -44,6 +44,21 @@ TABLE = """การกำหนดสัปดาห์เรียนคี่
 หมายเหตุ สัปดาห์ที่ 5 วันที่ 9 – 13 สิงหาคม 2570 กิจกรรมทดสอบผู้เรียนระหว่างภาค"""
 
 
+# Abridged side-by-side program comparison (ฉบับย่อ): registration rows only, no teaching weeks.
+ABRIDGED = """ปฏิทินการศึกษาระดับปริญญาตรี มหาวิทยาลัยสมมุติ ภาคเรียนที่ ๒/๒๕๗๑ (ฉบับย่อ)
+ที่ กิจกรรม
+ภาคปกติ (ค.บ.)
+ลงทะเบียนปฏิบัติ
+การวิชาชีพ
+ภาคพิเศษ ภาค กศ.ปช.
+1 วันเปิดภาคการศึกษา 3 ธ.ค. 71 10 ธ.ค. 71 17 ธ.ค. 71
+2 สอบปลายภาค – 1 – 5 มี.ค. 72 8 – 9 มี.ค. 72"""
+
+
+def abridged_pages():
+    return [{'page': 1, 'text': ABRIDGED}, {'page': 2, 'text': 'ปฏิทินการศึกษา (ต่อ)\n3 วันปิดภาคการศึกษา – 12 มี.ค. 72'}]
+
+
 def pages(thai_digits=True):
     texts = [ANNOUNCEMENT, MAKEUPS, TABLE]
     convert = (lambda t: t.translate(THAI)) if thai_digits else (lambda t: t)
@@ -129,6 +144,22 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(reader.metadata(evening)['track'], 'ภาค กศ.ปช.')
         unknown = reader.metadata([{'page': 1, 'text': 'Calendar notes'}], 'Term_calendar.PDF')
         self.assertEqual(unknown, {'academic_year': None, 'track': None, 'name': 'Term calendar'})
+
+    def test_abridged_multi_program_source_is_kept_without_choosing_a_program(self):
+        source = abridged_pages()
+        found = reader.abridged(source)
+        self.assertEqual((found['kind'], found['semester'], found['academic_year']), ('abridged_multi_program', 2, 2571))
+        # The practicum column keeps its full label; it is never reported as an ordinary program.
+        self.assertEqual(found['programs'], ['ภาคปกติ (ค.บ.) ลงทะเบียนปฏิบัติการวิชาชีพ', 'ภาคพิเศษ', 'ภาค กศ.ปช.'])
+        self.assertEqual(reader.metadata(source, 'MIX.pdf'), {'academic_year': 2571, 'track': 'ฉบับรวมหลายรูปแบบ',
+            'name': 'ปฏิทินการศึกษาระดับปริญญาตรี มหาวิทยาลัยสมมุติ ภาคเรียนที่ 2/2571 (ฉบับย่อ รวมหลายรูปแบบ)'})
+        self.assertIsNone(reader.read(source, 2571))  # no weeks or dates are generated
+        # Full calendars and a single-program abridged header are unaffected.
+        self.assertIsNone(reader.abridged(pages()))
+        single = [{'page': 1, 'text': ABRIDGED.replace('ภาคพิเศษ ภาค กศ.ปช.', '')
+                   .replace('ภาคปกติ (ค.บ.)\nลงทะเบียนปฏิบัติ\nการวิชาชีพ\n', 'ภาคปกติ\n')}]
+        self.assertIsNone(reader.abridged(single))
+        self.assertNotEqual(reader.metadata(single)['track'], 'ฉบับรวมหลายรูปแบบ')
 
     def test_date_lists(self):
         self.assertEqual(reader.dates('10 – 11, 13 – 14 สิงหาคม 2569'),

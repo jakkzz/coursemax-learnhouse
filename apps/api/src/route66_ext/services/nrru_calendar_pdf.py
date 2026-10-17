@@ -260,12 +260,55 @@ _TRACKS = (('ภาคปกต', 'ภาคปกติ'), ('ภาคพเศ
 _HEADER_YEAR = re.compile(rf'ปการศกษา\s*({Y})')
 
 
+ABRIDGED = 'abridged_multi_program'
+COMBINED_TRACK = 'ฉบับรวมหลายรูปแบบ'  # a shared source container, never a program classes use
+_ABRIDGED = re.compile(rf'^(ปฏทนการศกษา.*?)ภาคเรยนท\s*(\d)\s*/\s*({Y})\s*\(?ฉบบยอ')
+_PROGRAM = re.compile(r'ภาค\s*(?:ปกต|พเศษ|กศ\.?\s*ปช\.?)(?:\s*\([^)]*\))?')
+
+
+def abridged(pages):
+    """The NRRU abridged (ฉบับย่อ) calendar comparing several programs side by side.
+
+    It lists registration/fee/exam rows per program column but no teaching weeks,
+    holidays or make-ups, so it is kept as a source only: nothing is read into
+    weeks or dates and no column is chosen. Returns None for any other document.
+    """
+    rows = list(_lines(pages[:1]))
+    if not rows or not (head := _ABRIDGED.search(rows[0][2])):
+        return None
+    programs = []
+    for _, line, skeleton, index in rows[1:]:
+        if re.match(r'\d', skeleton):
+            break  # first activity row: the column header has ended
+        if re.fullmatch(r'ท\s*กจกรรม', skeleton):
+            continue
+        found = list(_PROGRAM.finditer(skeleton))
+        if not found:
+            if programs:
+                programs[-1] += (' ' if programs[-1].endswith(')') else '') + line  # wrapped Thai label
+            continue
+        cuts = [index[m.start()] for m in found] + [len(line)]
+        if found[0].start() and programs:
+            programs[-1] += ' ' + line[:cuts[0]].strip()
+        programs += [line[a:b].strip() for a, b in zip(cuts, cuts[1:])]
+    if len(programs) < 2:
+        return None
+    year = int(re.sub(r'\D', '', head[3]))
+    line, index = rows[0][1], rows[0][3]
+    return {'kind': ABRIDGED, 'semester': int(head[2]), 'academic_year': year if 2500 <= year <= 2700 else None,
+            'title': line[:index[head.end(1)]].strip(), 'programs': programs}
+
+
 def metadata(pages, filename=None):
     """Calendar year/group/name stated in the first-page header; None where it is not stated.
 
     Only the announcement header (up to its semester/year line) is read, so later
     cross-program references never change the group. Name falls back to the filename.
+    An abridged multi-program calendar is stored as one combined source, never a program.
     """
+    if (source := abridged(pages)) and source['academic_year']:
+        return {'academic_year': source['academic_year'], 'track': COMBINED_TRACK,
+                'name': f"{source['title']} ภาคเรียนที่ {source['semester']}/{source['academic_year']} (ฉบับย่อ รวมหลายรูปแบบ)"[:200]}
     header = []
     for page, line, skeleton, _ in _lines(pages[:1]):
         if dates(skeleton) and header:
@@ -288,4 +331,4 @@ def metadata(pages, filename=None):
     return {'academic_year': year, 'track': track, 'name': name}
 
 
-__all__ = ['METHOD', 'dates', 'metadata', 'read', 'thai']
+__all__ = ['ABRIDGED', 'COMBINED_TRACK', 'METHOD', 'abridged', 'dates', 'metadata', 'read', 'thai']

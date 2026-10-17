@@ -48,8 +48,16 @@ async def revision_dto(db, revision, include_pages=True):
             'source_hash': source.sha256 if source else None, 'source_page_count': source.page_count if source else None,
             'source_truncated': source.truncated if source else False,
             'source_pages': source.pages if source and include_pages else [],
+            **_source_kind(source),
             'parse_note': revision.parse_note, 'issues': planner.issues(payload, source.page_count if source else None),
             'published_at': revision.published_at, 'calendar': await calendar_summary(db, calendar)}
+
+
+def _source_kind(source):
+    from src.route66_ext.services import nrru_calendar_pdf
+    combined = nrru_calendar_pdf.abridged(source.pages or []) if source else None
+    return {'source_kind': combined['kind'] if combined else None,
+            'source_programs': combined['programs'] if combined else []}
 
 
 async def revision_in_org(db, revision_id, org_id, *, editor=False):

@@ -48,7 +48,7 @@ test('calendar upload/review remains separate from publishing or changing classe
 test('PDF upload and reopening an empty saved draft read dates automatically without exposing blank validation forms', () => {
  const s = source('calendar/CalendarLibrary.tsx')
  assert.match(s, /setFile\(null\); await openRevision\(value\)/)
- assert.match(s, /value\.state === 'draft' && value\.payload\.terms\.length === 0\) await readPdf\(value\)/)
+ assert.match(s, /value\.state === 'draft' && value\.payload\.terms\.length === 0 && !value\.source_kind\) await readPdf\(value\)/)
  assert.match(s, /openRevision\(await calendarRequest<Revision>\(`\/revisions\/\$\{c\.latest_revision_id\}/)
  assert.match(s, /reading \? .*Reading your calendar PDF/)
  assert.match(s, /!hasDates && !manual/)
@@ -75,6 +75,26 @@ test('file selection opens a filled preview; metadata editing and source notes a
  assert.match(preview, /week\.starts_on/)
  assert.match(preview, /closure\.makeup_on/)
  assert.doesNotMatch(preview, /type="checkbox"|<input|question|resolve/i)
+})
+test('PDF URL uses the same authenticated import and never downloads in the browser', () => {
+ const s = source('calendar/CalendarLibrary.tsx')
+ assert.match(s, /body.append\('url', url.trim\(\)\)/)
+ assert.match(s, /type="url"/)
+ assert.match(s, /Use PDF URL/)
+ assert.match(s, /onSubmit=.*void importUrl\(\)/)
+ assert.match(s, /setUrlEntry\(false\); await openRevision\(value\)/)
+ assert.doesNotMatch(s, /fetch\(url|iframe/)
+ assert.match(s, /revision.source_kind === 'abridged_multi_program' && !hasDates/)
+ assert.match(s, /Upload full calendar PDF/)
+})
+test('PDF URL errors offer localized retry or file upload without claiming a source was saved', async () => {
+ const original = globalThis.fetch
+ try {
+  for (const th of [false, true]) {
+   globalThis.fetch = async () => ({ ok: false, json: async () => ({ detail: { code: 'url_unavailable', message: 'Server detail' } }) })
+   await assert.rejects(calendarRequest('', th), th ? /อัปโหลดไฟล์/ : /upload the file/)
+  }
+ } finally { globalThis.fetch = original }
 })
 test('PDF reading errors describe recovery and preserve the uploaded source in both languages', async () => {
  const original = globalThis.fetch

@@ -11,7 +11,8 @@ import inspect
 
 DEPENDENCIES = frozenset({'get_db_session', 'get_current_user'})
 NATIVE_VALUES = frozenset({'engine', 'Course', 'Organization', 'Role', 'RoleTypeEnum',
-                           'UserAuditEvent', 'UserOrganization', 'PublicUser', 'User', 'UserRead'})
+                           'UserAuditEvent', 'UserOrganization', 'PublicUser', 'User', 'UserRead',
+                           'SSRFBlockedError'})
 
 
 def _operation(module, name, original):

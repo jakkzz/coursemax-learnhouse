@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useTranslation } from 'react-i18next'
-import { AuthLayout } from '@/extensions/route66/adapters/ui'
+import { AuthLayout, Button } from '@/extensions/route66/adapters/ui'
 
 export default function LinkGooglePage() {
   const { t } = useTranslation()
@@ -44,9 +44,9 @@ export default function LinkGooglePage() {
             className="w-full rounded-lg border p-3 text-base" disabled={busy} />
         </label>
         {error && <p role="alert" className="text-sm leading-relaxed">{t('auth.google_link_retry', { defaultValue: 'Linking could not start. Sign in again, confirm your password, then retry. Your account has not changed.' })}</p>}
-        <button type="submit" disabled={busy} className="w-full rounded-lg bg-black p-3 font-medium text-white disabled:opacity-50">
-          {busy ? t('common.loading') : t('auth.google_link_continue', { defaultValue: 'Choose the Google account to link' })}
-        </button>
+        <Button type="submit" disabled={busy} loading={busy} loadingLabel={t('common.loading')} className="w-full">
+          {t('auth.google_link_continue', { defaultValue: 'Choose the Google account to link' })}
+        </Button>
         <Link href="/home" className="block text-center text-sm underline underline-offset-4">{t('common.cancel')}</Link>
       </form>
     </AuthLayout>

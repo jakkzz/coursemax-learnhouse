@@ -19,14 +19,14 @@ export default function LineSignIn({ disabled = false, onAvailabilityChange, onB
   }, [onAvailabilityChange])
   if (!available) return null
   return <div className="space-y-2">
-    <ProviderButton provider="line" disabled={busy || disabled} aria-busy={busy} onClick={async () => {
+    <ProviderButton provider="line" disabled={busy || disabled} loading={busy} loadingLabel={t('common.loading')} aria-busy={busy} onClick={async () => {
       setBusy(true); onBusyChange?.(true); setError(false)
       try {
         const requested = new URLSearchParams(window.location.search).get('next')
         await startLine('signin', requested && /^\/(?!\/)/.test(requested) ? requested : '/home')
       } catch { setBusy(false); onBusyChange?.(false); setError(true) }
     }}>
-      {busy ? t('common.loading') : t('auth.line_signin')}
+      {t('auth.line_signin')}
     </ProviderButton>
     <p className="text-sm leading-relaxed text-neutral-700">{t('auth.line_linked_only')}</p>
     {error && <p role="alert" className="text-sm leading-relaxed">{t('auth.line_retry')}</p>}

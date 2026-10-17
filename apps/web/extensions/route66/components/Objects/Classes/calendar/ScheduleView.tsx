@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/extensions/route66/adapters/ui'
 import { localDay, monthDays, moveMonth, type MeetingSession } from './model'
 import styles from './calendar.module.css'
-import interior from '@/extensions/route66/components/interior/material.module.css'
+import { SegmentedControl } from '@/extensions/route66/components/interior/SegmentedControl'
 
 export default function ScheduleView({ sessions, th, timezone = 'Asia/Bangkok', preview = false }: { sessions: MeetingSession[]; th: boolean; timezone?: string; preview?: boolean }) {
   const t = (en: string, thai: string) => th ? thai : en
@@ -33,7 +33,7 @@ export default function ScheduleView({ sessions, th, timezone = 'Asia/Bangkok', 
     </article>)}
   </div> }
   return <div className={styles.workspace}>
-    <nav className={`${styles.tabs} ${interior.navigation}`} aria-label={t('Schedule view', 'มุมมองตารางเรียน')}><button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')}>{t('Table', 'ตาราง')}</button><button type="button" aria-pressed={view === 'calendar'} onClick={() => setView('calendar')}>{t('Calendar', 'ปฏิทิน')}</button></nav>
+    <SegmentedControl className={styles.tabs} label={t('Schedule view', 'มุมมองตารางเรียน')} value={view} onValueChange={setView} options={[{ value: 'table', label: t('Table', 'ตาราง') }, { value: 'calendar', label: t('Calendar', 'ปฏิทิน') }]} />
     {sessions.length === 0 ? <p className={styles.empty}>{t('No dated sessions yet. Select a school calendar and review the schedule to begin.', 'ยังไม่มีวันเรียน เลือกปฏิทินการศึกษาและตรวจสอบตารางเรียนเพื่อเริ่มต้น')}</p> : view === 'table' ? records(ordered) : <div className={styles.month}>
       <div className={styles.toolbar}><Button variant="outline" size="icon" className="min-h-11 min-w-11" aria-label={t('Previous month', 'เดือนก่อนหน้า')} onClick={() => { setMonth(m => moveMonth(m, -1)); setSelected('') }}><ChevronLeft size={18} aria-hidden="true" /></Button><label>{t('Month (Gregorian year)', 'เดือน (ค.ศ.)')}<input type="month" value={month} onChange={e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) { setMonth(e.target.value); setSelected('') } }} /></label><Button variant="outline" size="icon" className="min-h-11 min-w-11" aria-label={t('Next month', 'เดือนถัดไป')} onClick={() => { setMonth(m => moveMonth(m, 1)); setSelected('') }}><ChevronRight size={18} aria-hidden="true" /></Button></div>
       <div className={styles.monthGrid} aria-label={t('Class calendar', 'ปฏิทินชั้นเรียน')}>

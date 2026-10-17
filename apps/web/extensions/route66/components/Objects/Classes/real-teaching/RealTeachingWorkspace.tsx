@@ -11,7 +11,7 @@ import ClassSchedule from '../calendar/ClassSchedule'
 import { weekdayKey } from '../../Account/subpages/timetable-colors'
 import colors from '../../Account/subpages/timetable-colors.module.css'
 import styles from './workspace.module.css'
-import interior from '@/extensions/route66/components/interior/material.module.css'
+import { SegmentedControl } from '@/extensions/route66/components/interior/SegmentedControl'
 import palette from '../class-colors.module.css'
 
 type View = 'overview' | 'timetable' | 'roster'
@@ -38,7 +38,7 @@ export default function RealTeachingWorkspace({ context, linked, linksKnown, th,
   return <section className={`${styles.workspace} ${palette.workspace}`} aria-labelledby="real-class-title">
     <Button variant="ghost" className="min-h-11" onClick={onClose}><ArrowLeft size={16} aria-hidden="true" />{t.back}</Button>
     <header className={styles.heading}><h1 id="real-class-title" ref={heading} tabIndex={-1}>{c.title}</h1><p>{c.course_code} · {context.semester}/{context.academic_year} · {t.section} {c.section}</p></header>
-    <nav className={`${styles.tasks} ${interior.navigation}`} aria-label={t.tasks}>{(['overview', 'timetable', 'roster'] as const).map(key => <button type="button" key={key} aria-current={view === key ? 'page' : undefined} onClick={() => setView(key)}>{t[key]}</button>)}</nav>
+    <SegmentedControl className={styles.tasks} label={t.tasks} value={view} onValueChange={setView} options={(['overview', 'timetable', 'roster'] as const).map(key => ({ value: key, label: t[key] }))} />
     {view === 'overview' && <div className={styles.task} role="region" aria-label={t.overview}>
       <h2>{t.overview}</h2><dl className={styles.facts}>{[[t.code, c.course_code], [t.section, c.section], [t.term, `${context.semester}/${context.academic_year}`], ...(context.teacher_name ? [[t.teacher, context.teacher_name]] : [])].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
       <section className={styles.learningLink} aria-labelledby="learning-class-title"><h2 id="learning-class-title">{t.learning}</h2>

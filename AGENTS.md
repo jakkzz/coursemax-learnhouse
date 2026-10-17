@@ -34,6 +34,24 @@ Keep the existing extension boundary as the simple default; do not start an unre
 core refactor or policy expansion. No runtime security or infrastructure change is
 requested by this development-process directive.
 
+## Custom frontend standard — Interior (owner instruction, 2026-10-17)
+
+Use https://www.interior.dev/docs across all our custom LearnHouse frontend modules,
+existing and new. Share reviewed source/adapted headless interactions under
+`apps/web/extensions/route66/components/interior/`; consume them through existing
+extension adapters where appropriate. Do not implement another bespoke button,
+copy/loading control or choice rail in each feature, or call cosmetic CSS alone a
+complete component migration. Review the relevant upstream implementation first.
+
+Interior is copy-source, not a package/framework replacement. Pin the reviewed
+commit and retain its MIT notice/provenance in `docs/extensions/interior-ui.md`.
+Reuse native LearnHouse/Radix behavior when already adequate (auth, shell, forms,
+dialogs, tabs, dates and disclosures); record the reason for adaptations. Preserve
+EN/TH, keyboard/focus/pointer cancellation, stable loading layouts, reduced motion,
+forced colors and private projector content. Keep academic/network state in its
+existing owner; a UI animation must never infer successful persistence. No global
+native-shell restyle or auth/backend rewrite is implied.
+
 ## Earlier demo-retirement directive (completed; historical context)
 
 Remove production demos and dry-run the full-goal plan through sequential, bounded

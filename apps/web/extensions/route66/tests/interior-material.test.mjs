@@ -4,12 +4,15 @@ import { readFileSync } from 'node:fs'
 const source = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8')
 const css = source('components/interior/material.module.css')
 
-test('Interior materials are scoped, attributed and accessible without new controllers', () => {
+test('Interior controls are shared, attributed and preserve native behavior', () => {
   assert.doesNotMatch(css, /:root|font-family|linear-gradient/)
   for (const value of ['#131313', '#454545', '#6e6e6e', '#4568ff', 'inset 0 1px 2px', 'prefers-reduced-motion', 'forced-colors', 'focus-visible', '::selection', 'caret-color', 'scrollbar-color']) assert(css.includes(value), value)
   assert.match(source('components/interior/LICENSE'), /Copyright \(c\) 2026 ozzy/)
   const adapter = source('adapters/ui.ts')
-  assert.match(adapter, /export \{ Button \} from '@components\/ui\/button'/)
+  assert.match(adapter, /export \{ Button \} from '@\/extensions\/route66\/components\/interior\/Button'/)
+  assert.match(source('adapters/native-controls.ts'), /Button as NativeButton/)
+  assert.match(source('components/interior/Button.tsx'), /<NativeButton/)
+  assert.doesNotMatch(source('components/interior/Button.tsx'), /fetch\(|setTimeout|useAsyncAction/)
   assert.match(adapter, /export \{ Input \} from '@components\/ui\/input'/)
   assert.match(source('adapters/tabs.ts'), /export \{ Tabs, TabsList, TabsTrigger, TabsContent \}/)
   assert.doesNotMatch(adapter, /fetch\(|useEffect|useState|onClick|setTimeout/)
@@ -29,5 +32,5 @@ test('button variants and hidden navigation retain distinct treatments', () => {
   assert.match(css, /\[aria-pressed=true\]/)
   assert.doesNotMatch(css, /\[hidden\].*display/)
   assert.match(css, /prefers-reduced-motion:[\s\S]*\.scope button:not\(\[role=tab\]\):not\(\[data-meeting\]\):active:not\(:disabled\)[^{]*\{ transform: none/)
-  assert.match(css, /\.scope\.scope \.navigation > :is\(button,a\):is\(\[aria-pressed=true\],\[aria-current\]\)/)
+  assert.match(css, /\.navigation\.navigation > :is\(button,a\):is\(\[aria-pressed=true\],\[aria-current\],\[aria-checked=true\]\)/)
 })

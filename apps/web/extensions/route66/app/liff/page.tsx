@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useTranslation } from 'react-i18next'
 import { AuthLayout, Button } from '@/extensions/route66/adapters/ui'
+import { CopyButton } from '@/extensions/route66/components/interior/CopyButton'
 import { finishLine } from '@/extensions/route66/services/auth/line'
 import { useAttendanceText } from '@/extensions/route66/components/Objects/Classes/AttendanceWorkspace'
 import { attendanceRequest, attendanceReturn, rememberContinuation, forgetContinuation, pendingScan, reserveScan, type AttendanceError } from '@/extensions/route66/components/Objects/Classes/attendance-client'
@@ -27,7 +28,7 @@ function loadSDK():Promise<LiffSDK> {
 
 export default function LineAppPage() {
  const {t}=useTranslation(),{t:copy,mounted}=useAttendanceText()
- const [busy,setBusy]=useState(false),[error,setError]=useState(''),[unlinked,setUnlinked]=useState(false),[next,setNext]=useState('/home'),[copied,setCopied]=useState(false)
+ const [busy,setBusy]=useState(false),[error,setError]=useState(''),[unlinked,setUnlinked]=useState(false),[next,setNext]=useState('/home')
  async function open(destination=next,signal?:AbortSignal) {
   setBusy(true);setError('');setUnlinked(false)
   try {
@@ -78,10 +79,10 @@ export default function LineAppPage() {
  return <AuthLayout org={null}><main className="m-auto w-full max-w-md space-y-5 p-6">
   <h1 className="text-2xl font-semibold">{t('auth.line_app_title')}</h1>
   <p className="text-sm leading-relaxed">{t('auth.line_app_description')}</p>
-  {!error&&<Button className="min-h-11 w-full" disabled={busy} onClick={()=>void open()}>{busy?t('common.loading'):t('auth.line_app_continue')}</Button>}
+  {!error&&<Button className="min-h-11 w-full" disabled={busy} loading={busy} loadingLabel={t('common.loading')} onClick={()=>void open()}>{t('auth.line_app_continue')}</Button>}
   {error&&<p role="alert" className="text-sm leading-relaxed">{unlinked?copy.lineUnlinked:error}</p>}
   <a href={browser} onClick={event=>{const sdk=(window as Window&{liff?:LiffSDK}).liff;try{if(sdk?.openWindow){sdk.openWindow({url:new URL(browser,window.location.origin).href,external:true});event.preventDefault()}}catch{/* The ordinary link and copied continuation remain usable. */}}} className="inline-flex min-h-11 items-center text-sm underline underline-offset-4">{copy.continueBrowser}</a>
   {unlinked&&<Link href="/auth/link/line" className="inline-flex min-h-11 items-center text-sm underline underline-offset-4">{t('auth.line_link_title')}</Link>}
-  {next.includes('?handoff=')&&<><Button variant="outline" className="min-h-11" onClick={()=>void navigator.clipboard.writeText(window.location.origin+next).then(()=>setCopied(true)).catch(()=>setError(copy.copyFailed))}>{copy.copyContinuation}</Button>{copied&&<p role="status" className="text-sm">{copy.continuationCopied}</p>}</>}
+  {next.includes('?handoff=')&&<CopyButton variant="outline" className="min-h-11" value={()=>window.location.origin+next} label={copy.copyContinuation} copiedLabel={copy.continuationCopied} errorLabel={copy.copyError} onError={()=>setError(copy.copyFailed)} />}
  </main></AuthLayout>
 }

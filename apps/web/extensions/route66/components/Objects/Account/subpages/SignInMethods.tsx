@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import interior from '@/extensions/route66/components/interior/material.module.css'
 import Link from 'next/link'
 import { useTranslation } from 'react-i18next'
+import { Button } from '@/extensions/route66/adapters/ui'
 import { ProviderIcon, providerControlClass } from '@/extensions/route66/components/Auth/ProviderButton'
 
 type Method = { provider: 'google' | 'line'; linked: boolean | null; enabled: boolean; manageable: boolean; error: boolean }
@@ -53,6 +54,6 @@ export default function SignInMethods() {
         </Link>}
       </div>)}
     </div>
-    {!busy && methods.some(method => method.error) && <button type="button" onClick={() => setAttempt(value => value + 1)} className={`${providerControlClass} mt-4 border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-50`}>{t('auth.methods_retry')}</button>}
+    {!busy && methods.some(method => method.error) && <Button type="button" variant="outline" onClick={() => setAttempt(value => value + 1)} className="mt-4">{t('auth.methods_retry')}</Button>}
   </section>
 }

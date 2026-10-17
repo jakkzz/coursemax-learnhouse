@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Dialog, DialogContent, DialogDescription, DialogTitle } from '@/extensions/route66/adapters/ui'
 import interior from '@/extensions/route66/components/interior/material.module.css'
+import { CopyButton } from '@/extensions/route66/components/interior/CopyButton'
 import { attendanceRequest, type AttendanceError, type AttendanceText, type Session } from './attendance-client'
 import styles from './attendance.module.css'
 
@@ -59,7 +60,7 @@ export default function AttendanceCode({session,kind,t,arrived,total,live,onClos
    {summary}
    <div className="flex flex-wrap justify-center gap-3">
     <Button className="min-h-11" onClick={()=>setLarge(true)}>{t.projector}</Button>
-    <Button className="min-h-11" variant="outline" disabled={!seconds} onClick={()=>void navigator.clipboard.writeText(display!.checkin_url).then(()=>setError('')).catch(()=>setError(t.copyFailed))}>{t.copy}</Button>
+    <CopyButton className="min-h-11" variant="outline" disabled={!seconds} value={display?.checkin_url??''} label={t.copy} copiedLabel={t.continuationCopied} errorLabel={t.copyError} onCopy={()=>setError('')} onError={()=>setError(t.copyFailed)} />
     <Button className="min-h-11" variant="ghost" disabled={renewing} onClick={()=>renew.current()}>{t.renew}</Button>
     <Button className="min-h-11" variant="ghost" onClick={onClose}>{t.closeCode}</Button>
    </div>

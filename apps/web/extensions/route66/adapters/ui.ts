@@ -5,7 +5,7 @@ import NativeAuthLayout from '@components/Auth/AuthLayout'
 import interior from '@/extensions/route66/components/interior/material.module.css'
 
 // Native shell/control contracts; extension code consumes these, never replaces them.
-export { Button } from '@components/ui/button'
+export { Button } from '@/extensions/route66/components/interior/Button'
 export { Input } from '@components/ui/input'
 export { Dialog, DialogContent, DialogDescription, DialogTitle } from '@components/ui/dialog'
 export { DashTabBar } from '@components/Dashboard/Shared/DashTabBar/DashTabBar'

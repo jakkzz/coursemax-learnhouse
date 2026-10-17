@@ -14,6 +14,22 @@ The deployment capacity check failed: 2.31 GiB free, subsequently below 1 GiB, t
 No build/restart/prune was attempted in this task. Finish calendar bundle/types, focused desktop/mobile flows and the routine
 app-only deployment once adequate headroom exists; do not package failed artifacts.
 
+## Dry run — implementation request, 2026-10-17
+
+The follow-up request is deploy calendar first, then implement this plan. A fresh
+capacity check still failed at 5.21 GiB disk / 2.38 GiB available RAM; no build or
+restart was attempted. Offline checks passed 25 actual attendance-policy tests,
+83 web source tests and 14 in-memory design assertions using the actual policy.
+The rehearsal covers login after QR expiry, original arrival time, same/different
+actor retries, revoked membership, deadline/version/no-class rejection and a failure
+before receipt commit. It is not Redis/SQL/HTTP concurrency or real-device proof.
+
+Two implementation details were clarified before coding: retain enough completed
+handoff metadata to recover a committed receipt after a lost acknowledgement without
+extending the deadline for a new scan; and handle SSE buffering at both nginx layers,
+not just in FastAPI. Calendar deployment remains first; attendance application code
+has not been started or represented as deployed.
+
 ## What is worth bringing from CourseMax
 
 Reviewed CourseMax checkout `9da69c731e47d341d7e9d6c37e8aead5384aa466`.
@@ -162,8 +178,13 @@ No new animation or transport dependency is needed.
 
 Handoff storage needs atomic one-use claim/completion semantics and bounded retention;
 a storage outage cannot create attendance. Do not add a second Redis service or a
-background worker. The authenticated direct scan path remains available to someone
-already signed in with a valid current QR.
+background worker. Keep completed-handoff metadata briefly beyond its usable deadline
+so an authenticated same-actor retry can resolve an already committed receipt, even
+if cache finalization or its acknowledgement failed. That does not extend permission
+to create a new scan; canonical scan uniqueness/receipt lookup is the final arbiter.
+Validate roster eligibility before permanently binding a fresh handoff to an actor.
+The authenticated direct scan path remains available to someone already signed in
+with a valid current QR.
 
 **Historical coverage:** QR-open evidence already shows that collection was started.
 A backfilled session without collection/scan/decision evidence remains not recorded,
@@ -187,8 +208,13 @@ Refresh at session clock boundaries even without a new event. Recheck scope duri
 streaming and on reconnect; an open stream must not retain revoked privileges.
 
 Student feeds expose only their own result; teacher roster data stays in authorized
-staff view. Disable proxy buffering for the exact stream path if required, bound DB
-work, close abandoned streams, and release connections between reads. Use existing
+staff view. There are two nginx layers: the owned staging gateway and the app's native
+API proxy. Send `X-Accel-Buffering: no` from the SSE endpoint for the inner layer and
+disable buffering only for the exact stream path in the owned gateway. The inner
+proxy consumes that header; assuming it reaches the outer proxy would break timely
+delivery. Preserve existing auth/forwarded headers and all unrelated routing. Bound
+DB work, close abandoned streams, and release connections between reads; do not hold
+a request-scoped DB session for the lifetime of a StreamingResponse. Use existing
 native auth refresh/reconnect behavior. A short active-page polling fallback keeps
 check-in usable if streaming fails, clearly labeled reconnecting rather than called
 server push. No LINE push/multicast/broadcast is involved.

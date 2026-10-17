@@ -14,6 +14,10 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import create_engine, inspect, text
 
+# This is a standalone runner, not app startup: register the native FK targets
+# through existing typed adapters before creating the owned calendar tables.
+from src.route66_ext.adapters.db_organizations import Organization as _NativeOrganization
+from src.route66_ext.adapters.db_users import User as _NativeUser
 from src.route66_ext.migrations.versions import b3e9c4d1a702_school_calendar as migration
 
 _CLASS_BEFORE = {'id', 'course_id', 'academic_year', 'semester', 'section', 'registry_course_id',

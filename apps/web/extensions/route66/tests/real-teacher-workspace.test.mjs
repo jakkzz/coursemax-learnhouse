@@ -37,7 +37,7 @@ test('active classes use actual timetable context, with no fictional preview ent
  assert.doesNotMatch(source,/teaching-preview|TeacherPlanningPreview|planningPreview|canPreviewTeaching|teaching-preview-entry|fictional/)
  assert.match(source,/RealTeachingWorkspace/)
  assert.match(source,/onOpenClass=\{setWorkspaceClass\}/)
- assert.match(source,/hidden=\{Boolean\(workspaceClass\)\|\|Boolean\(studentClass\)\}/)
+ assert.match(source,/hidden=\{!calendarOpen&&\(Boolean\(workspaceClass\)\|\|Boolean\(studentClass\)\)\}/)
 })
 test('production demonstration data and its simulator have been removed, not relabelled',()=>{
  for(const file of ['TeacherPlanningPreview.tsx','model.ts','copy.ts','preview.module.css'])assert.equal(fs.existsSync(new URL('../components/Objects/Classes/teaching-preview/'+file,import.meta.url)),false)

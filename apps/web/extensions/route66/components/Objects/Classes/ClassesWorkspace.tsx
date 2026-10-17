@@ -5,8 +5,9 @@ import Link from 'next/link'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/extensions/route66/adapters/ui'
 import { Input } from '@/extensions/route66/adapters/ui'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/extensions/route66/adapters/tabs'
 import { toast } from 'react-hot-toast'
-import { AlertCircle, CalendarDays, CheckCircle2, RefreshCw, UserCheck, UserMinus } from 'lucide-react'
+import { AlertCircle, CheckCircle2, RefreshCw, UserCheck, UserMinus } from 'lucide-react'
 import CalendarLibrary from './calendar/CalendarLibrary'
 import ClassSchedule from './calendar/ClassSchedule'
 import palette from './class-colors.module.css'
@@ -38,7 +39,7 @@ export default function ClassesWorkspace(){
  const th = mounted && i18n.language.startsWith('th'), workspace = workspaceCopy[th ? 'th' : 'en']
  const [isSchoolStaff,setIsSchoolStaff] = useState(false)
  const [sourceView,setSourceView] = useState<'school'|'learnhouse'>('school')
- const [calendarOpen,setCalendarOpen] = useState(false),[calendarRefresh,setCalendarRefresh] = useState(0),[studentClass,setStudentClass] = useState<ClassRow|null>(null)
+ const [calendarOpen,setCalendarOpen] = useState(false),[calendarVisited,setCalendarVisited] = useState(false),[calendarRefresh,setCalendarRefresh] = useState(0),[studentClass,setStudentClass] = useState<ClassRow|null>(null)
  const [workspaceClass,setWorkspaceClass] = useState<RegistrarClassContext|null>(null)
  const [data,setData]=useState<{classes:ClassRow[];can_create:boolean;student_match_status:string|null}|null>(null),[catalog,setCatalog]=useState<Catalog|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[refresh,setRefresh]=useState(0),[query,setQuery]=useState('')
  const [selected,setSelected]=useState<number|null>(null),[roster,setRoster]=useState<Roster|null>(null),[preview,setPreview]=useState<Preview|null>(null),[reviewed,setReviewed]=useState(false),[setup,setSetup]=useState(false),[editing,setEditing]=useState(false),[assigning,setAssigning]=useState(false),[manual,setManual]=useState(false),[person,setPerson]=useState<Person|null>(null),[reason,setReason]=useState(''),[studentQuery,setStudentQuery]=useState(''),[membershipFilter,setMembershipFilter]=useState('all'),[accountFilter,setAccountFilter]=useState('all')
@@ -51,16 +52,28 @@ export default function ClassesWorkspace(){
  const nativeClasses=data?.classes.filter(c=>c.course_id!==null)??[],current=nativeClasses.find(c=>c.id===selected),visible=nativeClasses.filter(c=>`${c.course_name} ${c.section} ${c.academic_year} ${c.semester}`.toLowerCase().includes(query.toLowerCase()))||[],people=roster?.students.filter(p=>`${p.full_name_th} ${p.student_number||''} ${p.faculty} ${p.program}`.toLowerCase().includes(studentQuery.toLowerCase())&&(membershipFilter==='all'||p.status===membershipFilter)&&(accountFilter==='all'||p.account_status===accountFilter))||[]
  const reasonField=<label className="flex flex-col gap-2 text-sm font-medium">{t.reason}<Input className="min-h-11" value={reason} maxLength={500} onChange={e=>setReason(e.target.value)} required minLength={5}/></label>
  const workspaceLink = workspaceClass ? linkedTeachingClass(workspaceClass, data?.classes ?? []) : null
+ function openCalendars(){setSourceView('school');setCalendarVisited(true);setCalendarOpen(true)}
+ function closeCalendars(){setCalendarOpen(false);setCalendarRefresh(n=>n+1)}
+ function showClassList(){closeCalendars();setWorkspaceClass(null);setStudentClass(null)}
  return <>
- {calendarOpen&&<CalendarLibrary th={th} onClose={()=>{setCalendarOpen(false);setCalendarRefresh(n=>n+1)}} />}
  <div hidden={calendarOpen}>
  {studentClass&&<section className="space-y-6"><Button variant="ghost" className="min-h-11" onClick={()=>setStudentClass(null)}>{th?'ชั้นเรียนของฉัน':'My classes'}</Button><h1 className="text-2xl font-semibold">{studentClass.course_name} · {studentClass.section}</h1><ClassSchedule classId={studentClass.id} th={th}/></section>}
- {workspaceClass && <RealTeachingWorkspace calendarRefresh={calendarRefresh} onOpenCalendars={()=>setCalendarOpen(true)} context={workspaceClass} linked={workspaceLink} linksKnown={data!==null} th={th} onClose={() => { const id=workspaceClass.returnFocusId; setWorkspaceClass(null); requestAnimationFrame(() => { if(id)document.getElementById(id)?.focus() }) }} onChanged={() => setRefresh(n => n + 1)} onOpenRoster={() => { if(workspaceLink?.manageable===true){setSourceView('learnhouse');setSelected(workspaceLink.id);setWorkspaceClass(null)} }} />}
- <section hidden={Boolean(workspaceClass)||Boolean(studentClass)} className={`${styles.workspace} ${palette.workspace} space-y-6 pb-24`} aria-labelledby="classes-title">
- <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 id="classes-title" className="text-3xl font-semibold tracking-tight">{t.title}</h1><p className="mt-2 max-w-prose text-sm leading-relaxed text-neutral-600">{workspace.intro}</p></div><Button variant="outline" className="min-h-11" onClick={()=>setCalendarOpen(true)}><CalendarDays size={18} aria-hidden="true"/>{th?'ปฏิทินการศึกษา':'School calendars'}</Button></header>
+ {workspaceClass && <RealTeachingWorkspace calendarRefresh={calendarRefresh} onOpenCalendars={openCalendars} context={workspaceClass} linked={workspaceLink} linksKnown={data!==null} th={th} onClose={() => { const id=workspaceClass.returnFocusId; setWorkspaceClass(null); requestAnimationFrame(() => { if(id)document.getElementById(id)?.focus() }) }} onChanged={() => setRefresh(n => n + 1)} onOpenRoster={() => { if(workspaceLink?.manageable===true){setSourceView('learnhouse');setSelected(workspaceLink.id);setWorkspaceClass(null)} }} />}
+ </div>
+ <section hidden={!calendarOpen&&(Boolean(workspaceClass)||Boolean(studentClass))} className={`${styles.workspace} ${palette.workspace} space-y-6 pb-24`} aria-labelledby="classes-title">
+ <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 id="classes-title" className="text-3xl font-semibold tracking-tight">{t.title}</h1><p className="mt-2 max-w-prose text-sm leading-relaxed text-neutral-600">{workspace.intro}</p></div></header>
  <SchoolWorkspaceNav active="classes" th={th} />
- <nav className={school.sources} aria-label={th ? 'แหล่งชั้นเรียน' : 'Class source'}><button type="button" aria-pressed={sourceView==='school'} onClick={()=>{setSourceView('school');setSelected(null)}}>{th ? 'ชั้นเรียน NRRU' : 'NRRU classes'}</button><button type="button" aria-pressed={sourceView==='learnhouse'} onClick={()=>setSourceView('learnhouse')}>{th ? 'ชั้นเรียน LearnHouse' : 'LearnHouse classes'}</button></nav>
- <div hidden={sourceView!=='school'}>{mounted&&<TeacherTimetable th={th} onStaffStatus={setIsSchoolStaff} onOpenClass={setWorkspaceClass} linkedClasses={nativeClasses} linksKnown={data!==null} />}{data?.classes.some(c=>c.course_id===null||!c.manageable)&&<section className="mt-6 space-y-4" aria-label={th?'ชั้นเรียนที่บันทึกไว้':'Saved school classes'}><h2 className="text-xl font-semibold">{th?'วันเรียนและการเข้าเรียน':'Sessions and attendance'}</h2>{data.classes.filter(c=>c.course_id===null||!c.manageable).map(c=><article key={c.id} className="flex flex-wrap items-center justify-between gap-4 border-t border-neutral-300 py-4"><div><h3 className="font-semibold">{c.course_name}</h3><p className="text-sm text-neutral-600">{c.semester}/{c.academic_year} · {c.section}</p></div><Button variant="outline" className="min-h-11" onClick={()=>setStudentClass(c)}>{th?'เปิดตารางเรียน':'Open schedule'}</Button></article>)}</section>}</div>
+ <nav className={school.sources} aria-label={th ? 'แหล่งชั้นเรียน' : 'Class source'}><button type="button" aria-pressed={sourceView==='school'} onClick={()=>{setSourceView('school');setSelected(null);showClassList()}}>{th ? 'ชั้นเรียน NRRU' : 'NRRU classes'}</button><button type="button" aria-pressed={sourceView==='learnhouse'} onClick={()=>{setSourceView('learnhouse');showClassList()}}>{th ? 'ชั้นเรียน LearnHouse' : 'LearnHouse classes'}</button></nav>
+ <div hidden={sourceView!=='school'}>
+ <Tabs value={calendarOpen?'calendar':'classes'} onValueChange={value=>value==='calendar'?openCalendars():showClassList()}>
+ <TabsList className="h-auto max-w-full flex-wrap justify-start gap-1" aria-label={th?'ชั้นเรียน NRRU':'NRRU classes'}>
+ <TabsTrigger value="classes" className="min-h-11 whitespace-normal">{th?'รายชื่อชั้นเรียน NRRU':'NRRU class list'}</TabsTrigger>
+ <TabsTrigger value="calendar" className="min-h-11 whitespace-normal">{th?'ปฏิทินการศึกษา':'School calendar'}</TabsTrigger>
+ </TabsList>
+ <TabsContent value="calendar" forceMount hidden={!calendarOpen} className="mt-6">{calendarVisited&&<CalendarLibrary th={th} embedded onClose={closeCalendars} />}</TabsContent>
+ <TabsContent value="classes" forceMount hidden={calendarOpen} className="mt-6">{mounted&&<TeacherTimetable th={th} onStaffStatus={setIsSchoolStaff} onOpenClass={setWorkspaceClass} linkedClasses={nativeClasses} linksKnown={data!==null} />}{data?.classes.some(c=>c.course_id===null||!c.manageable)&&<section className="mt-6 space-y-4" aria-label={th?'ชั้นเรียนที่บันทึกไว้':'Saved school classes'}><h2 className="text-xl font-semibold">{th?'วันเรียนและการเข้าเรียน':'Sessions and attendance'}</h2>{data.classes.filter(c=>c.course_id===null||!c.manageable).map(c=><article key={c.id} className="flex flex-wrap items-center justify-between gap-4 border-t border-neutral-300 py-4"><div><h3 className="font-semibold">{c.course_name}</h3><p className="text-sm text-neutral-600">{c.semester}/{c.academic_year} · {c.section}</p></div><Button variant="outline" className="min-h-11" onClick={()=>setStudentClass(c)}>{th?'เปิดตารางเรียน':'Open schedule'}</Button></article>)}</section>}</TabsContent>
+ </Tabs>
+ </div>
  <div hidden={sourceView!=='learnhouse'} className="space-y-6">
  {!current&&catalog&&<ConnectionsInbox th={th} courses={catalog.courses} refresh={refresh} onChanged={()=>setRefresh(n=>n+1)} onOpenClass={id=>{setSelected(id);setWorkspaceClass(null);window.scrollTo(0,0)}}/>}
  {!current&&data&&(isSchoolStaff||data.can_create)&&<div className="space-y-1"><h2 className="text-xl font-semibold tracking-tight">{workspace.linked}</h2><p className="text-sm leading-relaxed text-neutral-600">{workspace.linkedHelp}</p></div>}
@@ -92,5 +105,5 @@ export default function ClassesWorkspace(){
  <details className="border-t border-neutral-200 pt-4"><summary className="min-h-11 cursor-pointer text-sm font-medium">{t.evidence}</summary><ol className="mt-3 space-y-3 text-xs text-neutral-600">{roster.events.map(e=><li key={e.id}><p>{e.created_at}</p><p>{e.kind}</p><pre className="mt-1 whitespace-pre-wrap break-words">{JSON.stringify(e.details,null,2)}</pre></li>)}</ol></details></>}
  </>}
  </div>
- </section></div></>
+ </section></>
 }

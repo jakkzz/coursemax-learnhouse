@@ -7,6 +7,24 @@ Claude Code's Opus 5.5 completed backend work in the separate `school-calendar`
 Herdr session; Impeccable-guided upload/review corrections and desktop/mobile task
 confirmation are complete.
 
+## NRRU classes subtabs — source ready, deployment pending
+
+The class workspace now places **NRRU class list** and **School calendar** under
+**NRRU classes**, instead of opening the library from a page-level button. Source
+navigation remains visible in the calendar. Native LearnHouse/Radix tabs provide
+keyboard and linked-panel behavior; no new Interior interaction implementation or
+native source patch is needed. Calendar loading is lazy, visited panels stay mounted
+so unsaved edits survive tab/source changes, and class Schedule links open this same
+calendar tab. Existing revision-back confirmation and all API permissions remain.
+
+75 web checks and four isolated real-component Playwright teacher/student flows
+(EN 1440 / TH 390) pass, including keyboard switching, retry, retained search/edits,
+read-only student controls and Schedule handoff. The fixture uses cached native
+controls, not a production Next build or live deployment. No academic writes.
+Evidence: `nrru-class-tabs-20261017/`. Full build/deployment is pending the existing
+3 GiB available-memory reserve; preflight observed 2.29 GiB. No cleanup/restart,
+backend/schema/data change or staging activation has occurred for this change.
+
 ## Current delivery: the same PDF reads from upload or URL
 
 The retained uploaded MIX PDF and the supplied URL PDF are **byte-identical**:

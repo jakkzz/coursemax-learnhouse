@@ -1,5 +1,30 @@
 # School academic calendars
 
+## Past dates and exam weeks — API fix deployed 2026-10-17
+
+Source `746c8aa2` / image `past-calendar-20261017` creates missing dated entries
+regardless of whether their dates have passed. This creates calendar sessions, not
+attendance scans, receipts or grades. Existing past or evidence-bearing sessions
+remain protected; apply/repeat stays transactional and idempotent.
+
+Missing odd/even labels no longer block otherwise valid dated meetings. Their mode
+and physical location remain unspecified, including during exam weeks; new syllabus
+text says so rather than incorrectly calling them online. Reviewed breaks and explicit
+PDF date lists still control which dates exist. An official W range limits eligible
+weeks; it is not a requirement to teach during every school break, so the misleading
+internal-slot/non-teaching-week warning is removed. No school revision is changed.
+
+21 calendar/PostgreSQL cases plus one optional skip and 40 pure cases pass. Synthetic
+in-memory planning against the actual running API verifies backdated/exam entries
+without database writes. Schema and protected academic/identity/source state are
+unchanged. The existing validated `3fb7f604` web artifact is retained byte-for-byte.
+UI simplification `9fc87afb` (compact review, expandable notes, date-only hybrid
+controls and clearer unknown-mode text) has 83 source web checks and TSX syntax
+compilation only: **not deployed**. Three full web builds were SIGKILLed under
+shared-host memory pressure; no failed artifact was packaged. Resume its build and
+focused browser/type checks when capacity supports it. Do not confuse the pending
+abridged-calendar UI recovery with the deployed full-calendar API fix.
+
 ## School policy first — deployed 2026-10-17
 
 The updated UI supersedes the first-mode workflow below. The normal path

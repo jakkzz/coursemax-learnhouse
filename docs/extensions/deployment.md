@@ -1,6 +1,35 @@
 # Internal extension deployment records
 
-## Latest: school-derived teaching policy and exact PDF dates — deployed 2026-10-17
+## Latest: include past calendar dates and non-blocking exam modes — API deployed 2026-10-17
+
+API source `746c8aa2`, healthy image `coursemax-learnhouse:past-calendar-20261017`, ID
+`sha256:74d6f5e627e7bd7f91cf3509f47a8f5d46c2129ca11b9f6dab146bfb65434900`.
+Missing past entries are added normally, without attendance evidence. Missing school
+rotation labels leave dated modes unknown rather than blocking the entire schedule
+or inventing a mode. Existing past/recorded sessions remain unchanged; breaks and
+explicit source-date lists still apply. New syllabi correctly label unknown modes.
+
+21 PostgreSQL calendar cases plus one optional skip and 40 pure cases pass. Running
+API synthetic in-memory planning confirms past/exam handling without academic writes.
+Fresh native-login live checks pass. App-only replacement/gateway reload; exact
+schema, protected academic/native content/identity/calendar/source rows, environment,
+mounts and observed peer IDs preserved. Fresh backup archive checked. 1,030 API files
+and unchanged 5,537 web entries/permissions verified, native Config/in-flight assets
+retained; 127-layer package uses the previously verified 126-layer prefix. No schema
+migration, school acceptance/application, data restoration, cleanup or unrelated
+restart. Exact actual parent `source-matched-calendar-20261017` / `40eda4fe…` is the
+compatible code recovery; it understands all stored payloads. Never restore older
+academic data. No full recovery restart/restore rehearsal claimed.
+
+Web remains the validated `3fb7f604` artifact. UI-only source `9fc87afb` is **not
+deployed**: three full builds were killed under shared-host memory pressure. Its
+83 source tests and TSX syntax compilation are not full bundle/type/browser acceptance;
+no failed artifact was packaged. Compact counters/notes and abridged hybrid date
+controls await a successful full web build. Evidence `past-calendar-20261017/`, failed
+`past-calendar-web{,-final,-webpack}-20261017/`, release `releases/past-calendar-20261017/`.
+Current release pointer updated; source menu points to the deployed API tree.
+
+## Previous: school-derived teaching policy and exact PDF dates — deployed 2026-10-17
 
 Source `3fb7f604bdf0120225dde60e815c425f32f6c8c2`, healthy image
 `coursemax-learnhouse:source-matched-calendar-20261017`, ID

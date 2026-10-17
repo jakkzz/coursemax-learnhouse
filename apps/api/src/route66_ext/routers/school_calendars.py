@@ -36,9 +36,16 @@ class _Body(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
 
+class Metadata(_Body):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    academic_year: StrictInt | None = Field(default=None, ge=2500, le=2700)
+    track: str | None = Field(default=None, min_length=1, max_length=40)
+
+
 class SaveDraft(_Body):
     expected_version: StrictInt = Field(ge=0)
     payload: dict
+    metadata: Metadata | None = None
 
 
 class Versioned(_Body):
@@ -47,6 +54,9 @@ class Versioned(_Body):
 
 class Publish(Versioned):
     reviewed: StrictBool
+    payload: dict | None = None
+    metadata: Metadata | None = None
+    accept_proposals: StrictBool = False
 
 
 class NewDraft(_Body):
@@ -104,14 +114,10 @@ def _pdf_facts(data):
 
 
 @router.post('')
-async def upload(request: Request, response: Response, name: str = Form(min_length=1, max_length=200),
-                 academic_year: int = Form(ge=2500, le=2700), track: str = Form(min_length=1, max_length=40),
+async def upload(request: Request, response: Response, name: str | None = Form(None, max_length=200),
+                 academic_year: int | None = Form(None, ge=2500, le=2700), track: str | None = Form(None, max_length=40),
                  file: UploadFile = File(...), db: AsyncSession = Depends(get_db_session)):
     private(response); user, config, _ = await context(request, db); boundary(request, config); administrator(user)
-    # Calendar group is a natural Thai/English label (for example ภาคปกติ), not a code.
-    track, name = ' '.join(track.split()), ' '.join(name.split())
-    if not track or not name:
-        raise HTTPException(422, {'code': 'invalid_calendar', 'message': 'Enter the calendar name and group'})
     data = await file.read(service.MAX_PDF_BYTES + 1)
     if len(data) > service.MAX_PDF_BYTES:
         raise HTTPException(413, {'code': 'too_large', 'message': 'Upload a PDF up to 10 MB'})
@@ -120,6 +126,17 @@ async def upload(request: Request, response: Response, name: str = Form(min_leng
     page_count, pages, truncated = await asyncio.to_thread(_pdf_facts, data)
     digest = sha256(data).hexdigest()
     filename = PurePath(file.filename or 'calendar.pdf').name[:255] or 'calendar.pdf'
+    # Explicit fields win; otherwise year/group/name come from the PDF header (never invented).
+    stated = nrru_calendar_pdf.metadata(pages, filename)
+    track = ' '.join((track or '').split()) or stated['track']
+    name = ' '.join((name or '').split()) or stated['name']
+    academic_year = academic_year or stated['academic_year']
+    missing = [label for label, value in (('ปีการศึกษา / academic year', academic_year), ('กลุ่มนักศึกษา / calendar group', track)) if not value]
+    if missing:
+        raise HTTPException(422, {'code': 'invalid_calendar_file', 'missing': missing, 'message':
+            'ไม่พบ ' + ' และ '.join(missing) + ' ในไฟล์ปฏิทิน / This PDF does not state its ' + ', '.join(m.split(' / ')[1] for m in missing)
+            + '. Upload the official academic calendar PDF.'})
+    name = name or f'{track} {academic_year}'
     await roster.serialize(db)
     calendar = (await db.exec(select(SchoolCalendar).where(SchoolCalendar.org_id == config.org_id,
         SchoolCalendar.academic_year == academic_year, SchoolCalendar.track == track))).first()
@@ -169,11 +186,57 @@ async def save(revision_id: int, body: SaveDraft, request: Request, response: Re
     private(response); user, config, _ = await context(request, db); boundary(request, config); administrator(user)
     payload = service.payload_model(body.payload)
     await roster.serialize(db)
-    row, _ = await service.revision_in_org(db, revision_id, config.org_id, editor=True)
+    row, calendar = await service.revision_in_org(db, revision_id, config.org_id, editor=True)
     service.draft_for_edit(row, body.expected_version)
+    row = await _regroup(db, user, row, calendar, body.metadata)
     row.payload = payload.model_dump(mode='json'); row.version += 1; db.add(row)
     await commit(db)
     return await service.revision_dto(db, row)
+
+
+async def _regroup(db, user, row, calendar, metadata):
+    """Apply preview metadata to a draft; returns the draft that now holds the edit.
+
+    A new year/group never reassigns guarded rows: it reuses or creates that calendar,
+    a byte-identical copy of the source and a new draft. The old draft and source stay.
+    """
+    if metadata is None:
+        return row
+    year = metadata.academic_year or calendar.academic_year
+    track = ' '.join((metadata.track or calendar.track).split())
+    name = ' '.join((metadata.name or '').split())
+    if not track:
+        raise HTTPException(422, {'code': 'invalid_calendar', 'message': 'Enter the calendar group'})
+    target = calendar
+    if (year, track) != (calendar.academic_year, calendar.track):
+        target = (await db.exec(select(SchoolCalendar).where(SchoolCalendar.org_id == calendar.org_id,
+            SchoolCalendar.academic_year == year, SchoolCalendar.track == track))).first()
+        if target is None:
+            target = SchoolCalendar(org_id=calendar.org_id, academic_year=year, track=track,
+                                    name=name or f'{track} {year}', created_by=user.id)
+            db.add(target); await db.flush()
+        source_id = None
+        if row.source_id:
+            original = await db.get(SchoolCalendarSource, row.source_id)
+            copy = (await db.exec(select(SchoolCalendarSource).where(SchoolCalendarSource.calendar_id == target.id,
+                SchoolCalendarSource.sha256 == original.sha256))).first()
+            if copy is None:
+                copy = SchoolCalendarSource(calendar_id=target.id, filename=original.filename, sha256=original.sha256,
+                    size=original.size, content=original.content, page_count=original.page_count, pages=original.pages,
+                    truncated=original.truncated, uploaded_by=original.uploaded_by)
+                db.add(copy); await db.flush()
+            source_id = copy.id
+        moved = SchoolCalendarRevision(calendar_id=target.id, number=await service.next_number(db, target.id),
+            payload=row.payload, source_id=source_id, parse_note=row.parse_note, created_by=user.id)
+        db.add(moved); await db.flush()
+        row.version += 1
+        row.parse_note = (f'Moved to {track} {year} revision {moved.number}; this draft is kept for history. '
+                          + (row.parse_note or ''))[:1000]
+        db.add(row)
+        row = moved
+    if name and name != target.name:
+        target.name = name; db.add(target)  # display title only; grouping and revisions are unchanged
+    return row
 
 
 _PARSE_PROMPT = """You read a Thai university academic-calendar PDF and return only facts it states.
@@ -261,16 +324,37 @@ async def publish(revision_id: int, body: Publish, request: Request, response: R
     if body.reviewed is not True:
         raise HTTPException(400, 'Review every term, week and closure before publishing')
     await roster.serialize(db)
-    row, _ = await service.revision_in_org(db, revision_id, config.org_id, editor=True)
+    row, calendar = await service.revision_in_org(db, revision_id, config.org_id, editor=True)
     service.draft_for_edit(row, body.expected_version)
     document = await db.get(SchoolCalendarSource, row.source_id) if row.source_id else None
-    found = planner.issues(service.payload_model(row.payload), document.page_count if document else None)
+    payload = service.payload_model(row.payload if body.payload is None else body.payload)
+    note = row.parse_note
+    if body.accept_proposals is True:
+        payload, accepted = _accept(payload)
+        if accepted:
+            note = ('Accepted as previewed: ' + '; '.join(accepted) + '. ' + (note or ''))[:1000]
+    found = planner.issues(payload, document.page_count if document else None)
     if found:
         raise HTTPException(422, {'code': 'not_publishable', 'issues': found})
+    row = await _regroup(db, user, row, calendar, body.metadata)
+    row.payload = payload.model_dump(mode='json'); row.parse_note = note
     row.state = 'published'; row.version += 1; row.published_by = user.id
     row.published_at = datetime.now(timezone.utc); db.add(row)
     await commit(db)
     return await service.revision_dto(db, row)
+
+
+def _accept(payload):
+    """One-action acceptance: the reviewer accepts the previewed proposals as stated."""
+    accepted = list(payload.unresolved)
+    for term in payload.terms:
+        for item, label in [(term, f'semester {term.semester} dates'),
+                            *((w, f'week {w.number}') for w in term.weeks),
+                            *((c, f'closure {c.affected_on.isoformat()}') for c in term.closures)]:
+            if item.uncertain:
+                accepted.append(label); item.uncertain = False
+    payload.unresolved = []
+    return payload, accepted
 
 
 @router.post('/{calendar_id}/draft')

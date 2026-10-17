@@ -256,4 +256,36 @@ def read(pages, academic_year=None):
     return {'method': METHOD, 'payload': payload, 'notes': notes}
 
 
-__all__ = ['METHOD', 'dates', 'read', 'thai']
+_TRACKS = (('ภาคปกต', 'ภาคปกติ'), ('ภาคพเศษ', 'ภาคพิเศษ'), ('กศ.ปช', 'ภาค กศ.ปช.'))
+_HEADER_YEAR = re.compile(rf'ปการศกษา\s*({Y})')
+
+
+def metadata(pages, filename=None):
+    """Calendar year/group/name stated in the first-page header; None where it is not stated.
+
+    Only the announcement header (up to its semester/year line) is read, so later
+    cross-program references never change the group. Name falls back to the filename.
+    """
+    header = []
+    for page, line, skeleton, _ in _lines(pages[:1]):
+        if dates(skeleton) and header:
+            break  # first dated row: the header has ended
+        header.append(skeleton)
+        if _TITLE.search(skeleton):
+            break
+    text = ' '.join(header)
+    stated = _TITLE.search(text) or _HEADER_YEAR.search(text)
+    year = int(re.sub(r'\D', '', stated[stated.re.groups])) if stated else None
+    year = year if year and 2500 <= year <= 2700 else None
+    found = sorted((text.find(key), label) for key, label in _TRACKS if key in text)
+    track = found[0][1] if found else None
+    title = 'ปฏิทินการเรียนการสอน' if 'ปฏทนการเรยนการสอน' in text else 'ปฏิทินการศึกษา' if 'ปฏทนการศกษา' in text else None
+    if title and year and track:
+        name = f'{title} {track} ปีการศึกษา {year}'
+    else:
+        stem = re.sub(r'\.pdf$', '', (filename or '').strip(), flags=re.IGNORECASE)
+        name = ' '.join(re.sub(r'[_]+', ' ', stem).split())[:200] or None
+    return {'academic_year': year, 'track': track, 'name': name}
+
+
+__all__ = ['METHOD', 'dates', 'metadata', 'read', 'thai']

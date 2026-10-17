@@ -25,10 +25,11 @@ from src.route66_ext.services import academic_rosters as roster, learning_access
 ORIGIN = 'https://learn.example.com'
 
 
-def blank_pdf():
+def blank_pdf(pages=1):
     from pypdf import PdfWriter
     writer, out = PdfWriter(), BytesIO()
-    writer.add_blank_page(width=200, height=200)
+    for _ in range(pages):
+        writer.add_blank_page(width=200, height=200)
     writer.write(out)
     return out.getvalue()
 
@@ -292,6 +293,91 @@ class SchoolCalendarTests(AcademicRosterTests):
         self.assertIn('NRRU calendar reader (no AI)', saved['parse_note'])
         refused = await self.client.post(f"/api/v1/school-calendars/revisions/{draft['id']}/publish", json={'expected_version': 1, 'reviewed': True})
         self.assertEqual(refused.status_code, 422)  # review questions block publishing until a person resolves them
+
+    async def file_only(self, pages, filename='calendar.pdf'):
+        from src.route66_ext.adapters import services_ai_rag_formats as formats
+        data = blank_pdf(len(pages))
+        with patch.object(formats, 'pdf_pages', lambda *a, **k: list(pages)):
+            response = await self.client.post('/api/v1/school-calendars', files={'file': (filename, data, 'application/pdf')})
+        return response, data
+
+    async def test_file_only_upload_then_one_action_accept_with_edits(self):
+        from src.route66_ext.tests.services.test_nrru_calendar_pdf import pages
+        await self.make_admin(); self.actor = 1
+        response, data = await self.file_only([(p['page'], p['text']) for p in pages()])
+        self.assertEqual(response.status_code, 200, response.text)
+        draft = response.json()
+        self.assertEqual((draft['calendar']['academic_year'], draft['calendar']['track'], draft['calendar']['name']),
+                         (2570, 'ภาคปกติ', 'ปฏิทินการเรียนการสอน ภาคปกติ ปีการศึกษา 2570'))
+        no_year = [(1, 'ประกาศมหาวิทยาลัยราชภัฏนครราชสีมา\nปฏิทินการเรียนการสอนสำหรับนักศึกษาภาคปกติ')]
+        refused, _ = await self.file_only(no_year)
+        self.assertEqual((refused.status_code, refused.json()['detail']['code']), (422, 'invalid_calendar_file'))
+        rid = draft['id']
+        self.ai(AsyncMock())
+        try:
+            parsed = (await self.client.post(f'/api/v1/school-calendars/revisions/{rid}/parse', json={'expected_version': 0})).json()
+        finally:
+            self.stop_ai()
+        self.assertEqual((parsed['version'], parsed['read_method']), (1, 'nrru_calendar_text_v1'))
+        url = f'/api/v1/school-calendars/revisions/{rid}/publish'
+        legacy = await self.client.post(url, json={'expected_version': 1, 'reviewed': True})
+        self.assertEqual(legacy.status_code, 422)  # without explicit acceptance, flags still block
+        stale = await self.client.post(url, json={'expected_version': 0, 'reviewed': True, 'accept_proposals': True})
+        self.assertEqual(stale.status_code, 409)
+        broken = {**parsed['payload'], 'terms': [{**parsed['payload']['terms'][0], 'ends_on': '2027-07-01'}]}
+        invalid = await self.client.post(url, json={'expected_version': 1, 'reviewed': True, 'accept_proposals': True, 'payload': broken})
+        self.assertEqual((invalid.status_code, invalid.json()['detail']['code']), (422, 'not_publishable'))
+        edited = parsed['payload']
+        edited['terms'][0]['closures'][0]['note'] = 'วันหยุด (แก้ไขแล้ว)'
+        done = await self.client.post(url, json={'expected_version': 1, 'reviewed': True, 'accept_proposals': True, 'payload': edited})
+        self.assertEqual(done.status_code, 200, done.text)
+        published = done.json()
+        self.assertEqual((published['id'], published['state'], published['issues'], published['payload']['unresolved']), (rid, 'published', [], []))
+        term = published['payload']['terms'][0]
+        self.assertEqual(term['closures'][0]['note'], 'วันหยุด (แก้ไขแล้ว)')
+        self.assertFalse(any(w['uncertain'] for w in term['weeks']))
+        self.assertTrue(published['parse_note'].startswith('Accepted as previewed: '))
+        self.assertIn('week 5', published['parse_note']); self.assertIn('NRRU calendar reader', published['parse_note'])
+        self.assertLessEqual(len(published['parse_note']), 1000)
+        self.assertEqual((await self.client.get(f'/api/v1/school-calendars/revisions/{rid}/source')).content, data)
+
+    async def test_metadata_regroup_copies_source_and_keeps_original_draft(self):
+        from src.route66_ext.tests.services.test_nrru_calendar_pdf import pages
+        await self.make_admin(); self.actor = 1
+        response, data = await self.file_only([(p['page'], p['text']) for p in pages()])
+        original = response.json()
+        payload = calendar_payload(monday(2))
+        moved = await self.client.put(f"/api/v1/school-calendars/revisions/{original['id']}",
+                                      json={'expected_version': 0, 'payload': payload, 'metadata': {'academic_year': 2571}})
+        self.assertEqual(moved.status_code, 200, moved.text)
+        moved = moved.json()
+        self.assertNotEqual((moved['id'], moved['calendar_id'], moved['source_id']),
+                            (original['id'], original['calendar_id'], original['source_id']))
+        self.assertEqual((moved['calendar']['academic_year'], moved['calendar']['track'], moved['source_hash'], moved['version']),
+                         (2571, 'ภาคปกติ', original['source_hash'], 1))
+        kept = (await self.client.get(f"/api/v1/school-calendars/revisions/{original['id']}")).json()
+        self.assertEqual((kept['calendar_id'], kept['source_id'], kept['payload'], kept['state'], kept['version']),
+                         (original['calendar_id'], original['source_id'], original['payload'], 'draft', 1))
+        self.assertTrue(kept['parse_note'].startswith('Moved to ภาคปกติ 2571 revision 1;'))
+        self.assertTrue(kept['parse_note'].endswith(original['parse_note']))  # parser/source notes kept
+        self.assertEqual(moved['parse_note'], original['parse_note'])
+        for rid in (original['id'], moved['id']):
+            self.assertEqual((await self.client.get(f'/api/v1/school-calendars/revisions/{rid}/source')).content, data)
+        renamed = (await self.client.put(f"/api/v1/school-calendars/revisions/{moved['id']}",
+                   json={'expected_version': 1, 'payload': payload, 'metadata': {'name': 'ปฏิทินใหม่'}})).json()
+        self.assertEqual((renamed['id'], renamed['calendar_id'], renamed['calendar']['name']), (moved['id'], moved['calendar_id'], 'ปฏิทินใหม่'))
+        done = (await self.client.post(f"/api/v1/school-calendars/revisions/{moved['id']}/publish", json={
+            'expected_version': 2, 'reviewed': True, 'metadata': {'track': 'ภาคพิเศษ'}})).json()
+        self.assertEqual((done['state'], done['calendar']['track'], done['calendar']['academic_year']), ('published', 'ภาคพิเศษ', 2571))
+        self.assertNotEqual(done['id'], moved['id'])
+        left = (await self.client.get(f"/api/v1/school-calendars/revisions/{moved['id']}")).json()
+        self.assertEqual((left['state'], left['calendar']['published_revision_id']), ('draft', None))
+        frozen = await self.client.put(f"/api/v1/school-calendars/revisions/{done['id']}",
+                                       json={'expected_version': done['version'], 'payload': payload, 'metadata': {'academic_year': 2572}})
+        self.assertEqual(frozen.status_code, 409)  # published grouping never moves
+        async with self.sessions() as db:
+            sources = (await db.exec(select(SchoolCalendarSource))).all()
+        self.assertEqual(len(sources), 3); self.assertEqual({s.sha256 for s in sources}, {sha256(data).hexdigest()})
 
     async def test_ai_provider_failures_keep_source_and_draft_and_refund_credit(self):
         draft, data = await self.text_draft()

@@ -58,6 +58,7 @@ docker run --rm --pull=never --network none --read-only \
   -e RUN_IDENTITY_POSTGRES_TESTS=1 -e IDENTITY_TEST_PG_SOCKET=/scratch \
   -e LEARNHOUSE_TEST_LEARNING_ACCESS="${LEARNHOUSE_TEST_LEARNING_ACCESS:-0}" \
   -e LEARNHOUSE_TEST_LEARNING_ACCESS_ONLY="${LEARNHOUSE_TEST_LEARNING_ACCESS_ONLY:-0}" \
+  -e LEARNHOUSE_TEST_ONLY="${LEARNHOUSE_TEST_ONLY:-}" \
   -w /app/api --entrypoint /app/api/.venv/bin/python "$API_IMAGE" \
   -B -c '
 import os
@@ -69,7 +70,11 @@ only = os.getenv("LEARNHOUSE_TEST_LEARNING_ACCESS_ONLY") == "1"
 if only and not extra:
     raise SystemExit("Learning-access-only requires LEARNHOUSE_TEST_LEARNING_ACCESS=1")
 suite = unittest.TestSuite()
-if not only:
+names = [n for n in os.getenv("LEARNHOUSE_TEST_ONLY", "").split(",") if n]
+if names:  # focused run: exact SchoolCalendarTests names only
+    from src.route66_ext.tests.services import test_school_calendar as c
+    suite.addTests(c.SchoolCalendarTests(name) for name in names)
+elif not only:
     suite.addTests(loader.loadTestsFromNames([
         "src.tests.services.test_native_google_sessions", "src.tests.services.test_native_line_sessions",
         "src.tests.services.test_attendance_policy", "src.route66_ext.tests.services.test_extension_boundary",
@@ -81,7 +86,7 @@ if not only:
     suite.addTests(c.SchoolCalendarTests(name) for name in c.SchoolCalendarTests.__dict__ if name.startswith("test_"))
     suite.addTests(loader.loadTestsFromNames(["src.route66_ext.tests.services.test_calendar_plan", "src.route66_ext.tests.services.test_nrru_calendar_pdf",
         "src.route66_ext.tests.services.test_school_calendar.ScopeTests"]))
-if extra:
+if extra and not names:
     from src.route66_ext.tests.services.test_learning_access import LearningAccessTests
     suite.addTests(LearningAccessTests(name) for name in LearningAccessTests.__dict__ if name.startswith("test_"))
     suite.addTests(loader.loadTestsFromName("src.route66_ext.tests.services.test_learning_access_policy"))

@@ -119,6 +119,17 @@ class ReaderTests(unittest.TestCase):
         text[0]['text'] = text[0]['text'].replace('วันหยุด วันสมมุติหนึ่ง', 'วันหยุด วันเป\uf712นสมมุติ')
         self.assertEqual(reader.read(text, 2570)['payload'].terms[0].closures[0].note, 'วันหยุด วันเป็นสมมุติ')
 
+    def test_metadata_from_header_only_with_filename_fallback(self):
+        text = pages()
+        text[1]['text'] += '\nนักศึกษาที่ลงทะเบียนเรียนข้ามภาคกับนักศึกษาภาค กศ.ปช.'  # later cross-program reference
+        self.assertEqual(reader.metadata(text, 'x.pdf'),
+                         {'academic_year': 2570, 'track': 'ภาคปกติ', 'name': 'ปฏิทินการเรียนการสอน ภาคปกติ ปีการศึกษา 2570'})
+        evening = [{'page': 1, 'text': 'ปฏิทินการศึกษา สำหรับนักศึกษาภาค กศ.ปช.\nปีการศึกษา ๒๕๗๑\n๑ มิถุนายน ๒๕๗๑ ภาคปกติ'}]
+        self.assertEqual(reader.metadata(evening)['academic_year'], 2571)
+        self.assertEqual(reader.metadata(evening)['track'], 'ภาค กศ.ปช.')
+        unknown = reader.metadata([{'page': 1, 'text': 'Calendar notes'}], 'Term_calendar.PDF')
+        self.assertEqual(unknown, {'academic_year': None, 'track': None, 'name': 'Term calendar'})
+
     def test_date_lists(self):
         self.assertEqual(reader.dates('10 – 11, 13 – 14 สิงหาคม 2569'),
                          [date(2026, 8, d) for d in (10, 11, 13, 14)])

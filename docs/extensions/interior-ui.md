@@ -2,7 +2,7 @@
 
 ## Review decision
 
-Keep `ea53a354`'s NRRU class-list/calendar subtabs. Its controlled native Radix tabs, lazy loading, mounted drafts and class search are useful working behavior. Baseline has 75 passing web checks and four real-component teacher/student browser journeys. This is source readiness, not a deployed production build.
+Kept `ea53a354`'s NRRU class-list/calendar subtabs. Its controlled native Radix tabs, lazy loading, mounted drafts and class search were already useful working behavior. The review baseline had 75 passing web checks and four real-component teacher/student browser journeys; subsequent enhancement and deployment are recorded below.
 
 Enhance consistency rather than replacing those controls. Existing surrounding inputs, blue source navigation and flat source panels do not yet share Interior's material vocabulary. Do not restore the earlier archived alternate tabs/press-state implementation.
 
@@ -27,3 +27,18 @@ Upstream https://github.com/ddoemonn/interior, MIT, copyright 2026 ozzy. Reviewe
 Native controls already supply keyboard navigation, disabled/pressed behavior, date/select semantics, focus and dialog cancellation. Keep them instead of copying a second headless controller or the demo async timer. Shared styling is scoped to custom feature roots, never the native shell or organization administration. Existing requests, confirmations, permissions and saved evidence are unchanged.
 
 Active surfaces include school identity and timetable, sign-in methods/provider buttons, auth link/callback/LIFF, class connections and rosters, attendance/check-in/receipts, calendar preview/editor and class schedule views. Retired preview fixtures stay untouched. No new raster assets.
+
+## Validation and delivery
+
+Deployed 2026-10-17, frontend source `7c483a0171ab9210a4ed4d5f909dab18485a0630`.
+78 web checks, full production bundle/generated-route TypeScript, 18 isolated
+real-component EN1440/TH390 flows and two fresh-native-login live read-only calendar
+flows pass. Fixed selected-source specificity and reduced-motion travel in one bounded
+visual pass and final confirmation. No page errors/overflow; detector returned `[]`.
+
+The 1,027 actual-parent API files remain byte-identical. Native shell/image Config,
+permissions, saved academic/calendar evidence and security policies are preserved;
+no migration or institutional parse/publication/schedule apply. The exact previous
+calendar-dates image is retained for compatible code rollback. Real Google/LINE
+exchange, owner-browser/device and institutional acceptance remain unchecked.
+See [deployment.md](deployment.md) for the live image and evidence pointers.

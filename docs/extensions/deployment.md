@@ -1,6 +1,33 @@
 # Internal extension deployment records
 
-## Latest: read the same PDF from upload or URL — deployed 2026-10-17
+## Latest: Interior custom UI and retained NRRU subtabs — deployed 2026-10-17
+
+Frontend source `7c483a0171ab9210a4ed4d5f909dab18485a0630`, healthy image
+`coursemax-learnhouse:interior-ui-20261017`, ID
+`sha256:4aba51786ee26a20601fb93065bcf28638cb98615de7b477ad22dbe5306dd95d`.
+Retains `ea53a354`'s working NRRU class-list/calendar subtabs, lazy loading and
+mounted search/drafts. Shared Interior materials now scope custom class, calendar,
+identity, attendance and auth surfaces; native controls, shell and permissions remain.
+Source pin, MIT notice and built design are recorded in [interior-ui.md](interior-ui.md).
+
+78 web checks, full production bundle/generated-route TypeScript, 18 isolated
+real-component EN1440/TH390 task journeys and two fresh-native-login live read-only
+calendar journeys pass. Final checks distinguish active/inactive source navigation,
+verify reduced motion and retain unsaved edits, confirmation/cancellation and recovery.
+No real provider exchange, owner-browser or institutional import acceptance is claimed.
+
+Frontend-only deployment preserves all 1,027 actual-parent API files byte-for-byte;
+newer offline mapping source was intentionally not added to the runtime. 5,409 required
+web entries, permissions, native image Config and in-flight assets verified. Fresh
+backup, app-only replacement and gateway reload; no migration. Protected schema,
+identity/roster/progress/calendar/source/draft evidence, environment, mounts and peer
+container IDs remain unchanged, except permitted startup role timestamps/source-menu URL.
+Recovery is the retained exact `calendar-pdf-dates-20261017` image, compatible with
+all current payloads; never restore older academic data for a UI rollback. 127 layers.
+Evidence `interior-ui-review/current/`, `interior-ui-web-20261017/` and
+`releases/interior-ui-20261017/` in the private launch-state directory.
+
+## Previous: read the same PDF from upload or URL — deployed 2026-10-17
 
 Source `bbad16c7807a353c24dd8ba1b6e97e29db29cabd`, healthy image
 `coursemax-learnhouse:calendar-pdf-dates-20261017`, ID

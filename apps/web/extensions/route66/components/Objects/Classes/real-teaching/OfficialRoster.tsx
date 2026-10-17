@@ -5,6 +5,7 @@ import { RefreshCw } from 'lucide-react'
 import { Button, Input } from '@/extensions/route66/adapters/ui'
 import type { RegistrarClassContext } from './model'
 import styles from './workspace.module.css'
+import interior from '@/extensions/route66/components/interior/material.module.css'
 
 type Student = { student_number: string; full_name_th: string; faculty: string; program: string; registry_status_code: string | null; display_position: number }
 type OfficialRosterData = { students: Student[]; fetched_at: string; source_url: string }
@@ -37,7 +38,7 @@ export default function OfficialRoster({ context, th }: { context: RegistrarClas
     <header className={styles.rosterHeading}><div><h2 id="official-roster-title">{t.title}</h2><p>{t.help}</p></div><Button size="icon" variant="outline" className="min-h-11 min-w-11" aria-label={t.refresh} title={t.refresh} disabled={busy} onClick={() => setAttempt(n => n + 1)}><RefreshCw size={18} aria-hidden="true" /></Button></header>
     {busy && <p role="status">{t.loading}</p>}
     {error && <div role="alert" className={styles.rosterError}><p>{error === 'identity' ? t.identity : t.failed}</p>{error === 'identity' && <a href="/account/school-identity" className={styles.action}>{th ? 'ตรวจสอบข้อมูลสถานศึกษา' : 'Review school identity'}</a>}</div>}
-    {data && <><div className={styles.rosterSearch}><label htmlFor={searchId}>{t.search}</label><Input id={searchId} className="min-h-11" value={query} onChange={e => setQuery(e.target.value)} /><p role="status">{people.length} / {data.students.length} {t.count}</p></div>
+    {data && <><div className={`${styles.rosterSearch} ${interior.well}`}><label htmlFor={searchId}>{t.search}</label><Input id={searchId} className="min-h-11" value={query} onChange={e => setQuery(e.target.value)} /><p role="status">{people.length} / {data.students.length} {t.count}</p></div>
       <div className={styles.officialStudents}>{people.length === 0 ? <p>{t.empty}</p> : people.map(p => <article key={p.student_number} className={styles.officialStudent}><div><p className={styles.studentNumber}>{p.student_number}</p><h3>{p.full_name_th}</h3></div><p className={styles.studentProgram}>{p.faculty} {p.program}</p>{p.registry_status_code && <p className={styles.studentStatus}>{t.status}: {p.registry_status_code}</p>}</article>)}</div>
       <p className={styles.fetched}>{t.updated}: <time dateTime={data.fetched_at}>{new Date(data.fetched_at).toLocaleString(th ? 'th-TH' : 'en-GB')}</time> · <a href={data.source_url} target="_blank" rel="noopener noreferrer">{t.source}</a></p>
     </>}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import interior from '@/extensions/route66/components/interior/material.module.css'
 import Link from 'next/link'
 import { useTranslation } from 'react-i18next'
 import { ProviderIcon, providerControlClass } from '@/extensions/route66/components/Auth/ProviderButton'
@@ -34,7 +35,7 @@ export default function SignInMethods() {
     return () => { controller.abort(); clearTimeout(timeout) }
   }, [load, attempt])
 
-  return <section aria-labelledby="signin-methods-title">
+  return <section className={interior.scope} aria-labelledby="signin-methods-title">
     <h2 id="signin-methods-title" className="text-lg font-semibold text-neutral-900">{t('auth.methods_title')}</h2>
     <p className="mt-1 max-w-prose text-sm leading-relaxed text-neutral-600">{t('auth.methods_description')}</p>
     <div className="mt-4 divide-y divide-neutral-200" aria-busy={busy}>

@@ -1,5 +1,7 @@
 'use client'
 
+import interior from '@/extensions/route66/components/interior/material.module.css'
+
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useTranslation } from 'react-i18next'
@@ -55,7 +57,7 @@ export default function ClassesWorkspace(){
  function openCalendars(){setSourceView('school');setCalendarVisited(true);setCalendarOpen(true)}
  function closeCalendars(){setCalendarOpen(false);setCalendarRefresh(n=>n+1)}
  function showClassList(){closeCalendars();setWorkspaceClass(null);setStudentClass(null)}
- return <>
+ return <div className={interior.scope}>
  <div hidden={calendarOpen}>
  {studentClass&&<section className="space-y-6"><Button variant="ghost" className="min-h-11" onClick={()=>setStudentClass(null)}>{th?'ชั้นเรียนของฉัน':'My classes'}</Button><h1 className="text-2xl font-semibold">{studentClass.course_name} · {studentClass.section}</h1><ClassSchedule classId={studentClass.id} th={th}/></section>}
  {workspaceClass && <RealTeachingWorkspace calendarRefresh={calendarRefresh} onOpenCalendars={openCalendars} context={workspaceClass} linked={workspaceLink} linksKnown={data!==null} th={th} onClose={() => { const id=workspaceClass.returnFocusId; setWorkspaceClass(null); requestAnimationFrame(() => { if(id)document.getElementById(id)?.focus() }) }} onChanged={() => setRefresh(n => n + 1)} onOpenRoster={() => { if(workspaceLink?.manageable===true){setSourceView('learnhouse');setSelected(workspaceLink.id);setWorkspaceClass(null)} }} />}
@@ -63,7 +65,7 @@ export default function ClassesWorkspace(){
  <section hidden={!calendarOpen&&(Boolean(workspaceClass)||Boolean(studentClass))} className={`${styles.workspace} ${palette.workspace} space-y-6 pb-24`} aria-labelledby="classes-title">
  <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 id="classes-title" className="text-3xl font-semibold tracking-tight">{t.title}</h1><p className="mt-2 max-w-prose text-sm leading-relaxed text-neutral-600">{workspace.intro}</p></div></header>
  <SchoolWorkspaceNav active="classes" th={th} />
- <nav className={school.sources} aria-label={th ? 'แหล่งชั้นเรียน' : 'Class source'}><button type="button" aria-pressed={sourceView==='school'} onClick={()=>{setSourceView('school');setSelected(null);showClassList()}}>{th ? 'ชั้นเรียน NRRU' : 'NRRU classes'}</button><button type="button" aria-pressed={sourceView==='learnhouse'} onClick={()=>{setSourceView('learnhouse');showClassList()}}>{th ? 'ชั้นเรียน LearnHouse' : 'LearnHouse classes'}</button></nav>
+ <nav className={`${school.sources} ${interior.navigation}`} aria-label={th ? 'แหล่งชั้นเรียน' : 'Class source'}><button type="button" aria-pressed={sourceView==='school'} onClick={()=>{setSourceView('school');setSelected(null);showClassList()}}>{th ? 'ชั้นเรียน NRRU' : 'NRRU classes'}</button><button type="button" aria-pressed={sourceView==='learnhouse'} onClick={()=>{setSourceView('learnhouse');showClassList()}}>{th ? 'ชั้นเรียน LearnHouse' : 'LearnHouse classes'}</button></nav>
  <div hidden={sourceView!=='school'}>
  <Tabs value={calendarOpen?'calendar':'classes'} onValueChange={value=>value==='calendar'?openCalendars():showClassList()}>
  <TabsList className="h-auto max-w-full flex-wrap justify-start gap-1" aria-label={th?'ชั้นเรียน NRRU':'NRRU classes'}>
@@ -105,5 +107,5 @@ export default function ClassesWorkspace(){
  <details className="border-t border-neutral-200 pt-4"><summary className="min-h-11 cursor-pointer text-sm font-medium">{t.evidence}</summary><ol className="mt-3 space-y-3 text-xs text-neutral-600">{roster.events.map(e=><li key={e.id}><p>{e.created_at}</p><p>{e.kind}</p><pre className="mt-1 whitespace-pre-wrap break-words">{JSON.stringify(e.details,null,2)}</pre></li>)}</ol></details></>}
  </>}
  </div>
- </section></>
+ </section></div>
 }

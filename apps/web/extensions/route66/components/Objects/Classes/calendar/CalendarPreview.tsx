@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { formatCalendarDate, type CalendarPayload, type Rotation } from './model'
 import CalendarDates from './CalendarDates'
 import styles from './calendar.module.css'
+import interior from '@/extensions/route66/components/interior/material.module.css'
 
 export default function CalendarPreview({ payload, th }: { payload: CalendarPayload; th: boolean }) {
   const [semester, setSemester] = useState(0), [view, setView] = useState<'weeks' | 'closures'>('weeks')
@@ -17,7 +18,7 @@ export default function CalendarPreview({ payload, th }: { payload: CalendarPayl
     {payload.terms.length > 1 && <label className={styles.toolbar}>{t('Semester', 'ภาคเรียน')}<select value={semester} onChange={e => setSemester(Number(e.target.value))}>{payload.terms.map((item, i) => <option key={i} value={i}>{item.semester}</option>)}</select></label>}
     <h2 className={styles.sectionTitle}>{t('Semester', 'ภาคเรียนที่')} {term.semester}</h2>
     <p className={styles.muted}>{day(term.starts_on)} – {day(term.ends_on)}</p>
-    <nav className={styles.tabs} aria-label={t('Preview sections', 'ส่วนของตัวอย่างปฏิทิน')}>
+    <nav className={`${styles.tabs} ${interior.navigation}`} aria-label={t('Preview sections', 'ส่วนของตัวอย่างปฏิทิน')}>
       <button type="button" aria-pressed={view === 'weeks'} onClick={() => setView('weeks')}>{t('Teaching weeks', 'สัปดาห์เรียน')} ({term.weeks.length})</button>
       <button type="button" aria-pressed={view === 'closures'} onClick={() => setView('closures')}>{t('Holidays & make-ups', 'วันหยุดและวันชดเชย')} ({term.closures.length})</button>
     </nav>

@@ -1,5 +1,7 @@
 'use client'
 
+import interior from '@/extensions/route66/components/interior/material.module.css'
+
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/extensions/route66/adapters/ui'
@@ -38,7 +40,7 @@ export default function AttendanceCheckin({receiptId}:{receiptId?:string}) {
   catch(e){const problem=e as Error&{signin?:boolean};setError(problem.message);setSignin(Boolean(problem.signin))}
   finally{setBusy(false)}
  }
- return <section className={`${styles.workspace} mx-auto max-w-2xl space-y-6 px-4 pb-24 pt-8 md:px-8`} aria-labelledby="checkin-title">
+ return <section className={`${interior.scope} ${styles.workspace} mx-auto max-w-2xl space-y-6 px-4 pb-24 pt-8 md:px-8`} aria-labelledby="checkin-title">
   <header><h1 className="text-3xl font-semibold" id="checkin-title">{receiptId?t.receipt:t.checkinTitle}</h1><p className="mt-3 text-sm leading-relaxed text-neutral-600">{receiptId?t.receiptHelp:t.checkinHelp}</p></header>
   {error&&<div role="alert" className="space-y-3"><p className="text-sm text-red-800">{error}</p>{signin?<Link className="inline-flex min-h-11 items-center rounded-lg bg-neutral-900 px-4 text-sm font-medium text-white" href={`/login?next=${encodeURIComponent(receiptId?'/attendance/receipts/'+receiptId:'/attendance/check-in')}`}>{t.signin}</Link>:receiptId?<Button className="min-h-11" variant="outline" onClick={()=>setRefresh(n=>n+1)} disabled={busy}>{t.retry}</Button>:null}</div>}
   {busy&&<p role="status">{t.waiting}</p>}

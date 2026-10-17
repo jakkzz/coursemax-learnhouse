@@ -1,0 +1,88 @@
+/* Adapted from Interior app/globals.css at 314800833bf01e23e6ae74c2a17fbdaac3688c84.
+   Copyright (c) 2026 ozzy. MIT; see LICENSE. Scoped to custom feature content. */
+.scope {
+  --interior-bezel: #ffffff;
+  --interior-panel: #ffffff;
+  --interior-well: #ffffff;
+  --interior-sub: #fafafa;
+  --interior-ink: #131313;
+  --interior-secondary: #454545;
+  --interior-muted: #6e6e6e;
+  --interior-accent: #4568ff;
+  --interior-accent-soft: #edf1ff;
+  --interior-line: #dedede;
+  --interior-lift: 0 1px 2px #0000000a, 0 0 0 1px #0000001c;
+  --interior-inset: inset 0 1px 2px #0000000d, inset 0 0 0 1px #0000001a;
+  --interior-cap: 0 1.5px 0 #00000017, inset 0 0 0 1px #0000001c;
+  min-width: 0;
+  color: var(--interior-ink);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  scrollbar-color: var(--interior-muted) var(--interior-sub);
+  scrollbar-width: thin;
+}
+.scope ::selection { background: var(--interior-accent-soft); color: var(--interior-ink); }
+.scope :is(h1,h2,h3) { text-wrap: balance; }
+.scope h1 { letter-spacing: -.025em; line-height: 1.4; }
+.scope p { line-height: 1.7; }
+.scope :global(.text-blue-950), .scope :global(.text-blue-900) { color: var(--interior-ink); }
+.scope :global(.text-blue-800) { color: var(--interior-secondary); }
+.scope :is(button,a,input,select,textarea,summary,[role=tabpanel]):focus-visible { outline: 2px solid var(--interior-accent); outline-offset: 3px; }
+.scope :where(input):not([type=checkbox]):not([type=radio]):not([type=file]),
+.scope.scope :is(select,textarea) {
+  max-width: 100%; min-width: 0; min-height: 44px;
+  border: 1px solid var(--interior-line); border-radius: 10px;
+  background: var(--interior-well); color: var(--interior-ink);
+  padding: 10px 12px; font-size: 14px; line-height: 1.5;
+  box-shadow: var(--interior-inset); caret-color: var(--interior-accent);
+}
+.scope input::placeholder, .scope textarea::placeholder { color: var(--interior-muted); opacity: 1; }
+.scope :is(input[type=checkbox],input[type=radio]) { accent-color: var(--interior-accent); }
+.scope :is(input,select,textarea):disabled { opacity: .6; cursor: not-allowed; }
+.scope button:not([role=tab]):not([data-meeting]) {
+  min-height: 44px; height: auto; border-radius: 10px;
+  border: 1px solid var(--interior-line); background: var(--interior-panel); color: var(--interior-ink);
+  box-shadow: var(--interior-cap); white-space: normal; line-height: 1.5;
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+  touch-action: manipulation;
+}
+.scope.scope button[class~='bg-primary'], .scope.scope button[class~='bg-black'], .scope.scope button[class~='bg-neutral-900'] {
+  background: var(--interior-ink); border-color: var(--interior-ink); color: #ffffff;
+  box-shadow: 0 1.5px 0 #00000030, inset 0 1px 0 #ffffff26;
+}
+.scope.scope button[class*='text-red-'] { color: #991b1b; border-color: #c0442f; }
+.scope button[class~='hover:bg-accent']:not([class~='border']):not([class~='bg-primary']) { background: transparent; border-color: transparent; box-shadow: none; }
+.scope button:disabled { opacity: .55; cursor: not-allowed; }
+.scope button:not([role=tab]):not([data-meeting]):active:not(:disabled) { transform: translateY(1px); box-shadow: var(--interior-inset); }
+.scope button:not([role=tab]):not([data-meeting]):hover:not(:disabled) { border-color: #b8b8b8; }
+.scope :global(.nice-shadow), .scope .panel { background: var(--interior-panel); border: 1px solid var(--interior-line); border-radius: 14px; box-shadow: var(--interior-lift); }
+.scope .well { background: var(--interior-sub); border: 1px solid var(--interior-line); border-radius: 12px; box-shadow: var(--interior-inset); color: var(--interior-secondary); }
+.scope [role=tablist], .scope .navigation {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px; width: fit-content; max-width: 100%; height: auto;
+  padding: 5px; border: 1px solid var(--interior-line); border-radius: 12px;
+  background: var(--interior-sub); box-shadow: var(--interior-inset);
+}
+.scope [role=tab], .scope.scope .navigation > :is(button,a) {
+  min-height: 44px; padding: 10px 14px; border-radius: 8px; border: 1px solid transparent;
+  background: transparent; color: var(--interior-secondary); font-size: 14px; line-height: 1.5;
+  box-shadow: none; text-decoration: none; white-space: normal;
+}
+.scope [role=tab][data-state=active], .scope.scope .navigation > :is(button,a):is([aria-pressed=true],[aria-current]) {
+  background: var(--interior-panel); border-color: var(--interior-line); color: var(--interior-ink);
+  font-weight: 600; box-shadow: var(--interior-cap);
+}
+.scope .navigation > :is(button,a):hover { background: var(--interior-panel); color: var(--interior-ink); }
+.provider { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; gap: 12px; padding: 12px 16px; border: 1px solid #dedede; border-radius: 10px; background: #ffffff; color: #131313; box-shadow: 0 1.5px 0 #00000017, inset 0 0 0 1px #0000000a; font-size: 15px; font-weight: 550; line-height: 1.5; touch-action: manipulation; }
+.provider.providerPrimary { background: #131313; color: #ffffff; border-color: #131313; }
+.provider:focus-visible { outline: 2px solid #4568ff; outline-offset: 3px; }
+.provider:disabled { cursor: not-allowed; opacity: .55; }
+.provider:active:not(:disabled) { transform: translateY(1px); }
+.authFrame { width: 100%; max-width: 480px; margin: auto; padding: 8px; border: 1px solid var(--interior-line); border-radius: 18px; background: var(--interior-bezel); box-shadow: var(--interior-lift); }
+@media (prefers-reduced-motion: reduce) {
+  .scope *, .provider { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+  .scope button:not([role=tab]):not([data-meeting]):active:not(:disabled), .provider:active:not(:disabled) { transform: none; }
+}
+@media (forced-colors: active) {
+  .scope :is(button,input,select,textarea,[role=tablist]), .scope .navigation, .scope .panel, .provider { border: 1px solid CanvasText; box-shadow: none; }
+  .scope [role=tab][data-state=active], .scope .navigation > :is([aria-pressed=true],[aria-current]) { outline: 2px solid Highlight; outline-offset: -3px; }
+}

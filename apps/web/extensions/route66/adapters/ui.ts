@@ -1,12 +1,18 @@
 'use client'
 
+import { createElement, type ComponentProps } from 'react'
+import NativeAuthLayout from '@components/Auth/AuthLayout'
+import interior from '@/extensions/route66/components/interior/material.module.css'
+
 // Native shell/control contracts; extension code consumes these, never replaces them.
 export { Button } from '@components/ui/button'
 export { Input } from '@components/ui/input'
 export { Dialog, DialogContent, DialogDescription, DialogTitle } from '@components/ui/dialog'
 export { DashTabBar } from '@components/Dashboard/Shared/DashTabBar/DashTabBar'
 export { default as useAdminStatus } from '@components/Hooks/useAdminStatus'
-export { default as AuthLayout } from '@components/Auth/AuthLayout'
+export function AuthLayout({ children, ...props }: ComponentProps<typeof NativeAuthLayout>) {
+  return createElement(NativeAuthLayout, { ...props, children: createElement('div', { className: `${interior.scope} ${interior.authFrame}` }, children) })
+}
 export { default as GeneralWrapperStyled } from '@components/Objects/StyledElements/Wrappers/GeneralWrapper'
 export { Breadcrumbs } from '@components/Objects/Breadcrumbs/Breadcrumbs'
 export { AccountSidebar } from '@components/Objects/Account/AccountSidebar'

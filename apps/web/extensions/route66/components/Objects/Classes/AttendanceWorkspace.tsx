@@ -1,5 +1,7 @@
 'use client'
 
+import interior from '@/extensions/route66/components/interior/material.module.css'
+
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useTranslation } from 'react-i18next'
@@ -66,7 +68,7 @@ export default function AttendanceWorkspace({classId}:{classId:number|null}) {
  const students=detail?.students?.filter(s=>`${s.name} ${s.student_number||''}`.toLowerCase().includes(query.toLowerCase())&&(filter==='all'||s.status===filter))||[]
  const start=form.starts_at?new Date(form.starts_at+'+07:00').getTime():NaN,end=form.ends_at?new Date(form.ends_at+'+07:00').getTime():NaN
  const validForm=form.title.trim()&&Number.isFinite(start)&&end>start&&Number(form.late_threshold_minutes)>=Number(form.grace_minutes)
- return <section className={`${styles.workspace} space-y-6 px-4 pb-24 pt-8 md:px-8`} aria-labelledby="attendance-title">
+ return <section className={`${interior.scope} ${styles.workspace} space-y-6 px-4 pb-24 pt-8 md:px-8`} aria-labelledby="attendance-title">
   <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 id="attendance-title" className="text-3xl font-semibold">{t.title}</h1><Link className="mt-2 inline-flex min-h-11 items-center text-sm underline underline-offset-4" href="/classes">{t.back}</Link>{schedule&&<p className="mt-2 break-words text-sm text-neutral-600">{schedule.course_name} · {schedule.section}</p>}</div>{schedule?.manageable&&!detail&&<Button className="min-h-11" onClick={()=>setCreating(true)}>{t.create}</Button>}</header>
   {error&&<div role="alert" className="space-y-3"><p className="text-sm text-red-800">{error}</p><Button className="min-h-11" variant="outline" disabled={busy} onClick={()=>setRefresh(n=>n+1)}>{t.retry}</Button></div>}
   {!classId?<p>{t.classMissing}</p>:!schedule&&!error?<p role="status">{t.loading}</p>:null}

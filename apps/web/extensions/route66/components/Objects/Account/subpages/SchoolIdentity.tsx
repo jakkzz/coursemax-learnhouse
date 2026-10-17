@@ -1,5 +1,7 @@
 'use client'
 
+import interior from '@/extensions/route66/components/interior/material.module.css'
+
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useTranslation } from 'react-i18next'
@@ -49,7 +51,7 @@ export default function SchoolIdentity({ classes = false }: { classes?: boolean 
   search:{tone:'bg-blue-50 text-blue-700',icon:<Search size={14}/>,label:t.stateSearch},
   ineligible:{tone:'bg-neutral-100 text-neutral-700',icon:<Info size={14}/>,label:t.stateIneligible},
  }[state]
- return <section className={`${styles.workspace} space-y-6 text-neutral-900`} aria-labelledby="school-title">
+ return <section className={`${interior.scope} ${styles.workspace} space-y-6 text-neutral-900`} aria-labelledby="school-title">
   <div><h1 id="school-title" className="text-3xl font-semibold tracking-tight">{classes?t.classes:t.title}</h1><p className="mt-2 max-w-prose text-sm leading-relaxed text-neutral-600">{status?.school_kind==='student'?(i18n.language.startsWith('th')?'ข้อมูลสถานศึกษาของคุณมาจากรายชื่อชั้นเรียนในทะเบียน การจับคู่ไม่เปลี่ยนชื่อโปรไฟล์หรือวิธีเข้าสู่ระบบของคุณ':'Your school details come from your official class roster. Matching does not change your profile name or sign-in methods.'):status?.directory_identity?teacher.intro:t.intro}</p></div>
   <SchoolWorkspaceNav active={classes?'classes':'identity'} th={th} />
   <div className="overflow-hidden rounded-xl bg-white nice-shadow">

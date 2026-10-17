@@ -32,7 +32,7 @@ schedule-applied event, and reloads through the schedule DTO. No migration, scho
 publication change, implicit holiday or universal exam closure is introduced.
 
 Validation covers 19 calendar/PostgreSQL cases (plus one opt-in real-PDF skip),
-two strengthened focused cases, 54 native-access/policy regressions, 20 pure planner
+including two strengthened cases, 54 native-access/policy regressions, 20 pure planner
 cases plus one static scope case, 81 web checks, 25 tooling/four overlay checks and
 the production bundle/generated-route TypeScript. Five compiled native-shell journeys
 cover non-admin teacher EN/TH desktop and Thai mobile, independent native draft

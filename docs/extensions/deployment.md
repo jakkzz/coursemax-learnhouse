@@ -1,6 +1,40 @@
 # Internal extension deployment records
 
-## Latest: course planning from published semester dates — deployed 2026-10-17
+## Latest: assigned-teacher syllabi and automatic hybrid weeks — deployed 2026-10-17
+
+Source `530b2415d2b9a203cf13d49f2b7dffe6da8b4dcc`, healthy image
+`coursemax-learnhouse:teacher-hybrid-schedule-20261017`, ID
+`sha256:711ebdb151c2af29325516cc35002d49e683d181edede21650301bf1c9aa75ff`.
+Fixes the native syllabus CREATE denial for active assigned course teachers who remain
+organization members. Exact native delegate plus immutable activity binding permits
+only syllabus preparation/editing; MFA and ordinary native permissions remain. No
+admin/native author grants added. Hybrid first-mode choice generates dated modes for
+reviewed school weeks or course-only dates; source rotations, gaps and make-ups are
+preserved. Syllabus creation remains independent of attendance saving.
+
+19 calendar/PG cases pass, one opt-in PDF case skipped; the two strengthened cases
+are included, not additional acceptance. 54 native-access regressions, 20 pure planner
+cases/one static scope case, 81 web, 25 tooling/four overlay checks, production bundle/
+generated-route types and five compiled native-shell desktop/mobile teacher/student
+journeys pass. Detector `[]`; finish/documenter reviews inline, not independent.
+Two fresh-native-login live read-only tasks and security denials pass. Published
+calendar/program choices remain identical; no institutional syllabus/schedule writes.
+Native rich-text editing remains desktop-only; institutional/provider/owner-browser
+acceptance remains separate.
+
+App-only replacement/gateway reload, no migration or data restore. Exact schema,
+protected calendar/source/native-content/version/role/identity/roster/progress rows,
+environment, mounts and all observed peer IDs preserved. Verified 1,030 API files,
+5,514 web entries/permissions, native Config and in-flight assets. Only affected API
+source plus the exact reviewed native RBAC file overlaid; unrelated offline tools
+excluded. Fresh backup/archive checked; exact preceding course-calendar-planning
+image `9d15059d…` retained for code recovery. It preserves private ownership/history,
+but does not provide this release's permission fix/first-mode controls. Never restore
+older academic data or use the organization-only backend for rollback. No new full
+restore rehearsal is claimed. Evidence `teacher-hybrid-schedule-20261017/`,
+`teacher-hybrid-schedule-web-20261017/`, `releases/teacher-hybrid-schedule-20261017/`.
+
+## Previous: course planning from published semester dates — deployed 2026-10-17
 
 Source `df75ce0887ade8089e9b64b67b7183dbd22b4d23`, healthy image
 `coursemax-learnhouse:course-calendar-planning-20261017`, ID

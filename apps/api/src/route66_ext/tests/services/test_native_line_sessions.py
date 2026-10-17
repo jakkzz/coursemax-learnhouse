@@ -304,6 +304,28 @@ class NativeLineTests(NativeGoogleTests):
             self.assertEqual(res.status_code,409)
         self.assertEqual(await self.counts(),before)
 
+    async def test_liff_continuation_survives_login_existing_session_and_mfa(self):
+        destination='/attendance/check-in?handoff='+'a'*43
+        async with self.line_http() as client:await self.link_line(client)
+        async with self.line_http(google=False) as client:
+            started=await client.post('/auth/line/liff/start',json={'return_path':destination})
+            response=await client.post('/auth/line/liff/session',json={'state':started.json()['state'],'id_token':'synthetic-continuation-token'})
+            self.assertEqual(response.status_code,200,response.text)
+            self.assertEqual(response.json()['return_path'],destination)
+            started=await client.post('/auth/line/liff/start',json={'return_path':destination})
+            repeated=await client.post('/auth/line/liff/session',json={'state':started.json()['state'],'id_token':'synthetic-continuation-token'})
+            self.assertEqual(repeated.json(),{'existing_session':True,'return_path':destination})
+        with patch('src.services.auth.session.is_mfa_active',new=AsyncMock(return_value=True)):
+            async with self.line_http(google=False) as client:
+                started=await client.post('/auth/line/liff/start',json={'return_path':destination})
+                response=await client.post('/auth/line/liff/session',json={'state':started.json()['state'],'id_token':'synthetic-continuation-mfa'})
+                self.assertTrue(response.json()['mfa_required'])
+                self.assertEqual(response.json()['return_path'],destination)
+                self.assertNotIn('LH_access',client.cookies)
+        async with self.line_http(google=False) as client:
+            for path in ('https://foreign.example/','//foreign.example/','/attendance/check-in#raw'):
+                self.assertEqual((await client.post('/auth/line/liff/start',json={'return_path':path})).status_code,400)
+
     async def test_liff_pending_mfa_does_not_set_access_cookie(self):
         async with self.line_http() as client:await self.link_line(client)
         with patch('src.services.auth.session.is_mfa_active',new=AsyncMock(return_value=True)):

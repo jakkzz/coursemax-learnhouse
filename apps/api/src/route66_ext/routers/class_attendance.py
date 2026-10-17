@@ -1,19 +1,27 @@
-"""Private native-session attendance API; no anonymous QR mutation or messaging."""
+"""Native-session attendance and anonymous transient scan reservation; no messaging."""
+import asyncio
+import json
+import time
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import StreamingResponse
+from sqlalchemy import func
+from redis.exceptions import RedisError
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator, model_validator
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
-from src.route66_ext.adapters.core_events_database import get_db_session
+from src.route66_ext.adapters.core_events_database import engine, get_db_session
 from src.route66_ext.routers.school_identity import context, private
-from src.route66_ext.routers.google_subject_auth import boundary, resources, throttle
+from src.route66_ext.routers.google_subject_auth import settings, boundary, resources, throttle
 from src.route66_ext.routers.academic_classes import staff_class, commit
 from src.route66_ext.db.class_attendance import AttendanceSession, AttendanceScan, AttendanceEvent
 from src.route66_ext.db.academic_classes import AcademicClass, AcademicRosterEntry, SchoolStudent
 from src.route66_ext.services import academic_rosters as roster
 from src.route66_ext.services import class_attendance as service
-from src.route66_ext.services.attendance_policy import SessionPolicy
+from src.route66_ext.services.attendance_policy import SessionPolicy, _utc
+from src.route66_ext.services.attendance_handoff import Handoffs
 
 router = APIRouter()
 
@@ -80,6 +88,11 @@ class ScanCode(BaseModel):
     token: str = Field(pattern=r'^[A-Za-z0-9_-]{43}$')
 
 
+class CompleteScan(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    handoff: str = Field(pattern=r'^[A-Za-z0-9_-]{43}$')
+
+
 def session_dto(row):
     return {k: getattr(row, k) for k in ('id', 'class_id', 'title', 'starts_at', 'ends_at', 'timezone', 'grace_minutes', 'late_threshold_minutes', 'state', 'version',
                                          'calendar_kind', 'academic_week', 'slot_key', 'nominal_on', 'replaces_session_id', 'mode', 'location', 'note')}
@@ -133,8 +146,25 @@ async def create(class_id: int, body: CreateSession, request: Request, response:
 @router.get('/sessions/{session_id}')
 async def detail(session_id: int, request: Request, response: Response, db: AsyncSession = Depends(get_db_session)):
     private(response)
+    return await session_snapshot(request, db, session_id)
+
+
+async def attendance_head(db, session_id):
+    event = select(func.max(AttendanceEvent.id)).where(AttendanceEvent.session_id == session_id).scalar_subquery()
+    head = (await db.exec(select(AttendanceSession.version, AcademicClass.version, event).join(
+        AcademicClass, AcademicClass.id == AttendanceSession.class_id).where(AttendanceSession.id == session_id))).first()
+    if head is None:
+        raise HTTPException(404, 'Attendance session not found')
+    return ':'.join(str(value or 0) for value in head)
+
+
+async def session_snapshot(request, db, session_id):
     actor, config, _ = await context(request, db)
+    # Read the cursor before the projection so a concurrent commit is not skipped.
+    cursor = await attendance_head(db, session_id)
     row, cls = await service.session_scope(db, session_id, config.org_id)
+    collected = (await db.exec(select(AttendanceEvent.id).where(
+        AttendanceEvent.session_id == row.id, AttendanceEvent.kind == 'checkin_opened').limit(1))).first() is not None
     manageable = True
     try:
         await roster.can_manage(db, actor, cls, config.org_id)
@@ -145,15 +175,54 @@ async def detail(session_id: int, request: Request, response: Response, db: Asyn
     now = datetime.now(timezone.utc)
     if not manageable:
         entry, _ = await service.member(db, cls, actor)
-        own = service.scan_projection(row, await service.scans_for(db, row.id, entry.id), now)
-        return {'session': session_dto(row), 'manageable': False, 'own': own}
+        own = service.scan_projection(row, await service.scans_for(db, row.id, entry.id), now, collected=collected)
+        return {'session': session_dto(row), 'manageable': False, 'own': own, 'cursor': cursor, 'as_of': now}
     entries = (await db.exec(select(AcademicRosterEntry, SchoolStudent).join(SchoolStudent, SchoolStudent.id == AcademicRosterEntry.student_id).where(AcademicRosterEntry.class_id == cls.id).order_by(AcademicRosterEntry.display_position))).all()
     scans = await service.scans_for(db, row.id)
     events = (await db.exec(select(AttendanceEvent).where(AttendanceEvent.session_id == row.id).order_by(AttendanceEvent.id.desc()).limit(30))).all()
-    return {'session': session_dto(row), 'manageable': True, 'students': [
+    return {'session': session_dto(row), 'manageable': True, 'cursor': cursor, 'as_of': now, 'students': [
         {'roster_entry_id': entry.id, 'name': student.full_name_th, 'student_number': student.student_number,
-         'membership': entry.status, **service.scan_projection(row, [s for s in scans if s.roster_entry_id == entry.id], now)}
+         'membership': entry.status, **service.scan_projection(row, [s for s in scans if s.roster_entry_id == entry.id], now, collected=collected)}
         for entry, student in entries], 'events': [{'id': e.id, 'kind': e.kind, 'created_at': e.created_at, 'details': e.details} for e in events]}
+
+
+def clock_phase(snapshot, now=None):
+    now = now or datetime.now(timezone.utc)
+    row = snapshot['session']
+    return (now >= _utc(row['starts_at']), now >= _utc(row['ends_at']))
+
+
+async def session_events(request, session_id, first, *, interval=1, lifetime=55):
+    snapshot = first
+    head, phase = snapshot['cursor'], clock_phase(snapshot, snapshot['as_of'])
+    checked, started = time.monotonic(), time.monotonic()
+    yield 'id: ' + head + '\ndata: ' + json.dumps(jsonable_encoder(snapshot), separators=(',', ':')) + '\n\n'
+    while time.monotonic() - started < lifetime:
+        await asyncio.sleep(interval)
+        if await request.is_disconnected():
+            return
+        try:
+            async with AsyncSession(engine, expire_on_commit=False) as db:
+                current = await attendance_head(db, session_id)
+                changed = current != head or clock_phase(snapshot) != phase
+                if not changed and time.monotonic() - checked < 10:
+                    continue
+                # Recheck native session, MFA, staff authority and roster before any payload.
+                snapshot = await session_snapshot(request, db, session_id)
+            # The connection is released BEFORE yielding or waiting for another event.
+            head, phase, checked = snapshot['cursor'], clock_phase(snapshot, snapshot['as_of']), time.monotonic()
+            yield 'id: ' + head + '\ndata: ' + json.dumps(jsonable_encoder(snapshot), separators=(',', ':')) + '\n\n'
+        except HTTPException as error:
+            yield 'event: access_lost\ndata: ' + json.dumps({'status': error.status_code}) + '\n\n'
+            return
+
+
+@router.get('/sessions/{session_id}/events')
+async def events(session_id: int, request: Request):
+    async with AsyncSession(engine, expire_on_commit=False) as db:
+        first = await session_snapshot(request, db, session_id)
+    return StreamingResponse(session_events(request, session_id, first), media_type='text/event-stream',
+        headers={'Cache-Control': 'private, no-store', 'Vary': 'Cookie, Authorization', 'X-Accel-Buffering': 'no'})
 
 
 @router.post('/sessions/{session_id}/state')
@@ -189,7 +258,8 @@ async def open_checkin(session_id: int, body: OpenChallenge, request: Request, r
     await commit(db)
     # Fragment is never sent in HTTP URLs/access logs. The page submits via POST.
     return {'token': token, 'checkin_url': config.handoff.client.public_origin + '/attendance/check-in#' + token,
-            'kind': challenge.kind, 'expires_at': challenge.expires_at, 'session_id': row.id}
+            'kind': challenge.kind, 'expires_at': challenge.expires_at, 'session_id': row.id, 'session_version': row.version,
+            'server_now': datetime.now(timezone.utc)}
 
 
 @router.post('/check-in')
@@ -206,6 +276,52 @@ async def checkin(body: ScanCode, request: Request, response: Response, db: Asyn
     return {'receipt': receipt, 'created': created}
 
 
+@router.post('/check-in/prepare')
+async def prepare(body: ScanCode, request: Request, response: Response, db: AsyncSession = Depends(get_db_session)):
+    private(response)
+    arrived_at = datetime.now(timezone.utc)
+    config = settings()
+    boundary(request, config)
+    try:
+        async with resources(config) as (redis, _):
+            # A classroom shares an IP; the ordinary login budget is not its size limit.
+            await throttle(redis, request, config, 'attendance-prepare', limit=600)
+            reservation = await service.reserve_scan(db, body.token, config.org_id, arrived_at)
+            handle = await Handoffs(redis, config.deployment).create(reservation)
+    except (RedisError, RuntimeError):
+        raise HTTPException(503, {'code': 'handoff_unavailable'}) from None
+    return {'handoff': handle, 'expires_at': reservation.expires_at,
+            'return_path': '/attendance/check-in?handoff=' + handle}
+
+
+@router.post('/check-in/complete')
+async def complete(body: CompleteScan, request: Request, response: Response, db: AsyncSession = Depends(get_db_session)):
+    private(response)
+    now = datetime.now(timezone.utc)
+    config = settings()
+    boundary(request, config)
+    actor, config, _ = await context(request, db)
+    await roster.serialize(db)
+    try:
+        async with resources(config) as (redis, _):
+            await throttle(redis, request, config, 'attendance-scan-' + str(actor.id))
+            store = Handoffs(redis, config.deployment)
+            pending = await store.get(body.handoff)
+            _, cls = await service.session_scope(db, pending.session_id, config.org_id)
+            # An unrelated account must not take ownership just by trying the link.
+            await service.member(db, cls, actor)
+            if pending.owner and pending.owner != actor.id:
+                raise HTTPException(409, {'code': 'handoff_claimed'})
+            reservation = await store.claim(body.handoff, actor.id)
+        receipt, created = await service.accept_scan(db, None, actor, config.org_id, now, reservation=reservation)
+        await commit(db)
+    except ValueError:
+        raise HTTPException(410, {'code': 'handoff_expired'}) from None
+    except RedisError:
+        raise HTTPException(503, {'code': 'handoff_unavailable'}) from None
+    return {'receipt': receipt, 'created': created}
+
+
 @router.get('/receipts/{receipt_id}')
 async def receipt(receipt_id: str, request: Request, response: Response, db: AsyncSession = Depends(get_db_session)):
     private(response)
@@ -214,7 +330,8 @@ async def receipt(receipt_id: str, request: Request, response: Response, db: Asy
     if not scan:
         raise HTTPException(404, 'Receipt not found')
     row, _ = await service.session_scope(db, scan.session_id, config.org_id)
-    return service.own_receipt(scan, row)
+    own = service.scan_projection(row, await service.scans_for(db, row.id, scan.roster_entry_id), datetime.now(timezone.utc))
+    return service.own_receipt(scan, row, own['status'])
 
 # Preserve private helper names through legacy compatibility imports.
 __all__ = [name for name in globals() if not name.startswith("__")]

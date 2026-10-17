@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useTranslation } from 'react-i18next'
 import { Loader2, AlertTriangle } from 'lucide-react'
 import AuthLayout from '@components/Auth/AuthLayout'
+import { attendanceRetryLogin } from '@/extensions/route66/components/Objects/Classes/attendance-client'
 
 export default function GoogleCallbackPage() {
   const { t } = useTranslation()
@@ -55,7 +56,7 @@ export default function GoogleCallbackPage() {
         {error ? <AlertTriangle className="mx-auto" size={24} /> : <Loader2 className="mx-auto animate-spin" size={24} />}
         <h1 className="text-xl font-semibold">{t('auth.google_continue')}</h1>
         <p className="text-sm leading-relaxed">{error ?? t('auth.google_completing', { defaultValue: 'Completing secure sign-in…' })}</p>
-        {error && <Link className="inline-block rounded-lg border px-4 py-3 text-sm font-medium" href="/login">{t('auth.google_back_to_login', { defaultValue: 'Back to sign in' })}</Link>}
+        {error && <Link className="inline-block rounded-lg border px-4 py-3 text-sm font-medium" href={attendanceRetryLogin()}>{t('auth.google_back_to_login', { defaultValue: 'Back to sign in' })}</Link>}
       </div>
     </AuthLayout>
   )

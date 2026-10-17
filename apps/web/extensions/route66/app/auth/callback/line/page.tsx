@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useTranslation } from 'react-i18next'
 import { AuthLayout } from '@/extensions/route66/adapters/ui'
 import { finishLine } from '@/extensions/route66/services/auth/line'
+import { attendanceRetryLogin } from '@/extensions/route66/components/Objects/Classes/attendance-client'
 
 export default function LineCallback() {
   const { t } = useTranslation()
@@ -37,7 +38,7 @@ export default function LineCallback() {
       <p role={error ? 'alert' : 'status'} aria-live="polite" className="text-sm leading-relaxed">
         {error ? t('auth.line_callback_retry') : t('auth.line_callback_wait')}
       </p>
-      {error && <Link href={linking ? '/auth/link/line' : '/login'} className="inline-flex rounded-lg border px-4 py-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2">
+      {error && <Link href={linking ? '/auth/link/line' : attendanceRetryLogin()} className="inline-flex rounded-lg border px-4 py-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2">
         {t('auth.line_try_again')}
       </Link>}
     </main>

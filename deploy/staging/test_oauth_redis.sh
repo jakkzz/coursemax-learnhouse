@@ -3,7 +3,7 @@
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 python3 -B "$ROOT/deploy/staging/preflight.py"
-API_IMAGE=ghcr.io/learnhouse/app@sha256:0aca30cd7b772bebfb75c8e4e54613ab4391adb2d4e05403992867388169514f
+API_IMAGE=${LEARNHOUSE_API_TEST_IMAGE:-ghcr.io/learnhouse/app@sha256:0aca30cd7b772bebfb75c8e4e54613ab4391adb2d4e05403992867388169514f}
 REDIS_IMAGE=redis@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
 # Never pull automatically; missing images require the separate pre-pull gate.
 docker image inspect "$API_IMAGE" >/dev/null
@@ -36,17 +36,11 @@ docker run --rm --pull=never --network none --read-only \
   --user "$(id -u):$(id -g)" --cap-drop ALL --security-opt no-new-privileges \
   --memory 192m --cpus 0.5 --pids-limit 64 --tmpfs /tmp:rw,size=16m \
   -v "$SCRATCH:/scratch" \
-  -v "$ROOT/apps/api/src/services/auth/provider_proof.py:/app/api/src/services/auth/provider_proof.py:ro" \
-  -v "$ROOT/apps/api/src/services/auth/provider_profile.py:/app/api/src/services/auth/provider_profile.py:ro" \
-  -v "$ROOT/apps/api/src/services/auth/oauth_transactions.py:/app/api/src/services/auth/oauth_transactions.py:ro" \
-  -v "$ROOT/apps/api/src/services/auth/google_handoff.py:/app/api/src/services/auth/google_handoff.py:ro" \
-  -v "$ROOT/apps/api/src/tests/services/test_provider_proof.py:/app/api/src/tests/services/test_provider_proof.py:ro" \
-  -v "$ROOT/apps/api/src/tests/services/test_oauth_transactions.py:/app/api/src/tests/services/test_oauth_transactions.py:ro" \
-  -v "$ROOT/apps/api/src/tests/services/test_oauth_transactions_redis.py:/app/api/src/tests/services/test_oauth_transactions_redis.py:ro" \
-  -v "$ROOT/apps/api/src/tests/services/test_google_handoff.py:/app/api/src/tests/services/test_google_handoff.py:ro" \
+  -v "$ROOT/apps/api/src:/app/api/src:ro" \
   -e RUN_OAUTH_REDIS_TESTS=1 -e OAUTH_TEST_REDIS_SOCKET=/scratch/redis.sock \
   -w /app/api --entrypoint /app/api/.venv/bin/python "$API_IMAGE" \
   -B -m unittest src.tests.services.test_provider_proof \
   src.tests.services.test_oauth_transactions \
   src.tests.services.test_oauth_transactions_redis \
-  src.tests.services.test_google_handoff -v
+  src.tests.services.test_google_handoff \
+  src.route66_ext.tests.services.test_attendance_handoff -v

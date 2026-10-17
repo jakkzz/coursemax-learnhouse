@@ -1,4 +1,5 @@
 import { getAPIUrl } from './services/config/config'
+import { attendanceLoginDestination } from '@/extensions/route66/components/Objects/Classes/attendance-client'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { isLocalhost as isLocalhostCheck } from './services/utils/ts/hostUtils'
@@ -345,7 +346,7 @@ export default async function proxy(req: NextRequest) {
 
     // A logged-in user has no business on /login, so bounce them to the hub (the
     // page itself re-verifies, so this is a best-effort UX shortcut).
-    if (pathname === '/login' && hasSession) {
+    if (pathname === '/login' && hasSession && !attendanceLoginDestination(req.nextUrl.searchParams.get('next'), req.nextUrl.origin)) {
       return NextResponse.redirect(new URL('/home', req.url))
     }
 

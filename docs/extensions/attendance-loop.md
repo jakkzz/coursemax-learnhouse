@@ -1,14 +1,54 @@
-# Attendance loop — CourseMax findings and next implementation
+# Attendance arrival loop
 
-## Scope and delivery order
+## Implemented arrival slice — 2026-10-17
+
+Source implementation is validated; attendance is not yet deployed. The current live
+image remains `calendar-ui-owner-20261017` / `e3914821…`. No migration is needed.
+
+- Camera entry reserves the server observation before native sign-in; LINE's in-app
+  browser carries that opaque reservation into LIFF before SDK/provider waits.
+  Existing native sessions finish directly. Unlinked/failed LINE can open a fresh
+  external browser or copy the same safe continuation, without copying auth state.
+- Deployment-scoped Redis holds a ten-minute usable reservation (capped by class end),
+  retained twenty minutes for acknowledged/committed retries. Eligibility precedes
+  atomic ownership claim. Raw and held scans use one immutable SQL writer; native
+  membership, session version and deadlines are checked again before commit.
+- Codes renew in place with a decoded four-module-margin QR ready before replacement.
+  The private teacher roster and the opaque full-viewport projector are distinct.
+  Phone animation follows committed evidence; own receipt reloads do not write again.
+- Authenticated SSE rereads canonical state with short DB sessions, bounded lifetime,
+  access rechecks and honest polling recovery. Cancellation changes effective status,
+  not immutable scans. Uncollected historical calendar dates remain unrecorded.
+- Three exact native seams are reviewed in `boundary.json`: check-in may mount while
+  native session lookup loads, Google retry keeps the opaque destination, and a stale
+  login marker does not discard a validated check-in/receipt task. Native account,
+  proof, MFA, admission and ordinary auth rate limits remain unchanged.
+
+Checks: 74 focused PostgreSQL/HTTP/policy/native-LINE/legacy-attendance tests
+(70 pass, four optional Redis skips); 109 OAuth/real-Redis tests pass, including those
+four Redis contracts; six Bun tests/44 assertions; 83 source checks; full native Turbo
+bundle and generated-route TypeScript; four synthetic component scenarios and three
+compiled-native scenarios; 13 gateway and four overlay regressions; 25 tooling tests.
+Two real nginx layers deliver the first synthetic frame in about 32 ms, before the
+second frame at 700 ms; the unchanged inner configuration and generated outer SSE
+location are both exercised. Inline review caught and fixed native dialog centering/
+entrance exposing the private roster; viewport opacity/coverage is now asserted.
+
+Private evidence is outside Git in `attendance-arrival-20261017` and
+`attendance-arrival-web-fonts-20261017`. Physical iOS/Android/LINE handoff behavior,
+real provider/MFA interruptions, shared-Wi-Fi class-wide login capacity and projector
+scan distance remain unaccepted. Synthetic API/provider boundaries are not production
+or institutional acceptance. Corrections/history/CSV and leave are later slices.
+
+## Historical scope and delivery order
 
 Owner brief, 2026-10-17: finish the pending calendar UI, then plan attendance from
 CourseMax's useful behavior. Fix difficult scanning and LINE/ordinary-camera login,
 make the phone experience enjoyable, and provide real-time feedback. Keep one data
 owner and add no new routine gates, forms or approval steps.
 
-This is source research and an implementation plan, not an attendance port or device
-acceptance. Calendar API `746c8aa2` is live; calendar UI `9fc87afb` is still pending.
+At this initial research checkpoint this was a plan, not an attendance port or device
+acceptance. Calendar API `746c8aa2` was live; calendar UI `9fc87afb` was still pending.
 The deployment capacity check failed: 2.31 GiB free, subsequently below 1 GiB, then
 3.17 GiB with 2.71 GiB available RAM; existing minima are 10 GiB disk / 3 GiB RAM.
 No build/restart/prune was attempted in this task. Finish calendar bundle/types, focused desktop/mobile flows and the routine

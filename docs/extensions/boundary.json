@@ -20,6 +20,27 @@
     ".impeccable/"
   ],
   "exceptions": {
+    "apps/web/components/Contexts/LHSessionContext.tsx": {
+      "reason": "Exact attendance-entry loading exception delegated to the owned path helper so an anonymous scan is reserved before native session lookup finishes; every completion and private read still uses native API authentication and roster authorization.",
+      "approval_reference": "Owner approved attendance implementation including scan-before-login continuity; no native session or permission authority is replaced.",
+      "tests": ["Actual native SessionGate synthetic EN/TH camera-to-sign-in-to-committed-receipt journeys", "attendance-client path bounds and full native bundle/generated-route types"],
+      "replacement_plan": "Keep the single path delegate until native session loading supports an explicit public-entry capability; do not exempt other pages.",
+      "sha256": "82a350628b1a4387a828c82b5c8534f86079fc4177664f71108b96a880bb8bd5"
+    },
+    "apps/web/app/auth/callback/google/page.tsx": {
+      "reason": "Exact retry-link delegate preserves a bounded opaque attendance continuation after Google cancellation/error; native OAuth, proof, state, session and MFA logic is unchanged.",
+      "approval_reference": "Owner approved the resumable attendance arrival loop and ordinary native sign-in recovery.",
+      "tests": ["attendance-client bounded safe continuation and storage-failure regressions", "native authentication regressions and full native bundle/generated-route types"],
+      "replacement_plan": "Retain one owned retry-link helper until native callbacks offer a shared safe task-continuation slot.",
+      "sha256": "0d358ffd146c8e82e6178218413f2c2c19d205873e2ab8b5fbc53e37e7c17b1e"
+    },
+    "apps/web/proxy.ts": {
+      "reason": "Exact owned helper exempts only local opaque attendance handoffs and canonical receipt destinations from the best-effort LH_session login bounce; stale markers cannot discard those tasks. Native server authentication, admission and authorization are unchanged.",
+      "approval_reference": "Owner approved attendance implementation with native sign-in continuity; this changes only the stale-marker navigation shortcut.",
+      "tests": ["attendance-client local handoff/receipt bounds and foreign/query destination rejection", "compiled native login/check-in task regressions and full generated-route types"],
+      "replacement_plan": "Keep this single delegate until native login redirect optimization verifies the session or preserves requested tasks itself.",
+      "sha256": "530fa417a29320d28e1155d0da63e831a18b003e26ac9c9dff84f728e1b72955"
+    },
     "apps/api/src/security/rbac/resource_access.py": {
       "reason": "Exact six-line denied-decision delegate for approved course teachers to create/read/edit only their native syllabus activity, bound by immutable class preparation evidence; native MFA, membership, roles and unrelated resource decisions remain native.",
       "approval_reference": "Owner request to fix course-owning teachers' schedule creation permission failure, traced to native syllabus creation; no organization role or general native authorship is granted.",

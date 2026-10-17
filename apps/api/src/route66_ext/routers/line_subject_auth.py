@@ -41,6 +41,10 @@ class UnlinkBody(BaseModel):
     expected_identity_id: int=Field(gt=0)
     confirm_remove: bool
 
+class LiffStartBody(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    return_path: str=Field(default='/home',max_length=2000)
+
 class LiffBody(BaseModel):
     model_config=ConfigDict(extra='forbid')
     state: str=Field(max_length=128,repr=False)
@@ -154,7 +158,7 @@ async def unlink(request:Request,response:Response,body:UnlinkBody,db:AsyncSessi
     return {'linked':False,'google_preserved':True}
 
 @router.post('/liff/start')
-async def liff_start(request:Request,response:Response,db:AsyncSession=Depends(get_db_session)):
+async def liff_start(request:Request,response:Response,body:LiffStartBody|None=None,db:AsyncSession=Depends(get_db_session)):
     config=line_settings();boundary(request,config)
     if not config.liff_enabled:raise HTTPException(503,'LINE in-app access is not enabled')
     await enforce_login_auth_method(db,config.org_id,'line')
@@ -162,8 +166,11 @@ async def liff_start(request:Request,response:Response,db:AsyncSession=Depends(g
     liff_config=replace(config,deployment=config.deployment+'-liff')
     async with resources(liff_config) as (redis,transactions):
         await throttle(redis,request,liff_config,'liff-start')
-        started=await transactions.begin(config.handoff.client,intent='signin',return_path='/home',
-                                          browser_cookie=request.cookies.get(COOKIE_NAME))
+        try:
+            started=await transactions.begin(config.handoff.client,intent='signin',return_path=body.return_path if body else '/home',
+                                              browser_cookie=request.cookies.get(COOKIE_NAME))
+        except OAuthTransactionError:
+            raise HTTPException(400,'Restart LINE sign-in') from None
     response.set_cookie(**started.binding_cookie());response.headers['Cache-Control']='no-store'
     return {'state':started.state,'liff_id':config.liff_id}
 
@@ -176,8 +183,8 @@ async def liff_session(request:Request,response:Response,body:LiffBody,db:AsyncS
     try:
         async with resources(liff_config) as (redis,transactions):
             await throttle(redis,request,liff_config,'liff-session')
-            await transactions.consume(config.handoff.client,intent='signin',state=body.state,
-                                        browser_cookie=request.cookies.get(COOKIE_NAME))
+            transaction=await transactions.consume(config.handoff.client,intent='signin',state=body.state,
+                                                    browser_cookie=request.cookies.get(COOKIE_NAME))
             async with httpx.AsyncClient(trust_env=False) as client:
                 proof=await verify_line_liff_token(body.id_token,client_id=config.handoff.client.client_id,
                     provider_namespace=config.handoff.client.provider_namespace,client=client)
@@ -188,7 +195,7 @@ async def liff_session(request:Request,response:Response,body:LiffBody,db:AsyncS
             existing=decode_jwt(extract_jwt_from_request(request) or '') or {}
             if isinstance(current,PublicUser) and existing.get('lhv')==2 and existing.get('amr')=='line':
                 response.headers['Cache-Control']='no-store'
-                return {'existing_session':True,'return_path':'/home'}
+                return {'existing_session':True,'return_path':transaction.return_path}
             ttl=proof.expires_at-int(time.time()) if type(proof.expires_at) is int else 0
             if not 0 < ttl <= 604800:raise HTTPException(401,'Restart LINE sign-in')
             key='lh:liff:used:'+config.deployment+':'+hashlib.sha256(body.id_token.encode()).hexdigest()
@@ -198,14 +205,16 @@ async def liff_session(request:Request,response:Response,body:LiffBody,db:AsyncS
                 raise HTTPException(503,'LINE sign-in storage unavailable; try again') from None
             if not consumed:
                 raise HTTPException(401,'LINE sign-in token was already used; sign in again')
-        user,session=await complete_native_line(db,VerifiedLineHandoff(proof,'signin','/home'),
+        user,session=await complete_native_line(db,VerifiedLineHandoff(proof,'signin',transaction.return_path),
             org_id=config.org_id,namespace=config.handoff.client.provider_namespace)
         await db.commit()
-    except (OAuthTransactionError,ProviderProofError,IdentityConflict,IntegrityError):
-        await db.rollback();raise HTTPException(409,'LINE sign-in could not complete. Use Google to link LINE first.') from None
+    except (OAuthTransactionError,ProviderProofError,IdentityConflict,IntegrityError) as error:
+        await db.rollback()
+        code='line_link_required' if isinstance(error,IdentityConflict) and str(error)=='line_link_required' else 'line_signin_failed'
+        raise HTTPException(409,{'code':code}) from None
     except BaseException:
         await db.rollback();raise
-    return session_response(request,response,user,session,'/home')
+    return session_response(request,response,user,session,transaction.return_path)
 
 # Preserve private helper names through legacy compatibility imports.
 __all__ = [name for name in globals() if not name.startswith("__")]

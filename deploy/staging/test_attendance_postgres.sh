@@ -65,6 +65,7 @@ docker run --rm --pull=never --network none --read-only \
   -e LEARNHOUSE_TEST_LEARNING_ACCESS="${LEARNHOUSE_TEST_LEARNING_ACCESS:-0}" \
   -e LEARNHOUSE_TEST_LEARNING_ACCESS_ONLY="${LEARNHOUSE_TEST_LEARNING_ACCESS_ONLY:-0}" \
   -e LEARNHOUSE_TEST_ONLY="${LEARNHOUSE_TEST_ONLY:-}" \
+  -e LEARNHOUSE_TEST_ARRIVAL_ONLY="${LEARNHOUSE_TEST_ARRIVAL_ONLY:-0}" \
   -w /app/api --entrypoint /app/api/.venv/bin/python "$API_IMAGE" \
   -B -c '
 import os
@@ -77,7 +78,14 @@ if only and not extra:
     raise SystemExit("Learning-access-only requires LEARNHOUSE_TEST_LEARNING_ACCESS=1")
 suite = unittest.TestSuite()
 names = [n for n in os.getenv("LEARNHOUSE_TEST_ONLY", "").split(",") if n]
-if names:  # focused run: exact SchoolCalendarTests names only
+if os.getenv("LEARNHOUSE_TEST_ARRIVAL_ONLY") == "1":
+    suite.addTests(loader.loadTestsFromNames([
+        "src.route66_ext.tests.services.test_attendance_arrival",
+        "src.route66_ext.tests.services.test_attendance_handoff",
+        "src.tests.services.test_attendance_policy", "src.tests.services.test_native_line_sessions",
+    ]))
+    suite.addTests(b.AttendanceTests(name) for name in b.AttendanceTests.__dict__ if name.startswith("test_"))
+elif names:  # focused run: exact SchoolCalendarTests names only
     from src.route66_ext.tests.services import test_school_calendar as c
     suite.addTests(c.SchoolCalendarTests(name) for name in names)
 elif not only:

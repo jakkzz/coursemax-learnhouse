@@ -83,13 +83,13 @@ async def resources(config):
         await redis.aclose()
 
 
-async def throttle(redis, request, config, action):
+async def throttle(redis, request, config, action, *, limit=30):
     key = 'lh:oauth-rate:' + config.deployment + ':' + action + ':' + hashlib.sha256(get_client_ip(request).encode()).hexdigest()
     try:
         count = await redis.eval(_LIMIT, 1, key)
     except Exception:
         raise HTTPException(503, 'Sign-in storage unavailable') from None
-    if count > 30:
+    if count > limit:
         raise HTTPException(429, 'Too many sign-in attempts. Wait five minutes.', headers={'Retry-After': '300'})
 
 

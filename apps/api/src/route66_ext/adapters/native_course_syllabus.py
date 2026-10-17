@@ -69,6 +69,8 @@ async def _prepare(db, request, user, course, year, semester, content, provenanc
         saved = (metadata or {}).get('route66_syllabus', {})
         if all(saved.get(k) == v for k, v in key.items()):
             return {'activity_uuid': activity_uuid, 'created': False}
+    if callable(content):
+        content = await content()  # Reopening authored content must not depend on a new school fetch.
     chapters = (await db.exec(select(Chapter).where(Chapter.course_id == course.id, Chapter.org_id == course.org_id))).all()
     chapter = next((c for c in chapters if (c.extra_metadata or {}).get('route66_syllabus') is True), None)
     if chapter is None:

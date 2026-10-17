@@ -24,7 +24,7 @@ export default function CalendarPreview({ payload, th }: { payload: CalendarPayl
     </nav>
     {view === 'weeks' ? <ol className={styles.previewList}>{term.weeks.map((week, i) => <li key={i} className={styles.previewWeek}>
       <strong>{t('Week', 'สัปดาห์')} {week.number}</strong>
-      <div><p>{day(week.starts_on)} – {day(week.ends_on)}</p>{week.uncertain && <small className={styles.muted}>{t('Proposed from source', 'ข้อมูลที่เสนอจากเอกสาร')}</small>}</div>
+      <div><p>{week.teaching_dates?.length ? week.teaching_dates.map(day).join(' · ') : `${day(week.starts_on)} – ${day(week.ends_on)}`}</p>{week.uncertain && <small className={styles.muted}>{t('Proposed from source', 'ข้อมูลที่เสนอจากเอกสาร')}</small>}</div>
       <div><p>{rotation(week.rotation)}</p>{!week.teaching ? <small>{t('No regular classes', 'งดเรียนตามตารางปกติ')}</small> : (week.rotation === 'midterm' || week.rotation === 'final') && <small>{t('Regular classes kept', 'คงการเรียนตามตาราง')}</small>}</div>
     </li>)}</ol> : <ul className={styles.previewList}>{term.closures.length === 0 && <li className={styles.empty}>{t('No holidays or closures in this calendar.', 'ปฏิทินนี้ไม่มีวันหยุดหรือวันงดเรียน')}</li>}{term.closures.map((closure, i) => <li key={i} className={styles.previewClosure}>
       <div><strong>{day(closure.affected_on)}</strong><p className={styles.muted}>{closure.makeup_on ? `${t('Make-up', 'ชดเชย')}: ${day(closure.makeup_on)}` : t('No make-up stated', 'ไม่ระบุวันชดเชย')}</p></div><p>{closure.note}</p>

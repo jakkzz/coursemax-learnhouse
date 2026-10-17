@@ -27,6 +27,7 @@ class Week(_Model):
     ends_on: date
     rotation: Rotation
     teaching: bool
+    teaching_dates: list[date] | None = Field(default=None, max_length=7)
     note: str | None = Field(default=None, max_length=300)
     page: int | None = Field(default=None, ge=1, le=500)
     uncertain: bool = False
@@ -185,6 +186,9 @@ def issues(payload: Payload, page_count: int | None = None):
             if week.teaching and (week.ends_on - week.starts_on).days > 6:
                 # One occurrence per slot per teaching week keeps meeting identity unique.
                 found.append(f'{label} week {week.number}: a teaching week can span at most 7 days')
+            if week.teaching_dates is not None and (len(set(week.teaching_dates)) != len(week.teaching_dates)
+                    or any(not week.starts_on <= d <= week.ends_on for d in week.teaching_dates)):
+                found.append(f'{label} week {week.number}: listed teaching dates must be unique and within the week')
             if week.uncertain:
                 found.append(f'{label} week {week.number}: marked uncertain')
             previous = week
@@ -262,6 +266,21 @@ def official_weeks(details):
     return frozenset(weeks)
 
 
+def official_course_facts(meetings):
+    """Read explicit registrar facts, never infer a delivery rule from week-number parity."""
+    clauses = [re.sub(r'\s+', '', m.get('details') or '') for m in meetings]
+    facts = {}
+    rule = 'เข้าชั้นเรียนในสัปดาห์คู่/เรียนออนไลน์ในสัปดาห์คี่'
+    if clauses and all(rule in text for text in clauses):
+        facts['teaching_pattern'] = 'even_onsite'
+    credits = {tuple(m.groups()) for text in clauses
+               for m in re.finditer(r'(?<![0-9])([0-9]{1,2})\(([0-9]{1,2})-([0-9]{1,2})-([0-9]{1,2})\)', text)}
+    if len(credits) == 1:
+        credit, lecture, practical, independent = credits.pop()
+        facts['credits'] = f'{credit} ({lecture}-{practical}-{independent})'
+    return facts
+
+
 def slots(meetings):
     """Official timetable meetings -> stable slot facts; unknown days are errors."""
     result, errors, seen = [], [], {}
@@ -287,8 +306,9 @@ def slots(meetings):
         seen[key] = seen.get(key, 0) + 1
         if seen[key] > 1:
             key += f'-{seen[key]}'
+        locations = re.findall(r'(?<![0-9.])[0-9]{2}\.[0-9]{2}\.[0-9]{2}(?![0-9.])', meeting.get('details') or '')
         result.append({'slot_key': key, 'weekday': day, 'start': start, 'end': end, 'weeks': weeks,
-                       'location': (meeting.get('details') or '')[:1000] or None})
+                       'location': locations[0] if len(locations) == 1 else (meeting.get('details') or '')[:1000] or None})
     return sorted(result, key=lambda s: (s['weekday'], s['start'], s['slot_key'])), errors
 
 
@@ -298,8 +318,17 @@ def _mode(pattern, rotation):
     return {'even': 'onsite', 'odd': 'online'}.get(rotation)
 
 
-def plan(payload: Payload, semester: int, meetings, pattern, label, hybrid_start=None):
+def plan(payload: Payload, semester: int, meetings, pattern, label, hybrid_start=None, policy_override=None):
     """Planned calendar meetings for one class; returns (rows, warnings, errors)."""
+    official = official_course_facts(meetings).get('teaching_pattern')
+    if policy_override is not None:
+        if policy_override not in PATTERNS or pattern != policy_override:
+            return [], [], ['Choose a valid course-specific teaching policy override / เลือกรูปแบบเรียนที่ใช้เฉพาะรายวิชาให้ถูกต้อง']
+        hybrid_start = None
+    elif official:
+        if pattern != official:
+            return [], [], ['The registrar specifies on campus in even school weeks and online in odd school weeks. Use the school policy or explicitly override it for this course. / ทะเบียนระบุเข้าชั้นเรียนในสัปดาห์คู่และเรียนออนไลน์ในสัปดาห์คี่ โปรดใช้รูปแบบจากทะเบียนหรือเลือกรูปแบบที่ใช้เฉพาะรายวิชา']
+        hybrid_start = None  # School-declared rotation is not an instructor-selected starting mode.
     if pattern not in PATTERNS:
         return [], [], ['Choose a meeting pattern']
     if hybrid_start not in (None, 'onsite', 'online'):
@@ -327,7 +356,7 @@ def plan(payload: Payload, semester: int, meetings, pattern, label, hybrid_start
         title = f'{label} · สัปดาห์ที่ {week.number}' + (' (ชดเชย)' if kind == 'makeup' else '')
         return {'calendar_kind': kind, 'academic_week': week.number, 'slot_key': slot['slot_key'],
                 'nominal_on': nominal, 'starts_at': starts, 'ends_at': ends, 'timezone': payload.timezone,
-                'state': state, 'rotation': week.rotation, 'mode': mode, 'location': slot['location'],
+                'state': state, 'rotation': week.rotation, 'mode': mode, 'location': slot['location'] if mode == 'onsite' else None,
                 'note': note, 'title': title[:160], 'makeup_for': nominal if kind == 'makeup' else None}
 
     for week in term.weeks:
@@ -342,6 +371,8 @@ def plan(payload: Payload, semester: int, meetings, pattern, label, hybrid_start
             if day > week.ends_on:
                 continue
             closure = closures.get(day)
+            if closure is None and week.teaching_dates is not None and day not in week.teaching_dates:
+                continue
             if closure is None and not week.teaching:
                 continue  # A non-teaching week only carries its explicit closures and their make-ups.
             mode = _mode(pattern, week.rotation)
@@ -355,7 +386,7 @@ def plan(payload: Payload, semester: int, meetings, pattern, label, hybrid_start
                     elapsed_weeks = (week.starts_on - anchor).days // 7
                 mode = base if elapsed_weeks % 2 == 0 else opposite(base)
             if mode is None:
-                errors.append('Choose how the first hybrid week meets, or use a reviewed school rotation / เลือกรูปแบบการเรียนของสัปดาห์แรก หรือใช้รอบสัปดาห์ที่ตรวจสอบจากปฏิทินแล้ว')
+                errors.append(f'Calendar week {week.number} needs its reviewed odd/even rotation. Open the full teaching calendar PDF and review this week before saving. / โปรดตรวจสอบสัปดาห์คี่หรือคู่ของสัปดาห์ที่ {week.number} จากปฏิทินฉบับเต็มก่อนบันทึก' if official else 'Choose how the first hybrid week meets, or use a reviewed school rotation / เลือกรูปแบบการเรียนของสัปดาห์แรก หรือใช้รอบสัปดาห์ที่ตรวจสอบจากปฏิทินแล้ว')
                 continue
             if closure is None:
                 rows.append(row('regular', week, slot, day, day, 'scheduled', mode, None))

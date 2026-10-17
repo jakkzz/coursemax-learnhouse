@@ -3,6 +3,8 @@ export type RegistrarClass = {
   course_code: string
   title: string
   section: string
+  teaching_pattern?: 'even_onsite'
+  credits?: string
   meetings: { day: string; start_time: string; end_time: string; details: string }[]
 }
 export type RegistrarTimetable = { academic_year: number; semester: number; fetched_at: string; classes: RegistrarClass[] }

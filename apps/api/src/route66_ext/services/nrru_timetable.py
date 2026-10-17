@@ -58,6 +58,9 @@ def parse_timetable(raw, officer_id, officer_code):
     if len(found)>100:raise DirectoryUnavailable('directory_changed')
     if not found and 'ไม่พบข้อมูลตารางสอน' not in text:
         raise DirectoryUnavailable('directory_changed')
+    from src.route66_ext.services.calendar_plan import official_course_facts
+    for entry in found.values():
+        entry.update(official_course_facts(entry['meetings']))
     return {**term,'classes':list(found.values()),'source':'https://reg.nrru.ac.th/registrar/teach_time.asp', 'authority':'registrar_read_only_not_learnhouse_assignment'}
 
 async def teacher_timetable(officer_id, officer_code, academic_year=None, semester=None, client=None):

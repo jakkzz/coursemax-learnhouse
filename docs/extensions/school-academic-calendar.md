@@ -1,6 +1,65 @@
 # School academic calendars
 
-## Assigned-teacher syllabi and automatic hybrid weeks
+## School policy first — validated, awaiting deployment
+
+The updated UI supersedes the first-mode workflow below. The normal path
+shows a read-only **School teaching policy**, not an online/on-campus/hybrid selector.
+The first-week selector is removed entirely. The exact school timetable clause
+`เข้าชั้นเรียนในสัปดาห์คู่/เรียนออนไลน์ในสัปดาห์คี่` supplies `even_onsite`; the PDF's
+explicit odd/even labels, not numeric week parity, determine actual dated modes.
+For example, a source-labeled even week 9 remains on campus after an exam pause.
+Unstated policies remain unknown rather than inferred from a room or week number.
+
+**Override school policy** is a secondary, explicit action. Only that action reveals
+a course-only selector. Hybrid exceptions still use reviewed school odd/even dates;
+there is no teacher-selected starting mode. **Use school policy** removes the exception.
+Changing either invalidates the dated preview; saving still requires review, the
+current version/fingerprint, own-section verification and existing class-management
+authority. Old/past attendance evidence remains protected.
+
+`policy_override: 'onsite' | 'online' | 'even_onsite' | null` travels through the
+existing preview/apply and independent syllabus paths. The override participates in
+the fingerprint/idempotency and is recorded in `class_schedule_applied`; the existing
+schedule DTO reloads it beside `school_pattern`. Restoring school policy records
+`null`. No school payload, publication, source bytes, role or schema is changed.
+Source and exception stay visibly distinct for students; student views remain
+read-only. Native syllabus drafts include the source rule, actual dated modes and
+any explicit exception, without rewriting existing authored content. Legacy
+`hybrid_start` remains compatible for previous API clients/records, but the current
+UI neither offers nor sends it; a school rule or explicit override ignores it.
+
+Explicit PDF `teaching_dates` retain discontinuous date lists, including July 27/31
+and August 10/11/13/14, rather than filling intervening dates. Explicit closures and
+make-ups keep their reviewed original-week semantics. Unique room numbers are used
+only for on-campus sessions. Credits, section and official meetings carry into new
+native syllabi. Reopening an existing syllabus does not require a fresh portal fetch.
+
+Checks so far are 82 web checks, 40 pure planner/reader/timetable cases, boundary/diff
+checks and four isolated real-component/native-control EN desktop/TH mobile teacher
+and student journeys. Browser tasks cover default read-only policy, explicit override,
+preview invalidation, save/reload, cancel, restore policy and zero student writes.
+The restored capacity gate subsequently passed without cleanup. The complete calendar
+PostgreSQL suite passed 20 cases with one opt-in private-PDF skip, including source-rule
+matching, independent syllabus creation, explicit override/apply/reload/restore and
+unchanged source/syllabus evidence. The production bundle/generated-route TypeScript
+and five compiled full-native-shell teacher/student EN/TH desktop/mobile journeys
+passed, including native editor save/reload and mobile handoff. These are synthetic
+acceptance, not institutional/provider or owner-browser acceptance. Deployment is
+pending the code-only package/backup/health checks. No cleanup or institutional
+calendar/schedule/syllabus writes were performed. Retained full five-page calendar drafts still require human review
+of midterm and make-up source conflicts; no re-upload or automatic publication.
+
+### Direction contract
+
+**THESIS** Read the school policy and review its actual dates; reveal controls only
+for a deliberate course exception. **STORY** Match the timetable and accepted PDF,
+preview/save dates, or prepare the native syllabus independently. **FIRST VIEWPORT**
+One calendar picker, a read-only school policy and one primary scheduling action;
+exception controls stay out of the common path. **OWN-WORLD / FORM** Preserve native
+LearnHouse and pinned Interior controls, typography and scoped materials; no new
+component system, dependency, font, animation or shipping raster.
+
+## Last deployed — assigned-teacher syllabi and automatic hybrid weeks
 
 The reported resource-owner CREATE error came from native **syllabus preparation**,
 not attendance-schedule saving. An active, explicitly assigned course teacher who
@@ -41,7 +100,7 @@ student online/on-campus make-ups. No page errors or horizontal overflow. These 
 synthetic checks, not institutional/provider or owner-browser acceptance. Native
 rich-text editing remains desktop-only. Finish review is inline, not independent.
 
-### Direction contract
+### Historical direction contract at deployment
 
 **THESIS** Choose the first hybrid mode once; review actual dates rather than calculate
 odd/even week numbers or acquire an admin role to write a syllabus.

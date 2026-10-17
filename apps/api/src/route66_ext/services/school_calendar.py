@@ -175,6 +175,8 @@ async def schedule_dto(db, cls, schedule, manageable):
             'calendar_name': calendar.name if calendar else None, 'pattern': schedule.pattern if schedule else '',
             'newer_revision_id': newer, 'planning': configuration.get('planning'),
             'hybrid_start': configuration.get('hybrid_start'),
+            'school_pattern': planner.official_course_facts(schedule.meetings).get('teaching_pattern') if schedule else None,
+            'policy_override': configuration.get('policy_override'),
             'syllabus_available': bool(cls and cls.course_id),
             'sessions': [session_dto(r, r.id in replaced) for r in rows]}
 
@@ -183,10 +185,12 @@ def _same(head, row):
     return all(getattr(head, k) == row[k] for k in _COMPARED)
 
 
-async def preview(db, cls, schedule, revision, payload, facts, pattern, now, hybrid_start=None):
+async def preview(db, cls, schedule, revision, payload, facts, pattern, now, hybrid_start=None, policy_override=None):
     """Diff of the reviewed plan against saved sessions; never writes."""
     label = f"{facts['course_code']} {facts['section']}"
-    rows, warnings, errors = planner.plan(payload, facts['semester'], facts['meetings'], pattern, label, hybrid_start)
+    rows, warnings, errors = planner.plan(payload, facts['semester'], facts['meetings'], pattern, label, hybrid_start, policy_override)
+    if policy_override is not None:
+        warnings.append('This course uses an explicit teaching policy override. The school timetable and calendar remain unchanged. / รายวิชานี้ใช้รูปแบบเรียนที่เลือกเป็นกรณีเฉพาะ โดยไม่เปลี่ยนตารางทะเบียนหรือปฏิทินการศึกษา')
     current, evidence = await heads(db, cls.id) if cls else ({}, set())
     planned_keys, actions = set(), []
     for row in rows:
@@ -231,6 +235,8 @@ async def preview(db, cls, schedule, revision, payload, facts, pattern, now, hyb
                 'actions': [(a, r, h and (h.id, h.version, h.state, h.id in evidence)) for a, r, h in actions]}
     if hybrid_start is not None:
         material['hybrid_start'] = hybrid_start
+    if policy_override is not None:
+        material['policy_override'] = policy_override
     sessions = []
     for action, row, head in actions:
         # Show the actual post-apply result: kept heads stay as saved; cancelled become no_class.

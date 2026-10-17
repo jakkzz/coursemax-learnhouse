@@ -217,7 +217,7 @@ def read(pages, academic_year=None):
         # Listed dates omit holidays; the week still covers closures in the same calendar week.
         span = days + [c for c in closures if c - timedelta(days=c.weekday()) in mondays]
         rows.append(planner.Week(number=number, starts_on=min(span), ends_on=max(span), rotation=item['rotation'],
-            teaching=item['days'] is not None, note=item['note'] if item['rotation'] in ('midterm', 'final') or item['days'] is None else None,
+            teaching=item['days'] is not None, teaching_dates=item['days'], note=item['note'] if item['rotation'] in ('midterm', 'final') or item['days'] is None else None,
             page=item['page'], uncertain=item['rotation'] in ('midterm', 'final')))
         if item['rotation'] in ('midterm', 'final'):
             notes.append(f'Week {number} is labelled "{item["note"] or item["rotation"]}" without saying classes stop; '

@@ -26,6 +26,63 @@ class PlannerTests(unittest.TestCase):
     def run_plan(self, data, pattern='onsite', meetings=MEETINGS):
         return p.plan(data, 1, meetings, pattern, '990001 P1')
 
+    def test_school_delivery_rule_overrides_manual_start_and_uses_school_rotation(self):
+        detail = '000204 (P7) 3 (2-2-5) W:(1-16) 27.03.03 (เข้าชั้นเรียนในสัปดาห์คู่/เรียนออนไลน์ในสัปดาห์คี่)'
+        meetings = [dict(MEETINGS[0], details=detail)]
+        self.assertEqual(p.official_course_facts(meetings), {'teaching_pattern': 'even_onsite', 'credits': '3 (2-2-5)'})
+        source = payload([week(1, 'odd'), week(2, 'even'), week(3, 'even')])
+        rows, _, errors = p.plan(source, 1, meetings, 'even_onsite', 'fixture', 'onsite')
+        self.assertEqual(errors, [])
+        self.assertEqual([(r['academic_week'], r['mode']) for r in rows], [(1, 'online'), (2, 'onsite'), (3, 'onsite')])
+        self.assertEqual([r['location'] for r in rows], [None, '27.03.03', '27.03.03'])
+        self.assertTrue(p.plan(source, 1, meetings, 'onsite', 'fixture')[2])
+        self.assertTrue(p.plan(payload([week(1)]), 1, meetings, 'even_onsite', 'fixture', 'online')[2])
+        self.assertNotIn('teaching_pattern', p.official_course_facts(MEETINGS))
+
+    def test_course_policy_override_is_explicit_and_never_changes_school_rotation(self):
+        source = payload([week(1, 'odd'), week(2, 'even')])
+        before = source.model_dump(mode='json')
+        meetings = [dict(MEETINGS[0], details='เข้าชั้นเรียนในสัปดาห์คู่/เรียนออนไลน์ในสัปดาห์คี่')]
+        self.assertTrue(p.plan(source, 1, meetings, 'online', 'fixture')[2])
+        for override in ('onsite', 'online', 'even_onsite'):
+            rows, _, errors = p.plan(source, 1, meetings, override, 'fixture', 'onsite', override)
+            self.assertEqual(errors, [])
+            self.assertEqual([r['mode'] for r in rows], ['online', 'onsite'] if override == 'even_onsite' else [override, override])
+        self.assertTrue(p.plan(source, 1, meetings, 'onsite', 'fixture', policy_override='online')[2])
+        self.assertTrue(p.plan(source, 1, meetings, 'onsite', 'fixture', policy_override='invalid')[2])
+        self.assertTrue(p.plan(payload([week(1)]), 1, meetings, 'even_onsite', 'fixture', 'onsite', 'even_onsite')[2])
+        self.assertEqual(source.model_dump(mode='json'), before)
+        self.assertEqual(p.official_course_facts(meetings)['teaching_pattern'], 'even_onsite')
+
+    def test_listed_pdf_dates_are_not_filled_but_explicit_closures_keep_makeups(self):
+        source = payload([{**week(1, 'odd'), 'teaching_dates': [MON, MON + timedelta(days=4)]}],
+            [{'affected_on': (MON + timedelta(days=1)).isoformat(), 'makeup_on': (MON + timedelta(days=5)).isoformat(), 'note': 'explicit closure'}])
+        meetings = [dict(MEETINGS[0], day=day) for day in ('จันทร์', 'อังคาร', 'พุธ', 'ศุกร์')]
+        rows, _, errors = p.plan(source, 1, meetings, 'even_onsite', 'fixture')
+        self.assertEqual(errors, [])
+        self.assertEqual([(r['nominal_on'], r['calendar_kind'], r['state'], r['mode']) for r in rows], [
+            (MON, 'regular', 'scheduled', 'online'), (MON + timedelta(days=1), 'regular', 'no_class', 'online'),
+            (MON + timedelta(days=4), 'regular', 'scheduled', 'online'), (MON + timedelta(days=1), 'makeup', 'scheduled', 'online')])
+        source.terms[0].weeks[0].teaching_dates.append(MON + timedelta(days=8))
+        self.assertTrue(any('listed teaching dates' in error for error in p.issues(source)))
+
+    def test_source_matched_syllabus_contains_credits_and_actual_dated_modes(self):
+        from types import SimpleNamespace
+        from src.route66_ext.services.course_syllabus import document
+        source = payload([week(1, 'odd'), week(2, 'even')])
+        cls = SimpleNamespace(semester=1, academic_year=2569, registry_course_code='000204', registry_title='Synthetic course', section='P7')
+        meetings = [dict(MEETINGS[0], details='000204 (P7) 3 (2-2-5) W:(1-16) 27.03.03 (เข้าชั้นเรียนในสัปดาห์คู่/เรียนออนไลน์ในสัปดาห์คี่)')]
+        text = p.canonical(document(cls, SimpleNamespace(name='Synthetic calendar', track='regular'),
+            SimpleNamespace(number=1, payload=source.model_dump(mode='json')), None, True, '', meetings))
+        for value in ('P7', '3 (2-2-5)', '27.03.03', '22/6/2569 · 09.00–12.00 · ออนไลน์', '29/6/2569 · 09.00–12.00 · ที่มหาวิทยาลัย'):
+            self.assertIn(value, text)
+        override = p.canonical(document(cls, SimpleNamespace(name='Synthetic calendar', track='regular'),
+            SimpleNamespace(number=1, payload=source.model_dump(mode='json')), None, True, '', meetings, policy_override='online'))
+        self.assertIn('29/6/2569 · 09.00–12.00 · ออนไลน์', override)
+        self.assertIn('รูปแบบเรียนที่ใช้เฉพาะรายวิชา', override)
+        self.assertIn('รูปแบบเรียนจากทะเบียน', override)
+        self.assertNotIn('29/6/2569 · 09.00–12.00 · ที่มหาวิทยาลัย', override)
+
     def test_multiple_slots_and_dates(self):
         rows, warnings, errors = self.run_plan(payload([week(1), week(2)]))
         self.assertEqual(errors, [])
@@ -223,7 +280,7 @@ class CoursePlanningTests(unittest.TestCase):
         source = self.dates()
         source.events[1].note = 'Only for the stated course group'
         revision = SimpleNamespace(number=3, payload=source.model_dump(mode='json'))
-        cls = SimpleNamespace(semester=1, academic_year=2569, registry_course_code='FIX101', registry_title=None)
+        cls = SimpleNamespace(semester=1, academic_year=2569, registry_course_code='FIX101', registry_title=None, section='P1')
         planning = p.CoursePlanning(program='A', starts_on=MON, ends_on=MON + timedelta(days=7)).model_dump(mode='json')
         doc = document(cls, SimpleNamespace(name='Synthetic calendar', track='A'), revision, planning, True, 'Verified course name')
         text = p.canonical(doc)

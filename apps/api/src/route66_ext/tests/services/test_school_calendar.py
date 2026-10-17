@@ -1058,6 +1058,76 @@ END; $$"""))
         self.assertEqual((own.status_code, own.json()['manageable']), (200, False))
         self.assertEqual(own.json()['sessions'], loaded['sessions'])
 
+    async def test_official_rule_matches_pdf_dates_and_syllabus_before_attendance_save(self):
+        from src.route66_ext.adapters import native_course_syllabus as native
+        from src.route66_ext.adapters.native_learning_access_test_support import CourseChapter, ChapterActivity, ResourceAuthor, UserGroup, UserGroupResource, UserGroupUser, ActivityVersion
+        async with self.engine.begin() as conn:
+            for table in (native.Chapter.__table__, native.Activity.__table__, CourseChapter.__table__, ChapterActivity.__table__, ResourceAuthor.__table__, UserGroup.__table__, UserGroupResource.__table__, UserGroupUser.__table__, ActivityVersion.__table__):
+                await conn.run_sync(table.create)
+        await self.make_admin()
+        data = calendar_payload(monday(2))
+        for index, w in enumerate(data['terms'][0]['weeks']):
+            w['rotation'] = 'odd' if index == 0 else 'even'
+            w['teaching_dates'] = [w['starts_on']]
+        revision = await self.published(data)
+        detail = '990001 (P1) 3 (2-2-5) W:(1-16) 27.03.03 (เข้าชั้นเรียนในสัปดาห์คู่/เรียนออนไลน์ในสัปดาห์คี่)'
+        meetings = [{**MEETINGS[0], 'details': detail}]
+        self.timetable[(2, '100', 'P1')] = {'course_code': '990001', 'title': 'Synthetic course 10', 'meetings': meetings}
+        self.actor = 2
+        path = '/api/v1/school-calendars/schedules/by-class/20/syllabus'
+        body = {'expected_version': 0, 'revision_id': revision['id'], 'section': self.section('P1'), 'language': 'th'}
+        self.assertEqual((await self.client.post(path, json={**body, 'section': self.section('P9')})).status_code, 409)
+        with patch('src.services.courses.chapters.index_course'), patch('src.services.courses.activities.activities.index_activity'):
+            created = await self.client.post(path, json=body)
+        self.assertEqual(created.status_code, 200, created.text)
+        self.assertTrue(created.json()['created'])
+        async with self.sessions() as db:
+            activity = (await db.exec(select(native.Activity))).one()
+            text = str(activity.content)
+            self.assertIn('3 (2-2-5)', text)
+            self.assertIn('27.03.03', text)
+            self.assertIn('ที่มหาวิทยาลัย', text)
+            self.assertIn('ออนไลน์', text)
+            self.assertEqual((await db.exec(select(ClassSchedule))).all(), [])
+            self.assertEqual((await db.exec(select(AttendanceSession))).all(), [])
+            self.assertEqual((await db.exec(select(ResourceAuthor))).all(), [])
+        del self.timetable[(2, '100', 'P1')]
+        reopened = await self.client.post(path, json=body)
+        self.assertEqual((reopened.status_code, reopened.json()['created']), (200, False))
+        self.timetable[(2, '100', 'P1')] = {'course_code': '990001', 'title': 'Synthetic course 10', 'meetings': meetings}
+        args = {'section': self.section('P1'), 'revision_id': revision['id'], 'pattern': 'even_onsite', 'hybrid_start': 'onsite'}
+        reviewed = await self.client.post('/api/v1/school-calendars/schedules/preview', json=args)
+        self.assertEqual(reviewed.status_code, 200, reviewed.text)
+        self.assertEqual(reviewed.json()['errors'], [])
+        self.assertEqual([s['mode'] for s in reviewed.json()['sessions']], ['online', 'onsite', 'onsite', 'onsite'])
+        saved = await self.client.post('/api/v1/school-calendars/schedules/apply', json={**args,
+            'expected_version': 0, 'fingerprint': reviewed.json()['fingerprint'], 'reviewed': True})
+        self.assertEqual(saved.status_code, 200, saved.text)
+        self.assertIsNone(saved.json()['hybrid_start'])
+        self.assertEqual([s['mode'] for s in saved.json()['sessions']], ['online', 'onsite', 'onsite', 'onsite'])
+        self.assertEqual((await self.client.get('/api/v1/school-calendars/schedules/by-class/20')).json(), saved.json())
+        self.assertEqual(saved.json()['school_pattern'], 'even_onsite')
+        self.assertIsNone(saved.json()['policy_override'])
+        exception = {**args, 'pattern': 'online', 'policy_override': 'online'}
+        reviewed_override = await self.client.post('/api/v1/school-calendars/schedules/preview', json=exception)
+        self.assertEqual(reviewed_override.status_code, 200, reviewed_override.text)
+        self.assertEqual({s['mode'] for s in reviewed_override.json()['sessions']}, {'online'})
+        applied_override = await self.client.post('/api/v1/school-calendars/schedules/apply', json={**exception,
+            'expected_version': 1, 'fingerprint': reviewed_override.json()['fingerprint'], 'reviewed': True})
+        self.assertEqual(applied_override.status_code, 200, applied_override.text)
+        self.assertEqual((applied_override.json()['school_pattern'], applied_override.json()['policy_override']), ('even_onsite', 'online'))
+        self.assertIsNone(applied_override.json()['hybrid_start'])
+        self.assertEqual((await self.client.get('/api/v1/school-calendars/schedules/by-class/20')).json(), applied_override.json())
+        restored_preview = await self.client.post('/api/v1/school-calendars/schedules/preview', json=args)
+        restored = await self.client.post('/api/v1/school-calendars/schedules/apply', json={**args,
+            'expected_version': 2, 'fingerprint': restored_preview.json()['fingerprint'], 'reviewed': True})
+        self.assertEqual(restored.status_code, 200, restored.text)
+        self.assertIsNone(restored.json()['policy_override'])
+        self.assertEqual([s['mode'] for s in restored.json()['sessions'] if not s['superseded']], ['online', 'onsite', 'onsite', 'onsite'])
+        async with self.sessions() as db:
+            self.assertEqual((await db.get(SchoolCalendarRevision, revision['id'])).payload, revision['payload'])
+            self.assertEqual(str((await db.exec(select(native.Activity))).one().content), text)
+
     async def test_native_syllabus_draft_is_course_owned_unpublished_and_not_overwritten(self):
         from src.route66_ext.adapters import native_course_syllabus as native
         from src.route66_ext.adapters.native_learning_access_test_support import CourseChapter, ChapterActivity, ResourceAuthor, UserGroup, UserGroupResource, UserGroupUser, PublicUser, read_native_activity, ActivityVersion, ActivityUpdate, update_activity, get_editor_bootstrap, check_resource_access, AccessAction, ResourceAccessChecker, UserOrganization

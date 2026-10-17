@@ -2,10 +2,18 @@
 from src.route66_ext.services import calendar_plan as planner
 
 
-def document(cls, calendar, revision, planning, th=False, course_name=''):
+def document(cls, calendar, revision, planning, th=False, course_name='', meetings=None, pattern=None, hybrid_start=None, policy_override=None):
     payload = planner.course_payload(planner.Payload.model_validate(revision.payload), cls.semester,
         planner.CoursePlanning.model_validate(planning) if planning else None)
     term = next(t for t in payload.terms if t.semester == cls.semester)
+    meetings = meetings or []
+    facts = planner.official_course_facts(meetings)
+    pattern = policy_override or facts.get('teaching_pattern') or pattern
+    sessions = []
+    if meetings and pattern:
+        sessions, _, errors = planner.plan(payload, cls.semester, meetings, pattern, cls.registry_course_code, hybrid_start, policy_override)
+        if errors:
+            raise ValueError(' · '.join(errors))
     t = lambda en, thai: thai if th else en
     nodes = []
     day = lambda value: f'{value.day}/{value.month}/{value.year + 543}' if th else str(value)
@@ -16,6 +24,16 @@ def document(cls, calendar, revision, planning, th=False, course_name=''):
 
     text('heading', t('Course syllabus', 'ประมวลรายวิชา'), level=1)
     text('paragraph', f'{cls.registry_course_code} · {cls.registry_title or course_name} · {cls.semester}/{cls.academic_year}')
+    text('paragraph', f'{t("Section", "กลุ่มเรียน")} {cls.section}')
+    if facts.get('credits'):
+        text('paragraph', f'{t("Credits", "หน่วยกิต")} {facts["credits"]}')
+    if facts.get('teaching_pattern'):
+        text('paragraph', t('Registrar teaching rule — on campus in even school weeks; online in odd school weeks.',
+                            'รูปแบบเรียนจากทะเบียน เข้าชั้นเรียนในสัปดาห์คู่และเรียนออนไลน์ในสัปดาห์คี่'))
+    if policy_override is not None:
+        mode = {'onsite': t('On campus', 'ที่มหาวิทยาลัย'), 'online': t('Online', 'ออนไลน์'),
+                'even_onsite': t('On campus in even school weeks; online in odd school weeks', 'เข้าชั้นเรียนในสัปดาห์คู่และเรียนออนไลน์ในสัปดาห์คี่')}[policy_override]
+        text('paragraph', t('Course-specific teaching policy override', 'รูปแบบเรียนที่ใช้เฉพาะรายวิชา') + ' · ' + mode)
     text('paragraph', f'{calendar.name} · {t("Calendar revision", "ฉบับปฏิทิน")} {revision.number}')
     text('paragraph', t('Draft for instructor completion. Calendar dates do not supply course outcomes, topics or grading rules.',
                         'ฉบับร่างสำหรับผู้สอนเติมรายละเอียด ปฏิทินไม่ได้ระบุผลลัพธ์การเรียนรู้ หัวข้อเนื้อหา หรือเกณฑ์คะแนนของรายวิชา'))
@@ -23,6 +41,10 @@ def document(cls, calendar, revision, planning, th=False, course_name=''):
                     t('Assessment and grading', 'การประเมินผลและเกณฑ์คะแนน')):
         text('heading', heading, level=2)
         text('paragraph', t('Complete from the approved course specification.', 'เติมข้อมูลตามข้อกำหนดรายวิชาที่ได้รับอนุมัติ'))
+    if meetings:
+        text('heading', t('Official timetable', 'ตารางเรียนจากทะเบียน'), level=2)
+        for meeting in meetings:
+            text('paragraph', f'{meeting["day"]} · {meeting["start_time"]}–{meeting["end_time"]} · {meeting.get("details", "")}')
     text('heading', t('Semester academic dates', 'กำหนดการศึกษาของภาคเรียน'), level=2)
     for event in payload.events:
         if event.semester != cls.semester or event.program != (planning['program'] if planning else calendar.track) or event.kind == 'other':
@@ -36,6 +58,16 @@ def document(cls, calendar, revision, planning, th=False, course_name=''):
         text('heading', f'{t("Week", "สัปดาห์ที่")} {week.number} · {day(week.starts_on)} – {day(week.ends_on)}', level=3)
         text('paragraph', t('Complete the topic, learning activities and assessment for this week.', 'เติมหัวข้อ กิจกรรมการเรียนรู้ และการประเมินผลของสัปดาห์นี้') if week.teaching else
              t('No regular teaching in this calendar week. Complete any exam or other arrangements separately.', 'ปฏิทินระบุว่าไม่มีการสอนตามตารางปกติในสัปดาห์นี้ โปรดเติมการสอบหรือกิจกรรมอื่นแยกต่างหาก'))
+        for session in sessions:
+            if session['academic_week'] != week.number:
+                continue
+            start = session['starts_at'].astimezone(planner.ZoneInfo(payload.timezone))
+            end = session['ends_at'].astimezone(planner.ZoneInfo(payload.timezone))
+            mode = t('On campus', 'ที่มหาวิทยาลัย') if session['mode'] == 'onsite' else t('Online', 'ออนไลน์')
+            state = t('No class', 'งดเรียน') if session['state'] == 'no_class' else mode
+            makeup = f' · {t("Make-up for", "ชดเชยวันที่")} {day(session["makeup_for"])}' if session['makeup_for'] else ''
+            clock = '%H.%M' if th else '%H:%M'
+            text('paragraph', f'{day(start.date())} · {start.strftime(clock)}–{end.strftime(clock)} · {state}{makeup}')
         if week.note:
             text('paragraph', week.note)
     for closure in term.closures:

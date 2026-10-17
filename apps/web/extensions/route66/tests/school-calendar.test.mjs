@@ -1,8 +1,24 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import { calendarRequest, formatCalendarDate, hasCalendarDates, localDay, monthDays, moveMonth } from '../components/Objects/Classes/calendar/model.ts'
+import { calendarRequest, formatCalendarDate, hasCalendarDates, localDay, monthDays, moveMonth, suggestedCalendar, teachingPolicyLabel } from '../components/Objects/Classes/calendar/model.ts'
 const source = file => fs.readFileSync(new URL('../components/Objects/Classes/' + file, import.meta.url), 'utf8')
+test('only one accepted year/semester teaching calendar is suggested; ambiguity and date-only sources stay explicit', () => {
+ const full = { id: 1, academic_year: 2569, published_revision_id: 10, planning_options: [{ semester: 1, requires_plan: false }] }
+ const dates = { ...full, id: 2, published_revision_id: 20, planning_options: [{ semester: 1, requires_plan: true }] }
+ assert.equal(suggestedCalendar([full, dates], 2569, 1), full)
+ assert.equal(suggestedCalendar([full, { ...full, id: 3 }], 2569, 1), undefined)
+ assert.equal(suggestedCalendar([full], 2570, 1), undefined)
+ assert.equal(suggestedCalendar([full], 2569, 2), undefined)
+ assert.equal(suggestedCalendar([dates], 2569, 1), undefined)
+ const s = source('calendar/ClassSchedule.tsx')
+ assert.match(s, /School teaching policy/)
+ assert.match(s, /!overriding \? <Button/)
+ assert.match(s, /schedule.policy_override \?\? officialPattern/)
+ assert.doesNotMatch(s, /First hybrid week|hybridStart|hybrid_start/)
+ assert.match(s, /section, .*settings/)
+ assert.match(source('calendar/CalendarPreview.tsx'), /week.teaching_dates.map\(day\)/)
+})
 test('month view uses complete Monday-first months, leap days and year boundaries', () => {
  assert.equal(monthDays('2028-02').days.length, 29)
  assert.equal(monthDays('2026-11').offset, 6)
@@ -109,17 +125,21 @@ test('academic dates are real calendar content without inventing teaching weeks'
  assert.match(source('calendar/CourseDatesForm.tsx'), /do not alter the school calendar/)
  assert.match(source('calendar/CourseDatesForm.tsx'), /Course holidays and make-ups/)
 })
-test('hybrid scheduling asks for a first mode, not odd/even arithmetic, without coupling syllabus creation', () => {
+test('school policy is automatic; only an explicit course override reveals a selector, never a first-week control', () => {
  const s = source('calendar/ClassSchedule.tsx')
- assert.match(s, /Hybrid · alternate campus and online/)
- assert.match(s, /First hybrid week/)
- assert.match(s, /hybrid_start: pattern === 'even_onsite'/)
- assert.match(s, /setHybridStart\(schedule.hybrid_start/)
- assert.doesNotMatch(s, /even_onsite" disabled|setPattern\(''\)\s*\n/)
- assert.doesNotMatch(s, /Even: campus|สัปดาห์คู่เรียนที่มหาวิทยาลัย/)
- assert.match(s, /Boolean\(incompleteDates\) \|\| incompleteHybrid/)
- const syllabus = s.slice(s.indexOf("aria-label={t('Course syllabus'"))
- assert.doesNotMatch(syllabus, /incompleteHybrid/)
+ assert.match(s, /Override school policy/)
+ assert.match(s, /Course-only override/)
+ assert.match(s, /Use school policy/)
+ assert.match(s, /policy_override: overriding \? pattern \|\| null : null/)
+ assert.match(s, /setOverriding\(Boolean\(saved.policy_override\)\)/)
+ assert.match(s, /The school timetable and calendar remain unchanged/)
+ assert.doesNotMatch(s, /Teaching mode|Choose teaching mode|First hybrid week|first week’s mode|setHybridStart|hybrid_start/)
+ for (const th of [false, true]) {
+  assert.notEqual(teachingPolicyLabel('even_onsite', th), teachingPolicyLabel('onsite', th))
+  assert.notEqual(teachingPolicyLabel('online', th), teachingPolicyLabel(undefined, th))
+ }
+ assert.match(teachingPolicyLabel(undefined, false), /Not stated/)
+ assert.match(teachingPolicyLabel('even_onsite', false), /even school weeks/)
 })
 test('PDF URL errors offer localized retry or file upload without claiming a source was saved', async () => {
  const original = globalThis.fetch

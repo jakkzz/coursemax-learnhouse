@@ -95,6 +95,7 @@ class ReaderTests(unittest.TestCase):
                          {1: 'odd', 2: 'even', 3: 'odd', 4: 'even', 5: 'midterm', 6: 'even', 7: 'odd', 8: 'even', 9: 'odd'})
         weeks = {w.number: w for w in term.weeks}
         self.assertEqual((weeks[3].starts_on, weeks[3].ends_on), (date(2027, 7, 26), date(2027, 7, 30)))
+        self.assertEqual(weeks[3].teaching_dates, [date(2027, 7, d) for d in (26, 27, 29, 30)])
         self.assertEqual(weeks[4].ends_on, date(2027, 8, 6))  # listed days omit the Friday holiday
         self.assertEqual((weeks[5].teaching, weeks[5].uncertain, weeks[5].note), (True, True, 'กิจกรรมทดสอบผู้เรียนระหว่างภาค'))
         self.assertEqual((weeks[8].starts_on, weeks[8].ends_on, weeks[8].teaching, weeks[8].uncertain),

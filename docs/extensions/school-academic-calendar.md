@@ -1,11 +1,48 @@
 # Shared school academic calendar
 
 Status: deployed to LearnHouse staging, 2026-10-17; not institutional acceptance.
-Live source `f8bf0e11728fc15f9e7fa7bbbbce686a4c7a5d70`, image
-`coursemax-learnhouse:calendar-pdf-preview-20261017`. Assignment work remains excluded.
+Live source `1e24fbfc55a6f3d613e8bc477a9845c12311e22c`, image
+`coursemax-learnhouse:calendar-pdf-url-20261017`. Assignment work remains excluded.
 Claude Code's Opus 5.5 completed backend work in the separate `school-calendar`
 Herdr session; Impeccable-guided upload/review corrections and desktop/mobile task
 confirmation are complete.
+
+## Current delivery: PDF URL alongside upload
+
+Choose **Use PDF URL**, paste a public HTTPS PDF link, then **Read PDF**. It uses
+exactly the same private source/draft storage as file upload; full teaching calendars
+continue into the existing preview/accept/edit flow. Authentication, org boundary,
+admin and MFA checks precede remote access. Native SSRF validation checks every hop
+and connected peer; redirects, total time and streamed size are bounded, with no
+forwarded credentials/cookies or environment proxies. Limit: 10 MB; URL: 2048 chars.
+
+The supplied NRRU `MIX 1-69 (18-7-69).pdf` downloads successfully: 111,914 bytes,
+two pages, semester 1/2569. It is an **abridged multi-program document**, not a full
+teaching-week announcement. Its three columns remain together as a source preview,
+not silently assigned to the first program. The year/title are detected, the original
+bytes/page text retained, and no teaching weeks, holidays or make-ups invented.
+There is no AI call or metadata questionnaire. The preview offers the original PDF,
+a full-calendar upload or another URL; it does not offer publication of empty weeks.
+Reopening this draft does not retry AI. No new schema or permission was introduced.
+Extraction is still pypdf, not Docling/OCR.
+
+Proof: 72 web tests, full bundle/generated-route TypeScript, 29 baked pure tests,
+six focused PostgreSQL tests plus one overlapping final URL-route test; 13 compiled
+EN1440/TH390 tasks including full-calendar URL preview, this actual source's read-only
+preview/reopening/byte hash, and failed-link → file-upload recovery. Two live fresh
+native-login read-only URL-entry smokes and native auth/security/connection checks
+pass. The actual link was fetched read-only and its bytes exercised in isolated PG;
+no live institutional source/draft was imported, parsed, published or applied by agent.
+1,025 API/5,359 web entries verified; native Config and in-flight assets preserved.
+App-only replacement/gateway reload, fresh backup, exact previous image retained,
+no migration; schema, source/draft, identity, academic data, env/mounts and peer service
+IDs preserved. Evidence: `calendar-pdf-url-20261017/` and matching web/release folders.
+Not institutional, owner-browser, provider, OCR or broad PDF-format acceptance.
+
+## Previous delivery: PDF-first preview and acceptance
+
+Source `f8bf0e11728fc15f9e7fa7bbbbce686a4c7a5d70`, image
+`coursemax-learnhouse:calendar-pdf-preview-20261017`.
 
 Use **My classes → School calendars → Upload academic calendar**, then choose the
 PDF. Its name, Buddhist academic year and program are filled from the document;
@@ -25,7 +62,7 @@ than invented. Explicit metadata remains supported by the existing API. Changing
 draft's year/program retains its old source/revision and copies into the correct
 calendar scope; published bindings and class sessions are never reassigned.
 
-Current proof: 70 web tests, full bundle/generated-route TypeScript, 21 baked pure
+Previous proof: 70 web tests, full bundle/generated-route TypeScript, 21 baked pure
 reader/planner tests, five focused PostgreSQL tests plus two focused compatibility/
 source-note checks (overlapping). Seven compiled EN1440/TH390 journeys cover file-only
 preview/accept, optional edits without a separate save, retained-draft failure/retry,
@@ -236,10 +273,13 @@ All routes are composed through `src.route66_ext.bootstrap`, under
 `/api/v1/school-calendars`; native files are unchanged.
 
 - `GET ''`: published library (plus drafts for platform superadmins), `can_edit`.
-- Multipart `POST ''`: `file` (PDF up to 10 MB); optional `name`, Buddhist
-  `academic_year`, natural-language `track` override the detected document metadata.
-  Missing year/program is rejected without inventing facts. A valid calendar source
-  is retained before optional date-reading AI calls.
+- Multipart `POST ''`: exactly one `file` (PDF up to 10 MB) or `url` (public HTTPS,
+  up to 2048 chars). The same storage path handles both. Optional `name`, Buddhist
+  `academic_year`, natural-language `track` override full-calendar metadata; a
+  recognized abridged multi-program document always stays a combined source, never
+  one program. Missing year/program is rejected without inventing facts. A valid
+  source is retained before optional AI calls. Revision DTOs include `source_kind`
+  and `source_programs`; recognized abridged sources have no generated term/week data.
 - `GET /revisions/{id}` and private `GET /revisions/{id}/source`.
 - `PUT /revisions/{id}`: `{expected_version,payload,metadata?}`; editable drafts only.
   Metadata supports `name`, `academic_year`, `track`; regrouping copies evidence into

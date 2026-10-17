@@ -1,6 +1,36 @@
 # Internal extension deployment records
 
-## Latest: PDF-first calendar preview — deployed 2026-10-17
+## Latest: calendar PDF URL — deployed 2026-10-17
+
+Source `1e24fbfc55a6f3d613e8bc477a9845c12311e22c`, image
+`coursemax-learnhouse:calendar-pdf-url-20261017`, ID
+`sha256:a706a4c6b65f03936ddacd04be9e6f1c6555fffe26bda3909081ba035aae1d5b`.
+**Use PDF URL** sits beside upload; both retain the same private original source.
+The supplied two-page NRRU MIX PDF is recognized as an abridged multi-program source,
+not a full teaching calendar: preview/original available, no guessed program column,
+weeks or attendance sessions. Full calendars retain preview/accept/edit. Native
+SSRF guard, per-hop/peer checks, 10 MB streaming and bounded timeout; auth/org/admin/
+MFA precede remote access. No provider/AI-setting/security-header changes.
+
+72 web checks, full bundle/types, 29 baked pure tests, six focused PG tests plus one
+overlapping final URL-route test, and 13 compiled EN1440/TH390 tasks pass. Actual-link
+read-only fetch + byte-identical isolated source/DTO proof; two live fresh-login
+read-only URL-entry smokes and native auth/security/connection smoke pass. No live
+institutional import/parse/publication/class apply, owner-browser or provider trial.
+
+Fresh protected backup, exact previous 2ed2b574 image retained for code rollback;
+1,025 API files and 5,359 required web entries verified. The old 126-layer image tag
+was unavailable: a **packaging-only** base was reconstructed from the current image's
+exact first 126 filesystem layers, with identical native Config except labels. Its
+old owned code was fully overlaid with current API/new web and current-parent assets
+retained; final Config verified against the actual parent. Candidate is 127 layers.
+No daemon/security/host changes, migration or data rollback. App-only replacement,
+gateway reload, schema/source/draft/identity/academic/env/mount/non-app preservation
+passed, allowing only native startup role timestamps and the source-menu URL.
+Evidence: `calendar-pdf-url-20261017/`, its web directory and matching release.
+See [school-academic-calendar.md](school-academic-calendar.md).
+
+## Previous: PDF-first calendar preview — deployed 2026-10-17
 
 Live source `f8bf0e11728fc15f9e7fa7bbbbce686a4c7a5d70`, image
 `coursemax-learnhouse:calendar-pdf-preview-20261017`, ID

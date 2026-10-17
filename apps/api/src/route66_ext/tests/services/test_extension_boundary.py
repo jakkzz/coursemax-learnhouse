@@ -123,7 +123,8 @@ class DiscoveryTests(unittest.TestCase):
         from alembic.script import ScriptDirectory
         from src.route66_ext.migrations.config import migration_config
         script = ScriptDirectory.from_config(migration_config())
-        self.assertEqual(script.get_heads(), ["b3e9c4d1a702"])
+        self.assertEqual(script.get_heads(), ["c4fa25e2b813"])
+        self.assertEqual(script.get_revision("c4fa25e2b813").down_revision, "b3e9c4d1a702")
         self.assertEqual(script.get_revision("b3e9c4d1a702").down_revision, "f47eb52fa044")
         self.assertEqual(script.get_revision("f47eb52fa044").down_revision, "f36da41e9f33")
 

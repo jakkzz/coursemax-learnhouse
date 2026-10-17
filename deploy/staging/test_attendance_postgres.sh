@@ -56,6 +56,7 @@ docker run --rm --pull=never --network none --read-only \
   --memory 384m --cpus 0.5 --pids-limit 64 --tmpfs /tmp:rw,size=16m \
   -v "$SCRATCH:/scratch" \
   -v "$ROOT/apps/api/src:/app/api/src:ro" \
+  -v "$ROOT/apps/api/config:/app/api/config:ro" \
   -v "$ROOT/apps/api/migrations:/app/api/migrations:ro" \
   -v "$ROOT/deploy/staging:/deployment:ro" \
   -e TESTING=true -e LEARNHOUSE_AUTH_JWT_SECRET_KEY=synthetic-fixture-jwt-secret-32-chars \

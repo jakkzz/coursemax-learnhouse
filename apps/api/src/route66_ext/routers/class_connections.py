@@ -9,7 +9,7 @@ import json
 from types import SimpleNamespace
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, ConfigDict, Field, StrictBool
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.route66_ext.adapters.core_events_database import get_db_session
@@ -17,6 +17,8 @@ from src.route66_ext.adapters.db_courses_courses import Course
 from src.route66_ext.adapters.db_users import User
 from src.route66_ext.adapters.db_user_organizations import UserOrganization
 from src.route66_ext.db.school_identity import NrruTeacherIdentity
+from src.route66_ext.db.school_calendar import SchoolCalendarAttachment
+from src.route66_ext.services import school_calendar as calendars
 from src.route66_ext.db.academic_classes import AcademicClass, AcademicClassEvent, CourseRegistryBinding, TeachingAssignment
 from src.route66_ext.routers.school_identity import context, private, eligible
 from src.route66_ext.routers.google_subject_auth import boundary, resources, throttle
@@ -44,6 +46,11 @@ class Choice(BaseModel):
     model_config = ConfigDict(extra="forbid")
     course_id: int = Field(gt=0, strict=True)
 
+class AttachCalendar(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    revision_id: StrictInt = Field(gt=0)
+
+
 class Setup(Section):
     course_id: int = Field(gt=0, strict=True)
 
@@ -61,16 +68,35 @@ async def requested(db, request_id, org_id):
     return event
 
 
+async def calendar_attachments(db, event):
+    if event is None:
+        return []
+    rows = (await db.exec(select(SchoolCalendarAttachment).where(
+        SchoolCalendarAttachment.request_event_id == event.id).order_by(SchoolCalendarAttachment.id))).all()
+    result = []
+    for row in rows:
+        revision, calendar = await calendars.revision_in_org(db, row.calendar_revision_id,
+            event.details['org_id'], editor=True)
+        result.append({'revision_id': revision.id, 'name': calendar.name, 'scope': calendar.scope,
+                       'attached_at': row.attached_at})
+    return result
+
+
 async def completed(db, event):
     rows = (await db.exec(select(AcademicClassEvent).where(
         AcademicClassEvent.kind == _CONNECTED).order_by(AcademicClassEvent.id.desc()))).all()
     return next((r for r in rows if r.details.get("connection_request_id") == event.id), None)
 
 
-async def verified_section(db, user, config, evidence, body, request, meetings=False):
+async def confirmed_teacher(db, user, evidence):
     identity = await db.get(NrruTeacherIdentity, user.id)
     if not eligible(evidence) or identity is None or identity.identity_id != evidence.identity_id:
         raise HTTPException(403, "Confirm your own staff record and sign in with your verified institutional Google account")
+    return identity
+
+
+async def verified_section(db, user, config, evidence, body, request, meetings=False):
+    identity = await confirmed_teacher(db, user, evidence)
     async with resources(config) as (redis, _):
         await throttle(redis, request, config, "class-connection-" + str(user.id))
         try:
@@ -139,6 +165,7 @@ async def section_status(request: Request, response: Response, body: SectionQuer
             "class_id": connected.id if connected else None,
             "school_class_id": school.id if school else None,
             "request_id": event.id if event else None, "can_request": can_request,
+            "calendar_attachments": await calendar_attachments(db, event),
             "courses": [{"id": c.id, "name": c.name} for c in courses]}
 
 
@@ -238,6 +265,36 @@ async def request_connection(body: Section, request: Request, response: Response
             "class_id": done.class_id if done else None}
 
 
+@router.post('/requests/{connection_id}/calendar')
+async def attach_calendar(connection_id: int, body: AttachCalendar, request: Request, response: Response,
+                          db: AsyncSession = Depends(get_db_session)):
+    private(response); user, config, evidence = await context(request, db); boundary(request, config)
+    await roster.serialize(db)
+    event = await requested(db, connection_id, config.org_id)
+    if event.actor_user_id != user.id and user.is_superadmin is not True:
+        raise HTTPException(404, 'Connection request not found')
+    if user.is_superadmin is not True:
+        await confirmed_teacher(db, user, evidence)
+    if await completed(db, event):
+        raise HTTPException(409, 'This proposal is already connected; its calendar evidence is retained')
+    revision, calendar = await calendars.revision_in_org(db, body.revision_id, config.org_id,
+        editor=user.is_superadmin is True, user_id=user.id)
+    if revision.state != 'published':
+        raise HTTPException(409, 'Accept the calendar before attaching it to a proposal')
+    if calendar.scope == 'teacher' and calendar.owner_user_id != event.actor_user_id:
+        raise HTTPException(404, 'Calendar revision not found')
+    if calendar.academic_year != event.details['academic_year']:
+        raise HTTPException(409, 'Choose a calendar for this proposal’s academic year')
+    exists = (await db.exec(select(SchoolCalendarAttachment).where(
+        SchoolCalendarAttachment.request_event_id == event.id,
+        SchoolCalendarAttachment.calendar_revision_id == revision.id))).first()
+    if exists is None:
+        db.add(SchoolCalendarAttachment(request_event_id=event.id, calendar_revision_id=revision.id, attached_by=user.id))
+    from src.route66_ext.routers.academic_classes import commit
+    await commit(db)
+    return {'calendar_attachments': await calendar_attachments(db, event)}
+
+
 @router.get("/requests")
 async def requests(request: Request, response: Response, db: AsyncSession = Depends(get_db_session)):
     private(response); user, config, _ = await context(request, db)
@@ -250,6 +307,7 @@ async def requests(request: Request, response: Response, db: AsyncSession = Depe
         teacher = await db.get(User, row.actor_user_id)
         result.append({"id": row.id, **row.details, "status": "connected" if done else "requested",
                        "class_id": done.class_id if done else None,
+                       "calendar_attachments": await calendar_attachments(db, row),
                        "teacher_name": " ".join([teacher.first_name, teacher.last_name]).strip() if teacher else ""})
     repairs = []
     if user.is_superadmin:
@@ -322,18 +380,20 @@ async def proposal(db, actor, org_id, event, body):
     except (ValueError, TimeoutError):
         raise HTTPException(503, "The registrar roster source is unavailable or does not match this exact section. Retry the preview; no IDs or URL are needed.") from None
     digest_policy = "selected_rows_v1" if selected_source["kind"] == "course_rtf" else "legacy_raw_v1"
-    snapshot = {"teacher_proof": proof.identity_id if proof else None, "actor_id": actor.id, "request_id": event.id, "course_id": course.id,
+    attachments = await calendar_attachments(db, event)
+    snapshot = {"calendar_attachments": attachments, "teacher_proof": proof.identity_id if proof else None, "actor_id": actor.id, "request_id": event.id, "course_id": course.id,
                 "official": d, "registry_class_id": class_id, "state": state,
                 "class": candidates[0].model_dump(mode="json") if candidates else None,
                 "source": {"kind": selected_source["kind"], "url": selected_source["url"],
                            "digest": source_digest, "digest_policy": digest_policy}}
-    fingerprint = hashlib.sha256(json.dumps(snapshot, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    fingerprint = hashlib.sha256(json.dumps(snapshot, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
     return {"expected_fingerprint": fingerprint, "course_name": course.name, "registry_class_id": class_id,
             "candidate_count": candidate_count, "source_url": selected_source["url"],
             "source_kind": selected_source["kind"], "source_digest": source_digest,
             "source_digest_policy": digest_policy, "roster_count": len(rows),
             "restricts_org_wide_access": state["group"].get("restricts_org_wide_access", False),
             "eligible_count": len(set(state["eligible"]) | ({event.actor_user_id} if proof else set())),
+            "calendar_attachments": attachments,
             "native_roles_changed": False, "progress_changed": False}, candidates, rows
 
 

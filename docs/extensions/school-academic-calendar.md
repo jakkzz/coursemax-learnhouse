@@ -1,4 +1,49 @@
-# Shared school academic calendar
+# School academic calendars
+
+## Teacher-private calendars and proposal evidence
+
+Implemented and dry-run on isolated PostgreSQL; staging rollout pending.
+Migration `c4fa25e2b813` follows `b3e9c4d1a702` in the existing composed graph.
+
+- Existing calendars retain their IDs and become organization-scoped. Shared
+  year/program uniqueness remains; each private upload gets its own calendar.
+- Confirmed teachers upload PDFs or HTTPS PDF URLs privately. Only the owner and
+  authorized platform reviewers in the same organization can read their drafts,
+  accepted dates and retained originals. A domain hint alone is not sufficient.
+- Acceptance freezes a private revision; it does not publish it to the school.
+  Teachers attach accepted own/private or published shared revisions to the existing
+  course-connection request. Attachments are append-only, idempotent per revision,
+  visible to the requester/reviewers and included in connection review fingerprints.
+  A completed proposal cannot acquire new attachments.
+- Administrators explicitly prepare a school-wide **copy**, then review and publish
+  it through the existing acceptance screen. Originals never change ownership or
+  visibility. Copied source bytes, provenance and revision lineage remain intact.
+- Acquisition provenance is per revision (`source_url`, `resolved_url`, `fetched_at`),
+  so PDF deduplication does not erase different retrievals. Existing unknown URLs
+  remain null. Cloning and metadata regrouping preserve provenance and lineage.
+- Publication, proposal approval and schedule application remain separate. Existing
+  class pins, attendance, rosters, native roles/enrollment and progress are unchanged.
+  Date-only sources still cannot generate teaching sessions.
+
+Bootstrap-created staging uses `deploy/staging/apply_private_calendar_migration.py`
+only after protected backup and an isolated restore rehearsal. It checks existing
+row hashes/counts, takes the existing transaction lock and never stamps native
+Alembic. Versioned databases use the composed Alembic graph instead.
+
+**Recovery must keep the new API.** A pre-ownership backend filters by organization
+alone and is not safe once private documents exist. Retain a compatible image with
+this API and the exact preceding web runtime; never restore academic data for a
+code rollback.
+
+Checks: 17 calendar/PostgreSQL cases, 54 native-access/policy checks, 80 web checks,
+production bundle/generated-route TypeScript, and eight compiled native-account-shell
+teacher/admin/student EN1060/TH390 tasks. File/URL intake, private acceptance,
+proposal attachment/review and explicit school-copy publication complete without
+schedule/course-approval writes, page errors or horizontal overflow. Synthetic
+fixtures are not institutional/provider acceptance. Existing Interior materials and
+native controls are reused; no dependency or replacement interaction was needed.
+
+## Earlier delivery history
 
 Status: deployed to LearnHouse staging, 2026-10-17; not institutional acceptance.
 Live source `bbad16c7807a353c24dd8ba1b6e97e29db29cabd`, image

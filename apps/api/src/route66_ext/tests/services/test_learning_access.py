@@ -23,6 +23,9 @@ class LearningAccessTests(AcademicRosterTests):
     async def asyncSetUp(self):
         await super().asyncSetUp()
         async with self.engine.begin() as conn:
+            from src.route66_ext.db.school_calendar import CALENDAR_TABLES
+            for table in CALENDAR_TABLES:
+                await conn.run_sync(table.create)
             for model in (UserGroup, UserGroupResource, UserGroupUser, ResourceAuthor, Trail, TrailRun, Activity, TrailStep):
                 await conn.run_sync(model.__table__.create)
         async with self.sessions.begin() as db:

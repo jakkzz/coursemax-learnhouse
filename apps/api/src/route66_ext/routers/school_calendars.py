@@ -14,14 +14,14 @@ from typing import Literal
 from urllib.parse import quote
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
-from sqlmodel import select
+from sqlmodel import select, or_
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.route66_ext.adapters.core_events_database import get_db_session
 from src.route66_ext.db.academic_classes import AcademicClass
 from src.route66_ext.db.school_calendar import SchoolCalendar, SchoolCalendarSource, SchoolCalendarRevision, ClassSchedule
 from src.route66_ext.routers.school_identity import context, private
 from src.route66_ext.routers.google_subject_auth import boundary
-from src.route66_ext.routers.class_connections import Section, SectionQuery, verified_section
+from src.route66_ext.routers.class_connections import Section, SectionQuery, verified_section, confirmed_teacher
 from src.route66_ext.services import academic_rosters as roster
 from src.route66_ext.services import calendar_plan as planner
 from src.route66_ext.services import nrru_calendar_pdf
@@ -81,6 +81,28 @@ def administrator(user):
         raise HTTPException(403, 'Platform administrator approval required to edit shared school calendars')
 
 
+async def upload_allowed(db, user, evidence):
+    if user.is_superadmin is True:
+        return True
+    try:
+        await confirmed_teacher(db, user, evidence)
+        return True
+    except HTTPException as error:
+        if error.status_code != 403:
+            raise
+        return False
+
+
+async def editable_revision(db, user, config, evidence, revision_id):
+    if user.is_superadmin is not True:
+        await confirmed_teacher(db, user, evidence)
+    row, calendar = await service.revision_in_org(db, revision_id, config.org_id,
+        editor=user.is_superadmin is True, user_id=user.id)
+    if not service.can_edit(calendar, user):
+        administrator(user)
+    return row, calendar
+
+
 async def commit(db):
     from src.route66_ext.routers.academic_classes import commit as checked
     await checked(db)
@@ -91,14 +113,18 @@ async def commit(db):
 @router.get('')
 async def calendars(request: Request, response: Response, year: int | None = None,
                     db: AsyncSession = Depends(get_db_session)):
-    private(response); user, config, _ = await context(request, db)
+    private(response); user, config, evidence = await context(request, db)
     query = select(SchoolCalendar).where(SchoolCalendar.org_id == config.org_id)
+    editor = user.is_superadmin is True
+    if not editor:
+        query = query.where(or_(SchoolCalendar.scope == 'organization', SchoolCalendar.owner_user_id == user.id))
     if year is not None:
         query = query.where(SchoolCalendar.academic_year == year)
     rows = (await db.exec(query.order_by(SchoolCalendar.academic_year.desc(), SchoolCalendar.track))).all()
-    items = [await service.calendar_summary(db, c) for c in rows]
-    editor = user.is_superadmin is True
-    return {'can_edit': editor, 'calendars': [c for c in items if editor or c['published_revision_id']]}
+    items = [await service.calendar_summary(db, c, user) for c in rows]
+    allowed = await upload_allowed(db, user, evidence)
+    return {'can_edit': editor, 'can_upload': allowed,
+            'calendars': [c for c in items if c['can_edit'] or c['published_revision_id']]}
 
 
 def _pdf_facts(data):
@@ -117,9 +143,16 @@ def _pdf_facts(data):
 async def upload(request: Request, response: Response, name: str | None = Form(None, max_length=200),
                  academic_year: int | None = Form(None, ge=2500, le=2700), track: str | None = Form(None, max_length=40),
                  file: UploadFile | None = File(None), url: str | None = Form(None, max_length=2048),
+                 scope: Literal['organization', 'teacher'] | None = Form(None),
                  db: AsyncSession = Depends(get_db_session)):
-    private(response); user, config, _ = await context(request, db); boundary(request, config); administrator(user)
+    private(response); user, config, evidence = await context(request, db); boundary(request, config)
+    scope = scope or ('organization' if user.is_superadmin is True else 'teacher')
+    if scope == 'organization':
+        administrator(user)
+    elif user.is_superadmin is not True:
+        await confirmed_teacher(db, user, evidence)
     url = (url or '').strip() or None
+    resolved_url, fetched_at = None, None
     if (file is None) == (url is None):
         raise HTTPException(422, {'code': 'file_or_url', 'message':
             'เลือกไฟล์ PDF หรือใส่ลิงก์อย่างใดอย่างหนึ่ง / Choose a PDF file or enter a link, not both'})
@@ -131,13 +164,16 @@ async def upload(request: Request, response: Response, name: str | None = Form(N
         from src.route66_ext.services import calendar_url
         await enforce_org_mfa(user.id, config.org_id, db)
         try:
-            data, filename, _ = await calendar_url.fetch(url, service.MAX_PDF_BYTES)
+            data, filename, resolved_url = await calendar_url.fetch(url, service.MAX_PDF_BYTES)
+            fetched_at = datetime.now(timezone.utc)
         except calendar_url.UrlError as exc:
             raise HTTPException(exc.status, {'code': exc.code, 'message': exc.message}) from None
-    return await _store(db, user, config, data, filename, name, academic_year, track)
+    return await _store(db, user, config, data, filename, name, academic_year, track,
+                        scope=scope, source_url=url, resolved_url=resolved_url, fetched_at=fetched_at)
 
 
-async def _store(db, user, config, data, filename, name, academic_year, track):
+async def _store(db, user, config, data, filename, name, academic_year, track, *,
+                 scope='organization', source_url=None, resolved_url=None, fetched_at=None):
     """One path for uploaded and linked PDFs: validate, keep the bytes, open an empty draft."""
     if len(data) > service.MAX_PDF_BYTES:
         raise HTTPException(413, {'code': 'too_large', 'message': 'Upload a PDF up to 10 MB'})
@@ -160,11 +196,14 @@ async def _store(db, user, config, data, filename, name, academic_year, track):
             + '. Upload the official academic calendar PDF.'})
     name = name or f'{track} {academic_year}'
     await roster.serialize(db)
-    calendar = (await db.exec(select(SchoolCalendar).where(SchoolCalendar.org_id == config.org_id,
+    # Each private upload is its own document, even for the same teacher/year/program.
+    calendar = None if scope == 'teacher' else (await db.exec(select(SchoolCalendar).where(
+        SchoolCalendar.org_id == config.org_id, SchoolCalendar.scope == 'organization',
         SchoolCalendar.academic_year == academic_year, SchoolCalendar.track == track))).first()
     if calendar is None:
         calendar = SchoolCalendar(org_id=config.org_id, academic_year=academic_year, track=track,
-                                  name=name, created_by=user.id)
+                                  name=name, created_by=user.id, scope=scope,
+                                  owner_user_id=user.id if scope == 'teacher' else None)
         db.add(calendar); await db.flush()
     source = (await db.exec(select(SchoolCalendarSource).where(SchoolCalendarSource.calendar_id == calendar.id,
         SchoolCalendarSource.sha256 == digest))).first()
@@ -180,23 +219,24 @@ async def _store(db, user, config, data, filename, name, academic_year, track):
     if truncated:
         note += ' Text was shortened for very long documents; check the PDF itself.'
     revision = SchoolCalendarRevision(calendar_id=calendar.id, number=await service.next_number(db, calendar.id),
-        payload=planner.empty_payload(), source_id=source.id, parse_note=note, created_by=user.id)
+        payload=planner.empty_payload(), source_id=source.id, parse_note=note, created_by=user.id,
+        source_url=source_url, resolved_url=resolved_url, fetched_at=fetched_at)
     db.add(revision); await db.flush()
     await commit(db)
-    return await service.revision_dto(db, revision)
+    return await service.revision_dto(db, revision, user=user)
 
 
 @router.get('/revisions/{revision_id}')
 async def revision(revision_id: int, request: Request, response: Response, db: AsyncSession = Depends(get_db_session)):
     private(response); user, config, _ = await context(request, db)
-    row, _ = await service.revision_in_org(db, revision_id, config.org_id, editor=user.is_superadmin is True)
-    return await service.revision_dto(db, row)
+    row, _ = await service.revision_in_org(db, revision_id, config.org_id, editor=user.is_superadmin is True, user_id=user.id)
+    return await service.revision_dto(db, row, user=user)
 
 
 @router.get('/revisions/{revision_id}/source')
 async def source(revision_id: int, request: Request, db: AsyncSession = Depends(get_db_session)):
     user, config, _ = await context(request, db)
-    row, _ = await service.revision_in_org(db, revision_id, config.org_id, editor=user.is_superadmin is True)
+    row, _ = await service.revision_in_org(db, revision_id, config.org_id, editor=user.is_superadmin is True, user_id=user.id)
     document = await db.get(SchoolCalendarSource, row.source_id) if row.source_id else None
     if document is None:
         raise HTTPException(404, 'This revision has no source PDF')
@@ -208,15 +248,15 @@ async def source(revision_id: int, request: Request, db: AsyncSession = Depends(
 @router.put('/revisions/{revision_id}')
 async def save(revision_id: int, body: SaveDraft, request: Request, response: Response,
                db: AsyncSession = Depends(get_db_session)):
-    private(response); user, config, _ = await context(request, db); boundary(request, config); administrator(user)
+    private(response); user, config, evidence = await context(request, db); boundary(request, config)
     payload = service.payload_model(body.payload)
     await roster.serialize(db)
-    row, calendar = await service.revision_in_org(db, revision_id, config.org_id, editor=True)
+    row, calendar = await editable_revision(db, user, config, evidence, revision_id)
     service.draft_for_edit(row, body.expected_version)
     row = await _regroup(db, user, row, calendar, body.metadata)
     row.payload = payload.model_dump(mode='json'); row.version += 1; db.add(row)
     await commit(db)
-    return await service.revision_dto(db, row)
+    return await service.revision_dto(db, row, user=user)
 
 
 async def _regroup(db, user, row, calendar, metadata):
@@ -234,25 +274,18 @@ async def _regroup(db, user, row, calendar, metadata):
         raise HTTPException(422, {'code': 'invalid_calendar', 'message': 'Enter the calendar group'})
     target = calendar
     if (year, track) != (calendar.academic_year, calendar.track):
-        target = (await db.exec(select(SchoolCalendar).where(SchoolCalendar.org_id == calendar.org_id,
+        target = None if calendar.scope == 'teacher' else (await db.exec(select(SchoolCalendar).where(
+            SchoolCalendar.org_id == calendar.org_id, SchoolCalendar.scope == 'organization',
             SchoolCalendar.academic_year == year, SchoolCalendar.track == track))).first()
         if target is None:
             target = SchoolCalendar(org_id=calendar.org_id, academic_year=year, track=track,
-                                    name=name or f'{track} {year}', created_by=user.id)
+                                    name=name or f'{track} {year}', created_by=user.id,
+                                    scope=calendar.scope, owner_user_id=calendar.owner_user_id)
             db.add(target); await db.flush()
-        source_id = None
-        if row.source_id:
-            original = await db.get(SchoolCalendarSource, row.source_id)
-            copy = (await db.exec(select(SchoolCalendarSource).where(SchoolCalendarSource.calendar_id == target.id,
-                SchoolCalendarSource.sha256 == original.sha256))).first()
-            if copy is None:
-                copy = SchoolCalendarSource(calendar_id=target.id, filename=original.filename, sha256=original.sha256,
-                    size=original.size, content=original.content, page_count=original.page_count, pages=original.pages,
-                    truncated=original.truncated, uploaded_by=original.uploaded_by)
-                db.add(copy); await db.flush()
-            source_id = copy.id
+        source_id = await service.copy_source(db, row.source_id, target.id)
         moved = SchoolCalendarRevision(calendar_id=target.id, number=await service.next_number(db, target.id),
-            payload=row.payload, source_id=source_id, parse_note=row.parse_note, created_by=user.id)
+            payload=row.payload, source_id=source_id, parse_note=row.parse_note, created_by=user.id,
+            **service.provenance(row), derived_from_revision_id=row.id)
         db.add(moved); await db.flush()
         row.version += 1
         row.parse_note = (f'Moved to {track} {year} revision {moved.number}; this draft is kept for history. '
@@ -280,8 +313,8 @@ not closures. Do not invent missing values; leave lists empty instead."""
 @router.post('/revisions/{revision_id}/parse')
 async def parse(revision_id: int, body: Versioned, request: Request, response: Response,
                 db: AsyncSession = Depends(get_db_session)):
-    private(response); user, config, _ = await context(request, db); boundary(request, config); administrator(user)
-    row, calendar = await service.revision_in_org(db, revision_id, config.org_id, editor=True)
+    private(response); user, config, evidence = await context(request, db); boundary(request, config)
+    row, calendar = await editable_revision(db, user, config, evidence, revision_id)
     service.draft_for_edit(row, body.expected_version)
     document = await db.get(SchoolCalendarSource, row.source_id) if row.source_id else None
     if document is None or not document.pages:
@@ -325,7 +358,7 @@ async def parse(revision_id: int, body: Versioned, request: Request, response: R
                       + (f'; {len(found)} items need review.' if found else '.'))[:1000]
     db.add(row)
     await commit(db)
-    return {**await service.revision_dto(db, row), 'read_method': method, 'read_notes': notes}
+    return {**await service.revision_dto(db, row, user=user), 'read_method': method, 'read_notes': notes}
 
 
 async def _ai_payload(db, user, config, calendar, document, revision_id):
@@ -359,11 +392,11 @@ async def _ai_payload(db, user, config, calendar, document, revision_id):
 @router.post('/revisions/{revision_id}/publish')
 async def publish(revision_id: int, body: Publish, request: Request, response: Response,
                   db: AsyncSession = Depends(get_db_session)):
-    private(response); user, config, _ = await context(request, db); boundary(request, config); administrator(user)
+    private(response); user, config, evidence = await context(request, db); boundary(request, config)
     if body.reviewed is not True:
         raise HTTPException(400, 'Review every term, week and closure before publishing')
     await roster.serialize(db)
-    row, calendar = await service.revision_in_org(db, revision_id, config.org_id, editor=True)
+    row, calendar = await editable_revision(db, user, config, evidence, revision_id)
     service.draft_for_edit(row, body.expected_version)
     document = await db.get(SchoolCalendarSource, row.source_id) if row.source_id else None
     payload = service.payload_model(row.payload if body.payload is None else body.payload)
@@ -380,7 +413,7 @@ async def publish(revision_id: int, body: Publish, request: Request, response: R
     row.state = 'published'; row.version += 1; row.published_by = user.id
     row.published_at = datetime.now(timezone.utc); db.add(row)
     await commit(db)
-    return await service.revision_dto(db, row)
+    return await service.revision_dto(db, row, user=user)
 
 
 def _accept(payload):
@@ -402,17 +435,47 @@ def _accept(payload):
 @router.post('/{calendar_id}/draft')
 async def new_draft(calendar_id: int, body: NewDraft, request: Request, response: Response,
                     db: AsyncSession = Depends(get_db_session)):
-    private(response); user, config, _ = await context(request, db); boundary(request, config); administrator(user)
+    private(response); user, config, evidence = await context(request, db); boundary(request, config)
     await roster.serialize(db)
-    base, calendar = await service.revision_in_org(db, body.from_revision_id, config.org_id, editor=True)
+    base, calendar = await editable_revision(db, user, config, evidence, body.from_revision_id)
     if calendar.id != calendar_id:
         raise HTTPException(404, 'Calendar revision not found')
     row = SchoolCalendarRevision(calendar_id=calendar.id, number=await service.next_number(db, calendar.id),
         payload=base.payload, source_id=base.source_id, created_by=user.id,
+        **service.provenance(base), derived_from_revision_id=base.id,
         parse_note=f'Draft copied from revision {base.number}. Publishing it does not change any class until each class reviews it.')
     db.add(row); await db.flush()
     await commit(db)
-    return await service.revision_dto(db, row)
+    return await service.revision_dto(db, row, user=user)
+
+
+class Share(_Body):
+    reviewed: StrictBool
+
+
+@router.post('/revisions/{revision_id}/share')
+async def share(revision_id: int, body: Share, request: Request, response: Response,
+                db: AsyncSession = Depends(get_db_session)):
+    private(response); user, config, _ = await context(request, db); boundary(request, config); administrator(user)
+    if body.reviewed is not True:
+        raise HTTPException(400, 'Review the private document before preparing a school-wide copy')
+    await roster.serialize(db)
+    base, original = await service.revision_in_org(db, revision_id, config.org_id, editor=True)
+    if original.scope != 'teacher' or base.state != 'published':
+        raise HTTPException(409, 'Choose an accepted private calendar to prepare a school-wide copy')
+    calendar = (await db.exec(select(SchoolCalendar).where(SchoolCalendar.org_id == config.org_id,
+        SchoolCalendar.scope == 'organization', SchoolCalendar.academic_year == original.academic_year,
+        SchoolCalendar.track == original.track))).first()
+    if calendar is None:
+        calendar = SchoolCalendar(org_id=config.org_id, academic_year=original.academic_year,
+            track=original.track, name=original.name, created_by=user.id)
+        db.add(calendar); await db.flush()
+    row = SchoolCalendarRevision(calendar_id=calendar.id, number=await service.next_number(db, calendar.id),
+        payload=base.payload, source_id=await service.copy_source(db, base.source_id, calendar.id),
+        **service.provenance(base), derived_from_revision_id=base.id, created_by=user.id,
+        parse_note='School-wide copy of an accepted private calendar. Review and publish separately; the private original and class schedules are unchanged.')
+    db.add(row); await db.flush(); await commit(db)
+    return await service.revision_dto(db, row, user=user)
 
 
 # --- Class schedules --------------------------------------------------------
@@ -458,7 +521,9 @@ async def schedule_by_class(class_id: int, request: Request, response: Response,
 async def _prepare(db, user, config, evidence, body, request):
     facts = await verified_section(db, user, config, evidence, body.section, request, meetings=True)
     facts.pop('org_id', None)
-    revision, calendar = await service.revision_in_org(db, body.revision_id, config.org_id)
+    revision, calendar = await service.revision_in_org(db, body.revision_id, config.org_id, user_id=user.id)
+    if revision.state != 'published':
+        raise HTTPException(409, 'Accept the calendar before preparing a class schedule')
     if not planner.has_teaching_weeks(service.payload_model(revision.payload)):
         raise HTTPException(422, {'code': 'teaching_weeks_required', 'message':
             'ปฏิทินนี้มีเฉพาะวันสำคัญ ยังไม่มีสัปดาห์การสอนที่ตรวจสอบแล้ว / This calendar has academic dates only. '

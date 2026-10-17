@@ -29,18 +29,24 @@ def payload_model(data):
             {'loc': list(e['loc']), 'msg': e['msg']} for e in error.errors()]}) from None
 
 
-async def calendar_summary(db, calendar):
+def can_edit(calendar, user):
+    return bool(user and (user.is_superadmin is True or
+                (calendar.scope == 'teacher' and calendar.owner_user_id == user.id)))
+
+
+async def calendar_summary(db, calendar, user=None):
     rows = (await db.exec(select(SchoolCalendarRevision.id, SchoolCalendarRevision.state).where(
         SchoolCalendarRevision.calendar_id == calendar.id))).all()
     published = max((i for i, state in rows if state == 'published'), default=None)
     payload = await db.get(SchoolCalendarRevision, published) if published else None
     return {'id': calendar.id, 'name': calendar.name, 'academic_year': calendar.academic_year,
-            'track': calendar.track, 'published_revision_id': published,
+            'track': calendar.track, 'scope': calendar.scope, 'can_edit': can_edit(calendar, user),
+            'published_revision_id': published,
             'has_teaching_weeks': bool(payload and planner.has_teaching_weeks(planner.Payload.model_validate(payload.payload))),
             'latest_revision_id': max((i for i, _ in rows), default=None)}
 
 
-async def revision_dto(db, revision, include_pages=True):
+async def revision_dto(db, revision, include_pages=True, user=None):
     calendar = await db.get(SchoolCalendar, revision.calendar_id)
     source = await db.get(SchoolCalendarSource, revision.source_id) if revision.source_id else None
     payload = planner.Payload.model_validate(revision.payload)
@@ -52,7 +58,8 @@ async def revision_dto(db, revision, include_pages=True):
             'source_pages': source.pages if source and include_pages else [],
             **_source_kind(source),
             'parse_note': revision.parse_note, 'issues': planner.issues(payload, source.page_count if source else None),
-            'published_at': revision.published_at, 'calendar': await calendar_summary(db, calendar)}
+            **provenance(revision), 'derived_from_revision_id': revision.derived_from_revision_id,
+            'published_at': revision.published_at, 'calendar': await calendar_summary(db, calendar, user)}
 
 
 def _source_kind(source):
@@ -62,12 +69,33 @@ def _source_kind(source):
             'source_programs': combined['programs'] if combined else []}
 
 
-async def revision_in_org(db, revision_id, org_id, *, editor=False):
+async def revision_in_org(db, revision_id, org_id, *, editor=False, user_id=None):
     revision = await db.get(SchoolCalendarRevision, revision_id)
     calendar = await db.get(SchoolCalendar, revision.calendar_id) if revision else None
-    if calendar is None or calendar.org_id != org_id or (revision.state != 'published' and not editor):
+    owner = calendar and calendar.scope == 'teacher' and calendar.owner_user_id == user_id
+    if (calendar is None or calendar.org_id != org_id
+        or (calendar.scope == 'teacher' and not (owner or editor))
+        or (revision.state != 'published' and not (owner or editor))):
         raise HTTPException(404, 'Calendar revision not found')
     return revision, calendar
+
+
+def provenance(revision):
+    return {key: getattr(revision, key) for key in ('source_url', 'resolved_url', 'fetched_at')}
+
+
+async def copy_source(db, source_id, calendar_id):
+    if source_id is None:
+        return None
+    original = await db.get(SchoolCalendarSource, source_id)
+    copy = (await db.exec(select(SchoolCalendarSource).where(SchoolCalendarSource.calendar_id == calendar_id,
+        SchoolCalendarSource.sha256 == original.sha256))).first()
+    if copy is None:
+        copy = SchoolCalendarSource(calendar_id=calendar_id, filename=original.filename, sha256=original.sha256,
+            size=original.size, content=original.content, page_count=original.page_count, pages=original.pages,
+            truncated=original.truncated, uploaded_by=original.uploaded_by)
+        db.add(copy); await db.flush()
+    return copy.id
 
 
 async def next_number(db, calendar_id):

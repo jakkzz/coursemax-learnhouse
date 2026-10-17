@@ -15,7 +15,7 @@ from sqlmodel import select
 from src.route66_ext.tests.services.test_academic_rosters import AcademicRosterTests
 from src.route66_ext.db.academic_classes import AcademicClass, AcademicRosterEntry, TeachingAssignment
 from src.route66_ext.db.class_attendance import AttendanceSession, AttendanceChallenge
-from src.route66_ext.db.school_calendar import CALENDAR_TABLES, ClassSchedule, SchoolCalendarSource
+from src.route66_ext.db.school_calendar import CALENDAR_TABLES, ClassSchedule, SchoolCalendar, SchoolCalendarRevision, SchoolCalendarSource, SchoolCalendarAttachment
 from src.route66_ext.db.school_identity import SchoolGoogleEvidence, NrruTeacherIdentity
 from src.db.users import User
 from src.db.user_organizations import UserOrganization
@@ -66,6 +66,7 @@ class SchoolCalendarTests(AcademicRosterTests):
         self.timetable = {}
         app = FastAPI()
         app.include_router(api.router, prefix='/api/v1/school-calendars')
+        app.include_router(connections.router, prefix='/api/v1/academic-classes')
         app.include_router(attendance_api.router, prefix='/api/v1/attendance')
 
         async def database():
@@ -185,7 +186,7 @@ class SchoolCalendarTests(AcademicRosterTests):
         await self.client.put(f'/api/v1/school-calendars/revisions/{rid}', json={'expected_version': 1, 'payload': payload})
         self.actor = 3
         self.assertEqual((await self.client.get(f'/api/v1/school-calendars/revisions/{rid}')).status_code, 404)
-        self.assertEqual((await self.client.get('/api/v1/school-calendars')).json(), {'can_edit': False, 'calendars': []})
+        self.assertEqual((await self.client.get('/api/v1/school-calendars')).json(), {'can_edit': False, 'can_upload': False, 'calendars': []})
         self.assertEqual((await self.client.post(f'/api/v1/school-calendars/revisions/{rid}/publish', json={'expected_version': 2, 'reviewed': True})).status_code, 403)
         self.actor = 1
         self.assertEqual((await self.client.post(f'/api/v1/school-calendars/revisions/{rid}/publish', json={'expected_version': 2, 'reviewed': False})).status_code, 400)
@@ -825,6 +826,154 @@ END; $$"""))
         legacy = await self.client.post(f"/api/v1/school-calendars/revisions/{drafts[0]['id']}/publish", json={'expected_version': 1, 'reviewed': True})
         self.assertEqual(legacy.status_code, 422)  # the unreadable "31 ก.พ." question blocks until accepted
         await self.date_calendar_boundaries(drafts[0], accept=True)
+
+    async def private_calendar(self, user=3):
+        self.actor = user
+        response = await self.client.post('/api/v1/school-calendars',
+            data={'name': 'Private teacher calendar', 'academic_year': '2569', 'track': 'ภาคปกติ'},
+            files={'file': ('private.pdf', blank_pdf(), 'application/pdf')})
+        self.assertEqual(response.status_code, 200, response.text)
+        draft = response.json()
+        response = await self.client.post(f"/api/v1/school-calendars/revisions/{draft['id']}/publish",
+            json={'expected_version': 0, 'reviewed': True, 'payload': calendar_payload(monday(2))})
+        self.assertEqual(response.status_code, 200, response.text)
+        return response.json()
+
+    async def test_private_calendars_isolate_sources_drafts_and_shared_groups(self):
+        await self.make_admin(); shared = await self.published(calendar_payload(monday(2)))
+        await self.teacher(3); private = await self.private_calendar()
+        again = await self.private_calendar()
+        await self.teacher(2); other = await self.private_calendar(2)
+        self.assertNotEqual(other['calendar_id'], private['calendar_id'])
+        self.assertEqual(private['calendar']['scope'], 'teacher')
+        self.assertTrue(private['calendar']['can_edit'])
+        self.assertEqual(len({r['calendar_id'] for r in (shared, private, again)}), 3)
+        self.assertTrue((await self.client.get('/api/v1/school-calendars')).json()['can_upload'])
+        for actor in (1, 2):
+            self.actor = actor
+            listing = (await self.client.get('/api/v1/school-calendars')).json()['calendars']
+            self.assertEqual(private['calendar_id'] in {c['id'] for c in listing}, actor == 1)
+            for suffix in ('', '/source'):
+                self.assertEqual((await self.client.get(f"/api/v1/school-calendars/revisions/{private['id']}{suffix}")).status_code,
+                                 200 if actor == 1 else 404)
+        self.actor = 3
+        self.assertEqual((await self.client.post('/api/v1/school-calendars', data={'scope': 'organization'},
+            files={'file': ('a.pdf', blank_pdf())})).status_code, 403)
+        self.assertEqual((await self.client.post(f"/api/v1/school-calendars/{shared['calendar_id']}/draft",
+            json={'from_revision_id': shared['id']})).status_code, 403)
+        draft = (await self.client.post(f"/api/v1/school-calendars/{private['calendar_id']}/draft",
+            json={'from_revision_id': private['id']})).json()
+        self.assertEqual(draft['derived_from_revision_id'], private['id'])
+        moved = await self.client.put(f"/api/v1/school-calendars/revisions/{draft['id']}", json={
+            'expected_version': 0, 'payload': draft['payload'], 'metadata': {'track': 'Private regroup'}})
+        self.assertEqual(moved.status_code, 200, moved.text)
+        self.assertEqual(moved.json()['calendar']['scope'], 'teacher')
+        self.config = SimpleNamespace(**{**vars(self.config), 'org_id': 2})
+        self.assertEqual((await self.client.get(f"/api/v1/school-calendars/revisions/{private['id']}/source")).status_code, 404)
+        with self.assertRaises(Exception):
+            async with self.sessions.begin() as db:
+                await db.execute(text("UPDATE schoolcalendar SET scope='organization', owner_user_id=NULL WHERE id=:id"), {'id': private['calendar_id']})
+
+    async def test_private_proposal_attachment_is_frozen_authorized_and_idempotent(self):
+        await self.teacher(3); private = await self.private_calendar()
+        self.timetable[(3, '100', 'P9')] = {'course_code': '990001', 'title': 'Synthetic proposal', 'meetings': MEETINGS}
+        response = await self.client.post('/api/v1/academic-classes/connections/requests', json=self.section())
+        self.assertEqual(response.status_code, 200, response.text)
+        request_id = response.json()['id']
+        path = f'/api/v1/academic-classes/connections/requests/{request_id}/calendar'
+        draft = (await self.client.post(f"/api/v1/school-calendars/{private['calendar_id']}/draft",
+            json={'from_revision_id': private['id']})).json()
+        self.assertEqual((await self.client.post(path, json={'revision_id': draft['id']})).status_code, 409)
+        for _ in range(2):
+            attached = await self.client.post(path, json={'revision_id': private['id']})
+            self.assertEqual(attached.status_code, 200, attached.text)
+            self.assertEqual([a['revision_id'] for a in attached.json()['calendar_attachments']], [private['id']])
+        self.actor = 2
+        self.assertEqual((await self.client.post(path, json={'revision_id': private['id']})).status_code, 404)
+        self.assertEqual((await self.client.get('/api/v1/academic-classes/connections/requests')).json()['requests'], [])
+        await self.make_admin(); self.actor = 1
+        inbox = (await self.client.get('/api/v1/academic-classes/connections/requests')).json()['requests']
+        self.assertEqual(inbox[0]['calendar_attachments'][0]['revision_id'], private['id'])
+        self.assertEqual((await self.client.get(f"/api/v1/school-calendars/revisions/{private['id']}/source")).content, blank_pdf())
+        async with self.sessions() as db:
+            self.assertEqual(len((await db.exec(select(SchoolCalendarAttachment))).all()), 1)
+            self.assertEqual((await db.exec(select(ClassSchedule))).all(), [])
+            self.assertEqual((await db.exec(select(AttendanceSession))).all(), [])
+        for sql in ('DELETE FROM schoolcalendarattachment', 'TRUNCATE schoolcalendarattachment',
+                    "UPDATE schoolcalendarattachment SET calendar_revision_id=" + str(draft['id'])):
+            with self.assertRaises(Exception):
+                async with self.sessions.begin() as db:
+                    await db.execute(text(sql))
+
+    async def test_private_url_provenance_and_admin_copy_do_not_change_class_pins(self):
+        from src.route66_ext.adapters import security_org_auth as mfa
+        await self.make_admin(); shared = await self.published(calendar_payload(monday(2)))
+        await self.teacher(3); self.actor = 3
+        self.timetable[(3, '100', 'P9')] = {'course_code': '990001', 'title': 'Synthetic section', 'meetings': MEETINGS}
+        preview = await self.preview(shared['id'], self.section())
+        saved = await self.apply(shared['id'], self.section(), preview)
+        self.assertEqual(saved.status_code, 200, saved.text)
+        schedule = saved.json()
+        with patch.object(mfa, 'enforce_org_mfa', AsyncMock()):
+            response = await self.post_link('https://files.example/private.pdf', blank_pdf(),
+                name='Private URL', academic_year='2569', track='ภาคปกติ')
+        self.assertEqual(response.status_code, 200, response.text)
+        draft = response.json(); url = draft['source_url']
+        with self.assertRaises(Exception):
+            async with self.sessions.begin() as db:
+                await db.execute(text("UPDATE schoolcalendarrevision SET source_url='https://changed.example/a.pdf' WHERE id=:id"), {'id': draft['id']})
+        self.assertEqual((url, draft['resolved_url']), ('https://files.example/private.pdf',) * 2)
+        self.assertIsNotNone(draft['fetched_at'])
+        private = (await self.client.post(f"/api/v1/school-calendars/revisions/{draft['id']}/publish", json={
+            'expected_version': 0, 'reviewed': True, 'payload': calendar_payload(monday(3))})).json()
+        self.assertEqual((await self.client.post(f"/api/v1/school-calendars/revisions/{private['id']}/share",
+            json={'reviewed': True})).status_code, 403)
+        self.actor = 1
+        copied = await self.client.post(f"/api/v1/school-calendars/revisions/{private['id']}/share", json={'reviewed': True})
+        self.assertEqual(copied.status_code, 200, copied.text)
+        copy = copied.json()
+        self.assertEqual((copy['state'], copy['calendar']['scope'], copy['calendar_id']), ('draft', 'organization', shared['calendar_id']))
+        self.assertEqual((copy['source_hash'], copy['source_url'], copy['fetched_at'], copy['derived_from_revision_id']),
+                         (private['source_hash'], url, private['fetched_at'], private['id']))
+        published = await self.client.post(f"/api/v1/school-calendars/revisions/{copy['id']}/publish", json={'expected_version': 0, 'reviewed': True})
+        self.assertEqual(published.status_code, 200, published.text)
+        async with self.sessions() as db:
+            self.assertEqual((await db.get(ClassSchedule, schedule['class_id'])).revision_id, shared['id'])
+            self.assertEqual((await db.get(SchoolCalendar, private['calendar_id'])).scope, 'teacher')
+            self.assertEqual((await db.get(SchoolCalendarRevision, private['id'])).source_url, url)
+        self.actor = 2
+        self.assertEqual((await self.client.get(f"/api/v1/school-calendars/revisions/{private['id']}/source")).status_code, 404)
+        self.assertEqual((await self.client.get(f"/api/v1/school-calendars/revisions/{copy['id']}/source")).content, blank_pdf())
+
+    async def test_private_calendar_migration_dry_run_preserves_existing_rows(self):
+        import importlib.util, os
+        import sqlalchemy as sa
+        await self.make_admin(); shared = await self.published(calendar_payload(monday(2)))
+        async with self.engine.begin() as conn:
+            await conn.execute(text('DROP TABLE schoolcalendarattachment'))
+            for table, columns in [('schoolcalendar', ('scope', 'owner_user_id')),
+                ('schoolcalendarrevision', ('source_url', 'resolved_url', 'fetched_at', 'derived_from_revision_id'))]:
+                for column in columns:
+                    await conn.execute(text(f'ALTER TABLE {table} DROP COLUMN {column}'))
+            await conn.execute(text('ALTER TABLE schoolcalendar ADD CONSTRAINT uq_school_calendar_track UNIQUE (org_id,academic_year,track)'))
+        spec = importlib.util.spec_from_file_location('private_calendar_migration', '/deployment/apply_private_calendar_migration.py')
+        runner = importlib.util.module_from_spec(spec); spec.loader.exec_module(runner)
+        url = 'postgresql://fixture@/fixture?host=/scratch&options=-csearch_path%3D' + self.schema
+        with patch.dict(os.environ, {'LEARNHOUSE_SQL_CONNECTION_STRING': url}):
+            await asyncio.to_thread(runner.main)
+            await asyncio.to_thread(runner.main)  # repeat is safe
+            async with self.sessions() as db:
+                row = await db.get(SchoolCalendar, shared['calendar_id'])
+                self.assertEqual((row.scope, row.owner_user_id), ('organization', None))
+                self.assertEqual((await db.get(SchoolCalendarRevision, shared['id'])).source_url, None)
+            async with self.engine.begin() as conn:
+                def verify(sync):
+                    for table in CALENDAR_TABLES:
+                        self.assertEqual({c['name'] for c in sa.inspect(sync).get_columns(table.name)}, set(table.columns.keys()))
+                await conn.run_sync(verify)
+                await conn.execute(text('CREATE TABLE alembic_version (version_num varchar(32))'))
+            with self.assertRaisesRegex(RuntimeError, 'Versioned database'):
+                await asyncio.to_thread(runner.main)
 
     async def test_private_actual_link_source_proof(self):
         """Opt-in: the live-retained MIX bytes and page text (exported read-only), by file and by link."""

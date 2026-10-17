@@ -7,6 +7,8 @@ import { AlertCircle, CheckCircle2, Clock3, Link2 } from 'lucide-react'
 import palette from './class-colors.module.css'
 import { Button } from '@/extensions/route66/adapters/ui'
 import type { RegistrarClassContext } from './real-teaching/model'
+import { calendarRequest, type CalendarSummary, type Revision } from './calendar/model'
+import CalendarPreview from './calendar/CalendarPreview'
 
 const control = 'min-h-11 min-w-0 max-w-full rounded-lg border border-neutral-300 bg-white px-3 text-sm text-neutral-900'
 export async function classRequest(path: string, th: boolean, body?: unknown, signal?: AbortSignal) {
@@ -20,13 +22,33 @@ export async function classRequest(path: string, th: boolean, body?: unknown, si
 }
 const requestId = () => crypto.randomUUID().replaceAll('-', '')
 
-type Connection = { id: number; teacher_name: string; registry_course_id: string; registry_class_id?: string; academic_year: number; semester: number; section: string; course_code: string; title: string; status: string }
+type CalendarAttachment = { revision_id: number; name: string; scope: 'organization' | 'teacher' }
+type Connection = { calendar_attachments?: CalendarAttachment[]; id: number; teacher_name: string; registry_course_id: string; registry_class_id?: string; academic_year: number; semester: number; section: string; course_code: string; title: string; status: string }
 export type ConnectionCourse = { id: number; name: string; private?: boolean }
 type ConnectionPreview = { expected_fingerprint: string; course_name: string; restricts_org_wide_access: boolean; roster_count: number; source_kind?: string; source_url?: string; source_digest?: string; native_access?: string }
 
-type SectionStatus = { status: 'ready' | 'requested' | 'connected' | 'needs_course' | 'conflict'; class_id: number | null; can_request: boolean; courses: { id: number; name: string }[] }
+type SectionStatus = { request_id?: number | null; calendar_attachments?: CalendarAttachment[]; status: 'ready' | 'requested' | 'connected' | 'needs_course' | 'conflict'; class_id: number | null; can_request: boolean; courses: { id: number; name: string }[] }
 
-export function SectionConnection({ context, th, onChanged }: { context: RegistrarClassContext; th: boolean; onChanged: () => void }) {
+function CalendarEvidence({ attachments, th }: { attachments?: CalendarAttachment[]; th: boolean }) {
+  const [value, setValue] = useState<Revision | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState('')
+  async function open(id: number) {
+    setBusy(true); setError('')
+    try { setValue(await calendarRequest<Revision>(`/revisions/${id}`, th)) }
+    catch (e) { setError((e as Error).message) }
+    finally { setBusy(false) }
+  }
+  if (!attachments?.length) return null
+  return <div className="space-y-3"><p className="text-sm font-medium">{th ? 'ปฏิทินที่แนบแล้ว' : 'Attached calendars'}</p>{attachments.map(a => <div className="flex flex-wrap items-center gap-3 text-sm" key={a.revision_id}><span>{a.name} · {a.scope === 'teacher' ? th ? 'ส่วนตัว' : 'Private' : th ? 'ทั้งสถานศึกษา' : 'School-wide'}</span><Button type="button" variant="outline" className="min-h-11" disabled={busy} onClick={() => void open(a.revision_id)}>{th ? 'ตรวจสอบปฏิทินที่แนบ' : 'Review attached calendar'}</Button></div>)}{value && <div className="space-y-3"><CalendarPreview payload={value.payload} th={th} /><a className="inline-flex min-h-11 items-center text-sm underline underline-offset-4" href={`/api/v1/school-calendars/revisions/${value.id}/source`} target="_blank" rel="noopener noreferrer">{th ? 'เปิดไฟล์ต้นฉบับที่แนบ' : 'Open attached original PDF'}</a><Button type="button" variant="ghost" className="min-h-11" onClick={() => setValue(null)}>{th ? 'ปิดปฏิทิน' : 'Close calendar'}</Button></div>}{error && <p role="alert" className="text-sm text-red-800">{error}</p>}</div>
+}
+
+function ProposalCalendar({ requestId, year, attachments, th, onChanged, onOpenCalendars }: { requestId: number; year: number; attachments?: CalendarAttachment[]; th: boolean; onChanged: (attachments: CalendarAttachment[]) => void; onOpenCalendars?: () => void }) {
+  const [catalog, setCatalog] = useState<CalendarSummary[]>([]), [revision, setRevision] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [attempt, setAttempt] = useState(0)
+  useEffect(() => { const a = new AbortController(); setError(''); calendarRequest<{ calendars: CalendarSummary[] }>('', th, { signal: a.signal }).then(c => setCatalog(c.calendars.filter(r => r.academic_year === year && r.published_revision_id))).catch(e => { if (!a.signal.aborted) setError(e.message) }); return () => a.abort() }, [year, th, attempt])
+  async function attach() { setBusy(true); setError(''); try { const result = await classRequest(`/connections/requests/${requestId}/calendar`, th, { revision_id: Number(revision) }); setRevision(''); onChanged(result.calendar_attachments) } catch (e) { setError((e as Error).message) } finally { setBusy(false) } }
+  return <details className="space-y-3 border-t border-neutral-200 pt-3"><summary className="min-h-11 cursor-pointer text-sm font-medium">{th ? 'ปฏิทินสำหรับคำขอนี้' : 'Calendar for this proposal'}</summary><p className="max-w-prose text-sm text-neutral-600">{th ? 'เลือกปฏิทินที่ยืนยันแล้ว หรือเตรียมไฟล์ส่วนตัวก่อน การแนบไม่อนุมัติรายวิชาและไม่สร้างตารางเรียน' : 'Choose an accepted calendar or prepare a private PDF first. Attaching does not approve the course or create a class schedule.'}</p><CalendarEvidence attachments={attachments} th={th}/><label className="flex flex-col gap-2 text-sm">{th ? 'ปฏิทินที่ต้องการแนบ' : 'Calendar to attach'}<select className={control} aria-label={th ? 'ปฏิทินที่ต้องการแนบ' : 'Calendar to attach'} value={revision} disabled={busy} onChange={e => setRevision(e.target.value)}><option value="">{th ? 'เลือกปฏิทินที่ยืนยันแล้ว' : 'Choose an accepted calendar'}</option>{catalog.filter(c => !attachments?.some(a => a.revision_id === c.published_revision_id)).map(c => <option key={c.id} value={c.published_revision_id!}>{c.name} · {c.scope === 'teacher' ? th ? 'ส่วนตัว' : 'Private' : th ? 'ทั้งสถานศึกษา' : 'School-wide'}</option>)}</select></label><div className="flex flex-wrap gap-3"><Button type="button" variant="outline" className="min-h-11" disabled={busy || !revision} onClick={() => void attach()}>{th ? 'แนบปฏิทินกับคำขอ' : 'Attach calendar to proposal'}</Button>{onOpenCalendars && <Button type="button" variant="ghost" className="min-h-11" disabled={busy} onClick={onOpenCalendars}>{th ? 'อัปโหลดหรือตรวจสอบปฏิทิน' : 'Upload or review a calendar'}</Button>}</div>{error && <div role="alert" className="text-sm text-red-800"><p>{error}</p><Button type="button" variant="outline" className="min-h-11" disabled={busy} onClick={() => setAttempt(n => n + 1)}>{th ? 'ลองอีกครั้ง' : 'Try again'}</Button></div>}</details>
+}
+
+export function SectionConnection({ context, th, onChanged, onOpenCalendars }: { context: RegistrarClassContext; th: boolean; onChanged: () => void; onOpenCalendars?: () => void }) {
   const [data, setData] = useState<SectionStatus | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState('')
   const [version, setVersion] = useState(0), [course, setCourse] = useState(''), changed = useRef(onChanged)
   changed.current = onChanged
@@ -70,6 +92,7 @@ export function SectionConnection({ context, th, onChanged }: { context: Registr
     </form>}
     {data?.status === 'requested' && <p className="max-w-prose text-sm text-neutral-600">{th ? 'บันทึกคำขอแล้ว ผู้ดูแลกำลังเลือกรายวิชาสำหรับกลุ่มเรียนนี้ หน้านี้จะอัปเดตเมื่อพร้อมใช้งาน' : 'Your request is saved. An administrator needs to select the course for this section. This page updates when it is ready.'}</p>}
     {data?.status === 'needs_course' && <><p className="max-w-prose text-sm text-neutral-600">{th ? 'เลือกรายวิชาที่ใช้กับกลุ่มเรียนนี้ก่อนโหลดรายชื่อนักศึกษา' : 'This section needs a course match before its roster can be loaded.'}</p>{data.can_request ? <Button className="min-h-11" disabled={busy} onClick={() => void submit()}>{busy ? th ? 'กำลังส่ง…' : 'Sending…' : th ? 'ส่งให้เลือกรายวิชา' : 'Request course match'}</Button> : <Link className="inline-flex min-h-11 items-center text-sm underline underline-offset-4" href="/account/school-identity">{th ? 'ตรวจสอบข้อมูลผู้สอน' : 'Review school identity'}</Link>}</>}
+    {data?.status === 'requested' && data.request_id && <ProposalCalendar requestId={data.request_id} year={academic_year} attachments={data.calendar_attachments} th={th} onOpenCalendars={onOpenCalendars} onChanged={attachments => setData(previous => previous ? { ...previous, calendar_attachments: attachments } : previous)}/>}
     {data?.status === 'conflict' && <p className="max-w-prose text-sm text-neutral-600">{th ? 'กลุ่มเรียนนี้มีการเชื่อมข้อมูลอยู่แล้ว โปรดตรวจสอบรายวิชาและงานสอนในชั้นเรียนของฉัน' : 'This section already has a connection. Review its course and teaching assignment in My classes.'}</p>}
     {error && <p role="alert" className="text-sm text-red-800">{error}</p>}
     {(error || data?.status === 'requested' || data?.status === 'connected' || data?.status === 'conflict') && <Button variant="outline" className="min-h-11" disabled={busy} onClick={() => { setVersion(v => v + 1); changed.current() }}>{th ? 'ตรวจสอบสถานะอีกครั้ง' : 'Refresh status'}</Button>}
@@ -92,6 +115,8 @@ export function ConnectionsInbox({ th, courses, refresh, onChanged, onOpenClass 
     <div className="divide-y divide-neutral-200">{pending.map(r => <article className="flex flex-wrap items-center justify-between gap-3 py-3" key={r.id}><div className="min-w-0"><h3 className="break-words text-sm font-semibold">{r.course_code} · {r.title}</h3><p className="mt-1 text-sm text-neutral-600">{r.semester}/{r.academic_year} · {th ? 'กลุ่มเรียน' : 'Section'} {r.section} · {r.teacher_name}</p></div>{data?.can_connect ? <Button variant="outline" className="min-h-11" onClick={() => { setSelected(r); setCourse(''); setError('') }}>{th ? 'เลือกรายวิชาและเชื่อมข้อมูล' : 'Choose course and connect'}</Button> : <span className="text-sm text-neutral-600">{th ? 'รอผู้ดูแลเลือกรายวิชา' : 'Awaiting the administrator’s course selection'}</span>}</article>)}</div>
     {selected && <form className="max-w-2xl space-y-4 rounded-lg border border-neutral-300 bg-white p-4" aria-label={th ? 'เชื่อมชั้นเรียน' : 'Connect class'} onSubmit={e => { e.preventDefault(); void (preview ? connect() : prepare()) }}>
       <h3 className="font-semibold">{selected.course_code} · {selected.title} · {selected.section}</h3>
+      <CalendarEvidence key={selected.id} attachments={selected.calendar_attachments} th={th}/>
+      {Boolean(selected.calendar_attachments?.length) && <p className="text-sm text-neutral-600">{th ? 'ปฏิทินเป็นเอกสารประกอบเท่านั้น การเชื่อมรายวิชาไม่เผยแพร่ไฟล์ส่วนตัวและไม่เปลี่ยนตารางเรียน' : 'The calendar is supporting evidence only. Connecting the course does not share private files or change class schedules.'}</p>}
       <p className="text-sm text-neutral-600">{th ? 'อนุมัติรายวิชาและงานสอนของผู้ขอ ระบบจะดึงรายชื่อของกลุ่มเรียนนี้อัตโนมัติหลังตรวจสอบ แล้วนำเข้ารายชื่อเริ่มต้นพร้อมเชื่อมสิทธิ์อ่าน ไม่เพิ่มสิทธิ์บัญชีและไม่แก้ไขผลงานเดิม' : 'Approve the requester’s course and teaching assignment. After review, the system retrieves this section’s roster automatically, imports the initial roster and connects reading access. Account roles and existing work stay unchanged.'}</p>
       <label className="flex flex-col gap-2 text-sm font-medium">{th ? 'รายวิชาในระบบที่ตรงกับวิชานี้' : 'Matching LearnHouse course'}<select className={control} required value={course} onChange={e => setCourse(e.target.value)}><option value="">{th ? 'เลือกรายวิชาแบบส่วนตัว' : 'Choose a private course'}</option>{available.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
       <p className="text-sm text-neutral-600">{th ? 'ไม่มีรายวิชาที่ถูกต้อง? สร้างรายวิชาแบบส่วนตัวในพื้นที่จัดการรายวิชา แล้วกลับมาโหลดใหม่ อย่าเลือกวิชาอื่นเพียงเพราะชื่อคล้ายกัน' : 'No correct course? Create a private course in the course manager, then refresh here. Similar names do not establish course identity.'}</p>

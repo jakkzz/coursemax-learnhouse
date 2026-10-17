@@ -1,6 +1,50 @@
 # Internal extension deployment records
 
-## Latest: assigned-teacher syllabi and automatic hybrid weeks — deployed 2026-10-17
+## Latest: school-derived teaching policy and exact PDF dates — deployed 2026-10-17
+
+Source `3fb7f604bdf0120225dde60e815c425f32f6c8c2`, healthy image
+`coursemax-learnhouse:source-matched-calendar-20261017`, ID
+`sha256:40eda4fe01a1d31fe740640f6749460522dc1b261e91a3c2f98fd97752c99ca4`.
+The default teaching-mode selector and all first-week selectors are removed. A
+read-only school policy derives from the verified timetable; explicit odd/even PDF
+labels, including school-even week 9, determine dated modes. Only an explicit
+course-only override reveals a selector. Exceptions persist/reload through existing
+version/fingerprint/application-event authority and do not change school facts.
+Discontinuous PDF dates, credits, unique on-campus rooms and official meetings carry
+into the plan/native syllabus; existing authored content is never overwritten.
+
+20 calendar/PostgreSQL cases pass, one opt-in private-PDF case skipped; 40 pure
+planner/reader/timetable and 82 web checks, boundary/diff, production bundle/generated-
+route types, five compiled full-native-shell and four isolated component journeys
+pass. Teacher EN/TH desktop/mobile tasks include automatic policy, explicit override
+disclosure, independent syllabus creation, native editor save/reload, mobile handoff
+and saved scheduling; students remain read-only. Two fresh-native-login live read-
+only tasks and security/origin/missing-class denials pass, including the new override
+request field. Published calendar/program projections are identical before/after.
+No real calendar acceptance, schedule application or syllabus creation occurred.
+
+Code-only app replacement and gateway reload; no migration, data restore, cleanup
+or unrelated restart. Exact schema, protected academic/native-content/version/role/
+identity/calendar/source rows, environment, mounts and all observed peer IDs preserved.
+Verified 1,030 API files, 5,537 web entries/permissions, native image Config and in-flight
+assets. Fresh backup archive checked. The previous packaging tag was absent before
+this task; a verified 126-layer exact prefix of the actual parent was reconstructed
+without pulls or pruning, with the complete current API/web overlay. The exact parent
+711ebdb1 image and compressed image archive are retained, but **do not roll back to
+its old API after any new `teaching_dates` payload is saved**: its strict reader cannot
+read that field. Use data-compatible code recovery
+`coursemax-learnhouse:source-matched-calendar-recovery-20261017`, ID
+`sha256:8ed007f4171f73a79fb343633062b2db4cf99a846209fe83836e79abc35976c7`.
+Recovery retains the current API and preceding UI; all API/previous web signatures and
+explicit-date validation were checked. No full restore/restart rehearsal is claimed.
+Never restore older academic data. Reviews are inline, not independent; institutional/
+provider/owner-browser acceptance and desktop-only rich-text limitations remain.
+
+Evidence `source-matched-calendar-20261017/`, `source-matched-calendar-web-20261017/`
+and `releases/source-matched-calendar-20261017/`. Existing full PDF drafts remain
+unpublished until human review of their midterm/make-up conflicts; no re-upload needed.
+
+## Previous: assigned-teacher syllabi and automatic hybrid weeks — deployed 2026-10-17
 
 Source `530b2415d2b9a203cf13d49f2b7dffe6da8b4dcc`, healthy image
 `coursemax-learnhouse:teacher-hybrid-schedule-20261017`, ID

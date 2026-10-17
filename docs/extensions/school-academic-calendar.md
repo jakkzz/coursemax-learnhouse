@@ -1,6 +1,6 @@
 # School academic calendars
 
-## School policy first — validated, awaiting deployment
+## School policy first — deployed 2026-10-17
 
 The updated UI supersedes the first-mode workflow below. The normal path
 shows a read-only **School teaching policy**, not an online/on-campus/hybrid selector.
@@ -44,8 +44,12 @@ matching, independent syllabus creation, explicit override/apply/reload/restore 
 unchanged source/syllabus evidence. The production bundle/generated-route TypeScript
 and five compiled full-native-shell teacher/student EN/TH desktop/mobile journeys
 passed, including native editor save/reload and mobile handoff. These are synthetic
-acceptance, not institutional/provider or owner-browser acceptance. Deployment is
-pending the code-only package/backup/health checks. No cleanup or institutional
+acceptance, not institutional/provider or owner-browser acceptance. Source `3fb7f604` is deployed healthy as `source-matched-calendar-20261017`
+(image `40eda4fe…`). App-only replacement/gateway reload, checked backup, exact schema
+and protected-row/environment/mount/peer preservation, two live fresh-login read-only
+journeys and override-field security denials passed. Published calendar/program
+projections are unchanged. See `deployment.md` for data-compatible code recovery;
+old APIs cannot read newly retained explicit date lists. No cleanup or institutional
 calendar/schedule/syllabus writes were performed. Retained full five-page calendar drafts still require human review
 of midterm and make-up source conflicts; no re-upload or automatic publication.
 

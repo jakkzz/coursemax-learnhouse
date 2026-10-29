@@ -22,13 +22,14 @@ if [[ $(id -u) == 0 ]]; then echo 'Run this fixture as an unprivileged user' >&2
 printf 'fixture:x:%s:%s:Synthetic fixture:/tmp:/bin/sh\n' "$(id -u)" "$(id -g)" > "$SCRATCH/passwd"
 docker run -d --rm --pull=never --name "$NAME" --network none --read-only \
   --user "$(id -u):$(id -g)" --cap-drop ALL --security-opt no-new-privileges \
-  --memory 384m --cpus 0.5 --pids-limit 96 \
-  --tmpfs "/var/lib/postgresql/data:rw,size=192m,uid=$(id -u),gid=$(id -g)" \
+  --memory 512m --cpus 0.5 --pids-limit 96 \
+  --tmpfs "/var/lib/postgresql/data:rw,size=320m,uid=$(id -u),gid=$(id -g)" \
   --tmpfs "/var/run/postgresql:rw,size=4m,uid=$(id -u),gid=$(id -g)" \
   --tmpfs /tmp:rw,size=16m -v "$SCRATCH:/scratch" -v "$SCRATCH/passwd:/etc/passwd:ro" \
   -e POSTGRES_USER=fixture -e POSTGRES_DB=fixture -e POSTGRES_PASSWORD=synthetic-fixture-only \
   "$DB_IMAGE" -c listen_addresses='' -c unix_socket_directories=/scratch,/var/run/postgresql \
-  -c unix_socket_permissions=0700 -c shared_buffers=16MB -c max_connections=20 >/dev/null
+  -c unix_socket_permissions=0700 -c shared_buffers=16MB -c max_connections=20 \
+  -c min_wal_size=32MB -c max_wal_size=64MB -c checkpoint_timeout=30s >/dev/null
 STARTED=1
 READY=0
 for _ in $(seq 1 60); do
@@ -45,12 +46,18 @@ if [[ $READY != 1 ]]; then
   exit 1
 fi
 
-docker run --rm --pull=never --network none --read-only \
+VENV=()
+if [[ -n ${LEARNHOUSE_API_TEST_VENV:-} ]]; then
+  VENV=(-v "$LEARNHOUSE_API_TEST_VENV:/app/api/.venv:ro")
+fi
+docker run --rm --pull=never --network none --read-only "${VENV[@]}" \
   --user "$(id -u):$(id -g)" --cap-drop ALL --security-opt no-new-privileges \
   --memory 384m --cpus 0.5 --pids-limit 64 --tmpfs /tmp:rw,size=16m \
   -v "$SCRATCH:/scratch" \
   -v "$ROOT/apps/api/src:/app/api/src:ro" \
+  -v "$ROOT/apps/api/config:/app/api/config:ro" \
   -v "$ROOT/apps/api/migrations:/app/api/migrations:ro" \
+  -v "$ROOT/deploy/staging:/deployment:ro" \
   -e TESTING=true -e LEARNHOUSE_AUTH_JWT_SECRET_KEY=synthetic-fixture-jwt-secret-32-chars \
   -e LEARNHOUSE_DOMAIN=learn.example.com -e LEARNHOUSE_SSL=true -e LEARNHOUSE_DISABLE_EE=1 \
   -e RUN_IDENTITY_POSTGRES_TESTS=1 -e IDENTITY_TEST_PG_SOCKET=/scratch \

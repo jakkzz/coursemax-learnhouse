@@ -97,6 +97,16 @@ and shared services intact; real historical migration and cutover remain separat
 work. Prefer owned adapters/routes over native-core changes. Newest ../STATUS.md and
 current release pointer are authoritative over historical deployment headings.
 
+## Current upstream source — 2026-10-29
+
+Upstream 1.4.3 (`2d753372`) is integrated with our customizations; this is not a
+live upgrade. See `docs/extensions/upstream-1.4.3.md` for conflict resolutions,
+updated dependency tests and remaining deployment work. Live remains `88fea34b`.
+The historical boundary snapshot stays pinned; exact upstream-byte acceptance
+cannot overwrite retained custom hooks. Use the composed migration entrypoint,
+not an assumed native-only `upgrade head`. Recorded private runtime/release files
+are missing: recover them before any recreation; do not generate new secrets.
+
 ## Historical extraction baseline
 
 Extraction source/image `fe1877c9`; read the newest `docs/extensions/deployment.md`

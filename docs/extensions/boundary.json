@@ -1,5 +1,6 @@
 {
   "upstream_baseline": "45cf5d4f78cf537064070dc8e315a64990d14966",
+  "accepted_upstream_revision": "2d75337273ac496c523db34541707f4268d4d644",
   "snapshot": "cfad1e042e45318051c547df044525a9ed3f7069",
   "policy_version": 1,
   "owned_prefixes": [
@@ -20,6 +21,118 @@
     ".impeccable/"
   ],
   "exceptions": {
+    "apps/api/src/routers/auth.py": {
+      "reason": "Reviewed upstream 1.4.3 integration retains retired email-only Google, provider refresh/logout ownership and native custom-domain/link fixes.",
+      "approval_reference": "Owner request to update upstream while keeping customization; docs/extensions/upstream-1.4.3.md.",
+      "tests": ["Native auth regression suite", "Isolated PostgreSQL Google/LINE lifecycle"],
+      "replacement_plan": "Retain the exact provider delegates until upstream supports immutable provider-owned subjects.",
+      "sha256": "5d12066e10a9ba948a15584f7bc0e0038f4e66a2a1163754bf469bba624eb3f7"
+    },
+    "apps/api/src/routers/mfa.py": {
+      "reason": "Combine upstream session rotation and single-use challenges with provider-owned subjects, original auth time and native custom-domain provenance.",
+      "approval_reference": "Owner upstream integration request; docs/extensions/upstream-1.4.3.md.",
+      "tests": ["test_upstream_143_sessions", "Native MFA HTTP regressions", "PostgreSQL provider MFA/replay tests"],
+      "replacement_plan": "Keep minimal provider-claim delegates in native MFA; no second session authority.",
+      "sha256": "e84bf56acbbc594a6e982280cedb49d69bdfedd15ccec3dba079a197038ecfe2"
+    },
+    "apps/api/src/security/auth.py": {
+      "reason": "Upstream token-minter and domain-provenance fixes with existing provider subject resolution, strict replay/revocation and fractional issuance preserved.",
+      "approval_reference": "Owner upstream integration request; docs/extensions/upstream-1.4.3.md.",
+      "tests": ["Native auth/RBAC regressions", "PostgreSQL Google/LINE sessions"],
+      "replacement_plan": "Keep the existing provider session seam until upstream offers equivalent subject ownership.",
+      "sha256": "0c31b7677679723ff554025da36fbea28b2b6873f97591ec5985da59ed308471"
+    },
+    "apps/api/src/security/session_context.py": {
+      "reason": "Preserve LINE method while adopting upstream custom-domain provenance.",
+      "approval_reference": "Owner upstream integration request; docs/extensions/upstream-1.4.3.md.",
+      "tests": ["test_upstream_143_sessions", "Native custom-domain auth tests"],
+      "replacement_plan": "Keep the exact method addition; native claims remain authoritative.",
+      "sha256": "6a96b7781c6a56b49718365909f94a8bdb71bae45f05f4063d0cf61ba3e06443"
+    },
+    "apps/api/src/services/auth/session.py": {
+      "reason": "Preserve provider identity arguments and existing Redis challenge ledger while adopting upstream custom-domain arguments and durable native challenge consumption.",
+      "approval_reference": "Owner upstream integration request; docs/extensions/upstream-1.4.3.md.",
+      "tests": ["test_upstream_143_sessions", "Native MFA and PostgreSQL provider challenge tests"],
+      "replacement_plan": "Keep one issuance entrypoint; do not switch an in-flight challenge to a fresh spending ledger.",
+      "sha256": "fc5a35e69dfb32baac20544333e705553442479002e3ecaf31958b3e7405cdab"
+    },
+    "apps/api/src/services/courses/courses.py": {
+      "reason": "Retain academic course-history veto before file deletion alongside upstream course fixes.",
+      "approval_reference": "Owner upstream integration request; docs/extensions/upstream-1.4.3.md.",
+      "tests": ["PostgreSQL academic retention and learning-access tests"],
+      "replacement_plan": "Keep pre-storage retention guard; chapter/activity deletion compatibility is separately recorded, not assumed covered.",
+      "sha256": "ca3fe9b5e1fe4cec972e3d330eabb9eca4502218fc70cf864737c5c09915262d"
+    },
+    "apps/api/src/services/orgs/auth_policy.py": {
+      "reason": "Preserve LINE policy label with upstream custom-domain restrictions and viewer scoping.",
+      "approval_reference": "Owner upstream integration request; docs/extensions/upstream-1.4.3.md.",
+      "tests": ["Native org-policy tests", "PostgreSQL LINE session tests"],
+      "replacement_plan": "Retain native org policy and the one LINE label addition.",
+      "sha256": "3ed4cb19ff9c0811943c1975b0f9bf05306dfc142b9ffe1bec5531df8bc21216"
+    },
+    "apps/api/src/services/users/users.py": {
+      "reason": "Keep manual profile locks/import cancellation and owner-only email DTO while adopting native session-epoch invalidation, resource checks and org email redaction.",
+      "approval_reference": "Owner upstream integration request; docs/extensions/upstream-1.4.3.md.",
+      "tests": ["Native users/privacy regressions", "PostgreSQL provider profile/session tests"],
+      "replacement_plan": "Keep exact profile lifecycle delegates and self DTO until upstream provides equivalent hooks.",
+      "sha256": "29748763f184ad99847833921e142130f6c20966bbf0483dd40576982d505a5c"
+    },
+    "apps/api/src/tests/security/test_hardening_round7b_auth.py": {
+      "reason": "Adapt upstream's legacy Google success expectation to the deliberately retired HTTP 410 endpoint; retain the magic-link domain-binding assertions.",
+      "approval_reference": "Owner upstream integration request; docs/extensions/upstream-1.4.3.md.",
+      "tests": ["Native auth regression suite", "Owned Google completion tests cover the replacement"],
+      "replacement_plan": "Remove this test adaptation only if upstream retires its email-only Google endpoint too.",
+      "sha256": "e75b6d83707001843714fadd1329928420f74ac298cd096a80c3778cf94fe77e"
+    },
+    "apps/web/app/api/auth/[...path]/route.ts": {
+      "reason": "Union provider/native MFA token endpoints; preserve exact provider Origin and strict logout while adopting upstream same-origin checks, client host and refresh-token redaction.",
+      "approval_reference": "Owner upstream integration request; docs/extensions/upstream-1.4.3.md.",
+      "tests": ["auth-proxy-hardening.test.mjs", "upstream-auth-proxy.test.js", "Generated route TypeScript"],
+      "replacement_plan": "Keep one native proxy, not a second cookie/session writer.",
+      "sha256": "9b6014ce43abcf0016a8a94d23a5976c552a5338d4616316712105f4e56adc13"
+    },
+    "apps/web/app/auth/login/login.tsx": {
+      "reason": "Keep provider capabilities, controls and stored MFA handoff; combine native pending-MFA redirect protection without racing provider token hydration.",
+      "approval_reference": "Owner upstream integration request; docs/extensions/upstream-1.4.3.md.",
+      "tests": ["Frontend source contracts", "Attendance continuation tests", "Generated route TypeScript"],
+      "replacement_plan": "Keep native login and small provider/task seams; no replacement auth UI.",
+      "sha256": "e1c0d5092a4d05e91ff9e19f2a82888599a93bf8953a40d9eb142eadb5bca10b"
+    },
+    "apps/web/app/orgs/[orgslug]/(withmenu)/layout.tsx": {
+      "reason": "Compose upstream command-palette/shortcut providers with existing in-flow attribution on account/classes/attendance and chromeless guards.",
+      "approval_reference": "Owner upstream integration request; docs/extensions/upstream-1.4.3.md.",
+      "tests": ["Layout/footer source contracts", "Native shortcut tests", "Generated route TypeScript"],
+      "replacement_plan": "Keep native shell providers; custom framing remains one exact watermark prop.",
+      "sha256": "783fd3bdadaaa6276aa09fb7e96a62f58e8bef3a67166719fa344e1460c4aea5"
+    },
+    "apps/web/components/Contexts/AuthContext.tsx": {
+      "reason": "Preserve provider server handoff and strict logout while adopting upstream auth-epoch, magic-link recovery and httpOnly refresh-token behavior.",
+      "approval_reference": "Owner upstream integration request; docs/extensions/upstream-1.4.3.md.",
+      "tests": ["Native/provider auth proxy tests", "Generated route TypeScript"],
+      "replacement_plan": "Keep a single native auth context and owned provider flow.",
+      "sha256": "1b8c28c6c0ca8e1bc3102d231158babc4f96a3af2c9c064189ee81a22b68e1f6"
+    },
+    "apps/web/components/Objects/Account/subpages/AccountSecurity.tsx": {
+      "reason": "Keep custom sign-in methods and EN/TH security grouping while accepting native session refresh after MFA rotation.",
+      "approval_reference": "Owner upstream integration request; docs/extensions/upstream-1.4.3.md.",
+      "tests": ["Native MFA proxy regression", "Frontend source contracts", "Generated route TypeScript"],
+      "replacement_plan": "Retain native account-security behavior and owned provider controls.",
+      "sha256": "fb2d4546b2d3fb6ff3f1cb8e997120e498c6503a871fa670e407add5665fb4c2"
+    },
+    "apps/web/locales/en.json": {
+      "reason": "Retain custom locale entries alongside upstream 1.4.3 copy; no overwrite of Thai/custom dictionaries.",
+      "approval_reference": "Owner upstream integration request; docs/extensions/upstream-1.4.3.md.",
+      "tests": ["Frontend source contracts", "Native site-search translations"],
+      "replacement_plan": "Move custom translation namespace only when supported without breaking native consumers.",
+      "sha256": "cb5ba31d20d5486dabf0843eb41d13c2a5d46b35e83e50f5d4b2df4333fddd69"
+    },
+    "docker/nginx.conf": {
+      "reason": "Keep attendance streaming's unbuffered proxy alongside upstream route/configuration updates.",
+      "approval_reference": "Owner upstream integration request; docs/extensions/upstream-1.4.3.md.",
+      "tests": ["Source diff and existing SSE route contract; baked two-proxy validation remains deployment work"],
+      "replacement_plan": "Retain exact proxy buffering behavior until native stream configuration is equivalent.",
+      "sha256": "3f27101024434dad056fcc986c501d621244de59b284fcbb9ac4cf0c1b630e31"
+    },
     "apps/web/components/Contexts/LHSessionContext.tsx": {
       "reason": "Exact attendance-entry loading exception delegated to the owned path helper so an anonymous scan is reserved before native session lookup finishes; every completion and private read still uses native API authentication and roster authorization.",
       "approval_reference": "Owner approved attendance implementation including scan-before-login continuity; no native session or permission authority is replaced.",
@@ -39,7 +152,7 @@
       "approval_reference": "Owner approved attendance implementation with native sign-in continuity; this changes only the stale-marker navigation shortcut.",
       "tests": ["attendance-client local handoff/receipt bounds and foreign/query destination rejection", "compiled native login/check-in task regressions and full generated-route types"],
       "replacement_plan": "Keep this single delegate until native login redirect optimization verifies the session or preserves requested tasks itself.",
-      "sha256": "530fa417a29320d28e1155d0da63e831a18b003e26ac9c9dff84f728e1b72955"
+      "sha256": "decd5fc88b0e0276ff3e43cb1bd29768c474b49d16c07ca22e47d6ce8b82fe15"
     },
     "apps/api/src/security/rbac/resource_access.py": {
       "reason": "Exact six-line denied-decision delegate for approved course teachers to create/read/edit only their native syllabus activity, bound by immutable class preparation evidence; native MFA, membership, roles and unrelated resource decisions remain native.",
@@ -49,7 +162,7 @@
         "native access regressions and compiled full-shell EN/TH teacher/student tasks"
       ],
       "replacement_plan": "Keep this single explicit delegate until upstream offers a native activity-scoped teacher capability hook; do not widen to course-wide edit access.",
-      "sha256": "4563cb49110ad07c3782592b9827e460f8ed177b7d18b9bf802a677237cd68b5"
+      "sha256": "9fd5a9dd8d25b9cd302795b4bfd442e5b334e577a47b7d9c87f6152653613aad"
     },
     "apps/api/src/db/academic_classes.py": {
       "reason": "Extension namespace extraction; exact compatibility/model/route/migration/test delegate only.",
@@ -859,11 +972,11 @@
       "sha256": "a74ca6fe174105cdd52b651d0883f3e0d5e5a4046f5c3a031f943f34d11b4dfe"
     },
     "apps/web/components/Dashboard/Menus/DashLeftMenu.tsx": {
-      "reason": "Exact approved removal of the obsolete classes-preview native menu entry only.",
+      "reason": "Preserve obsolete classes-preview menu removal; upstream 1.4.3 changes only the Discord destination in this native file.",
       "approval_reference": "Owner's 2026-10-16 narrow obsolete-menu-removal approval.",
       "tests": ["Native menu regression checks; owned web tests; boundary and source audits"],
       "replacement_plan": "No replacement; classes-preview is retired and native courses/assignments routes remain.",
-      "sha256": "1b96388141e8e9dcd297c532dfc791502fd02b64698a0ff49bc76a84f3dd0f54",
+      "sha256": "6d8cd28f734679d9e6f61a292476099e224bc55449626ec63eb1db9e0a7c43bf",
       "previous_sha256": "acf1f16a5f57b9da1d427375362f2978da6d648f214f055bcc8014dc447f33bf"
     },
     "apps/web/components/Dashboard/Menus/DashMobileMenu.tsx": {
@@ -871,7 +984,7 @@
       "approval_reference": "Owner's 2026-10-16 narrow obsolete-menu-removal approval.",
       "tests": ["Native menu regression checks; owned web tests; boundary and source audits"],
       "replacement_plan": "No replacement; classes-preview is retired and native courses/assignments routes remain.",
-      "sha256": "61413b453b28f18386445c135a7e21357ea7ffd5a841e9299ee01441f855bb5f",
+      "sha256": "26b10ff9515c42059544ce9acd31d79a1d612081193adb974bca20e6f37b15e1",
       "previous_sha256": "74d98143022013c75e428408b95fc1cc89ff8dbece06ac5127d786a908d14515"
     }
   },

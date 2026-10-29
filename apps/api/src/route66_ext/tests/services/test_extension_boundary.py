@@ -84,7 +84,14 @@ class DiscoveryTests(unittest.TestCase):
                     if legacy is not None:
                         self.assertIs(getattr(legacy, name), value)
                     tables.add(value.__table__.name)
-        self.assertEqual(len(tables), 19)
+        self.assertEqual(tables, {
+            'academicclass', 'academicclassevent', 'academicrosterentry',
+            'attendancechallenge', 'attendanceevent', 'attendancescan', 'attendancesession',
+            'classschedule', 'courseregistrybinding', 'nrruteacheridentity',
+            'provideridentity', 'provideridentityevent', 'providerprofileimport',
+            'schoolcalendar', 'schoolcalendarattachment', 'schoolcalendarrevision',
+            'schoolcalendarsource', 'schoolgoogleevidence', 'schoolstudent', 'teachingassignment',
+        })
         self.assertEqual(register_models(), modules)
 
     def test_bootstrap_unique_existing_route_paths(self):
@@ -123,7 +130,9 @@ class DiscoveryTests(unittest.TestCase):
         from alembic.script import ScriptDirectory
         from src.route66_ext.migrations.config import migration_config
         script = ScriptDirectory.from_config(migration_config())
-        self.assertEqual(script.get_heads(), ["c4fa25e2b813"])
+        self.assertEqual(script.get_heads(), ["d5ab36f3c924"])
+        self.assertEqual(script.get_revision("d5ab36f3c924").down_revision,
+                         ("c4fa25e2b813", "e8f9a0b1c2d3"))
         self.assertEqual(script.get_revision("c4fa25e2b813").down_revision, "b3e9c4d1a702")
         self.assertEqual(script.get_revision("b3e9c4d1a702").down_revision, "f47eb52fa044")
         self.assertEqual(script.get_revision("f47eb52fa044").down_revision, "f36da41e9f33")

@@ -25,14 +25,23 @@ def exception_valid(path, policy, content):
                 exception.get('sha256') == hashlib.sha256(content).hexdigest())
 
 
-def violations(changes, policy, reader):
+def violations(changes, policy, reader, upstream_contents=None):
     errors = []
+    # An upstream update must never silently replace a retained custom hook.
+    protected = {entry['path'] for entry in policy.get('legacy_inventory', [])}
+    protected.update(policy.get('exceptions', {}))
+    upstream_contents = upstream_contents or {}
     for status, path in changes:
         if is_owned(path, policy):
             continue
         if status == '?' and ignored_untracked(path, policy):
             continue
-        if not exception_valid(path, policy, reader(path)):
+        content = reader(path)
+        if path not in protected and path in upstream_contents:
+            expected = upstream_contents[path]
+            if (content is not None and content == expected) or (status == 'D' and expected is None):
+                continue
+        if not exception_valid(path, policy, content):
             errors.append(path)
     return sorted(set(errors))
 
@@ -53,12 +62,24 @@ def main():
             return None
         return file.read_bytes()
 
-    errors = violations(changes, policy, reader)
+    upstream_contents = {}
+    revision = policy.get('accepted_upstream_revision')
+    if revision:
+        # Exact pinned upstream bytes only, not a new snapshot or path allowlist.
+        if len(revision) != 40 or any(c not in '0123456789abcdef' for c in revision):
+            raise ValueError('Expected a full pinned upstream commit')
+        paths = subprocess.check_output(['git', 'diff', '--name-only', '--no-renames', '-z',
+                                         policy['upstream_baseline'], revision, '--'], cwd=ROOT).decode().split('\0')
+        for path in filter(None, paths):
+            result = subprocess.run(['git', 'show', f'{revision}:{path}'], cwd=ROOT, capture_output=True)
+            upstream_contents[path] = result.stdout if result.returncode == 0 else None
+
+    errors = violations(changes, policy, reader, upstream_contents)
     if errors:
         print('Boundary review required (do not auto-refresh the snapshot/allowlist):')
         print('\n'.join('  ' + path for path in errors))
         return 1
-    print('PASS: changes confined to extension-owned policy paths or exact reviewed exceptions.')
+    print('PASS: extension-owned paths, exact reviewed exceptions or unchanged pinned upstream content.')
     print('Legacy patches remain; this is not runtime, security or upstream-upgrade acceptance.')
     return 0
 

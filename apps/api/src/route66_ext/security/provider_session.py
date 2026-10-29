@@ -118,6 +118,21 @@ async def resolve_provider_session(db, payload, *, check_revocation=True):
     return user
 
 
+def mfa_challenge_usable(payload):
+    """Refuse a spent provider challenge before consuming a backup code."""
+    jti = payload.get('jti')
+    if payload.get('purpose') != 'mfa_pending' or not isinstance(jti, str) or re.fullmatch(r'[A-Za-z0-9_-]{43}', jti) is None:
+        return False
+    from src.route66_ext.adapters.core_redis import get_redis_client
+    try:
+        redis = get_redis_client()
+        if redis is None:
+            raise RuntimeError()
+        return redis.get(f'lh:mfa:used:{jti}') is None
+    except Exception:
+        raise HTTPException(503, 'Session validation temporarily unavailable') from None
+
+
 def consume_mfa_challenge(payload):
     """Claim a successfully verified provider challenge once, fail closed."""
     jti = payload.get('jti')

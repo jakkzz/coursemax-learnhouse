@@ -51,7 +51,11 @@ PRIVATE=()
 if [[ -n ${LEARNHOUSE_TEST_PRIVATE_SOURCE:-} ]]; then
   PRIVATE=(-v "$LEARNHOUSE_TEST_PRIVATE_SOURCE:/private" -e LEARNHOUSE_TEST_PRIVATE_SOURCE=/private)
 fi
-docker run --rm --pull=never --network none --read-only \
+VENV=()
+if [[ -n ${LEARNHOUSE_API_TEST_VENV:-} ]]; then
+  VENV=(-v "$LEARNHOUSE_API_TEST_VENV:/app/api/.venv:ro")
+fi
+docker run --rm --pull=never --network none --read-only "${VENV[@]}" \
   --user "$(id -u):$(id -g)" --cap-drop ALL --security-opt no-new-privileges "${PRIVATE[@]}" \
   --memory 384m --cpus 0.5 --pids-limit 64 --tmpfs /tmp:rw,size=16m \
   -v "$SCRATCH:/scratch" \

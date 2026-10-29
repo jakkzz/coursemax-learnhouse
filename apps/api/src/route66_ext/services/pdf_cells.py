@@ -25,7 +25,8 @@ def _decode(raw, font):
 
 
 def _page(page):
-    from pypdf._font import Font
+    # pypdf 6.21 (upstream 1.4.3) moved its font decoder into generic.
+    from pypdf.generic._font import Font
     fonts = {}
     for name, ref in (page.get('/Resources', {}).get('/Font') or {}).items():
         try:

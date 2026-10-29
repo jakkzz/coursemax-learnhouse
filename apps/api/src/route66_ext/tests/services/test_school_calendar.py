@@ -18,6 +18,7 @@ from src.route66_ext.db.class_attendance import AttendanceSession, AttendanceCha
 from src.route66_ext.db.school_calendar import CALENDAR_TABLES, ClassSchedule, SchoolCalendar, SchoolCalendarRevision, SchoolCalendarSource, SchoolCalendarAttachment
 from src.route66_ext.db.school_identity import SchoolGoogleEvidence, NrruTeacherIdentity
 from src.db.users import User
+from src.db.courses.assignments import Assignment
 from src.db.user_organizations import UserOrganization
 from src.route66_ext.routers import school_calendars as api, class_connections as connections, class_attendance as attendance_api
 from src.route66_ext.services import academic_rosters as roster, learning_access as access
@@ -1163,7 +1164,7 @@ END; $$"""))
         from src.route66_ext.adapters.native_learning_access_test_support import CourseChapter, ChapterActivity, ResourceAuthor, UserGroup, UserGroupResource, UserGroupUser, PublicUser, read_native_activity, ActivityVersion, ActivityUpdate, update_activity, get_editor_bootstrap, check_resource_access, AccessAction, ResourceAccessChecker, UserOrganization
         from src.route66_ext.tests.services.test_native_google_sessions import request as native_request
         async with self.engine.begin() as conn:
-            for table in (native.Chapter.__table__, native.Activity.__table__, CourseChapter.__table__, ChapterActivity.__table__, ResourceAuthor.__table__, UserGroup.__table__, UserGroupResource.__table__, UserGroupUser.__table__, ActivityVersion.__table__):
+            for table in (native.Chapter.__table__, native.Activity.__table__, CourseChapter.__table__, ChapterActivity.__table__, ResourceAuthor.__table__, UserGroup.__table__, UserGroupResource.__table__, UserGroupUser.__table__, ActivityVersion.__table__, Assignment.__table__):
                 await conn.run_sync(table.create)
         await self.make_admin()
         revision = await self.published(calendar_payload(monday(2)))

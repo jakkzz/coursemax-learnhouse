@@ -13,8 +13,8 @@ in the app the moment it is minted; it can only be spent at the MFA
 verification endpoint, which decodes it explicitly.
 """
 
-from dataclasses import dataclass
 import secrets
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional
 
@@ -22,7 +22,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.db.users import User
 from src.security.auth import create_access_token, create_refresh_token, decode_jwt
-from src.security.session_context import AMR_CLAIM, SORG_CLAIM, session_claims
+from src.security.session_context import (
+    AMR_CLAIM,
+    CUSTOM_DOMAIN_CLAIM,
+    SORG_CLAIM,
+    session_claims,
+)
 from src.services.auth.mfa import is_mfa_active
 
 MFA_PENDING_PURPOSE = "mfa_pending"
@@ -43,17 +48,58 @@ class SessionIssueResult:
 
 
 def create_mfa_pending_token(
-    email: str, amr: Optional[str] = None, org_id: Optional[int] = None,
+    email: str,
+    amr: Optional[str] = None,
+    org_id: Optional[int] = None,
+    custom_domain: bool = False,
     *, provider_claims: Optional[dict] = None,
 ) -> str:
     """Mint the interim token. It carries the session's provenance (``amr`` /
     ``sorg``) so that when the second factor is completed at ``/auth/login/mfa``
     the real session is minted with the same method and org it was started for."""
     return create_access_token(
-        data={"sub": email, "purpose": MFA_PENDING_PURPOSE, **session_claims(amr, org_id), **(provider_claims or {}),
-              **({"jti": secrets.token_urlsafe(32)} if provider_claims else {})},
+        data={
+            "sub": email,
+            "purpose": MFA_PENDING_PURPOSE,
+            "jti": secrets.token_urlsafe(32 if provider_claims else 16),
+            **session_claims(amr, org_id, custom_domain=custom_domain),
+            **(provider_claims or {}),
+        },
         expires_delta=MFA_PENDING_TTL,
     )
+
+
+async def mfa_pending_token_usable(db_session: AsyncSession, token: str) -> bool:
+    """Read-only pre-check, before a code is spent on it: the pending token
+    carries a ``jti`` that has not been redeemed yet."""
+    from src.services.auth.link_tokens import link_token_spent
+
+    payload = decode_jwt(token) or {}
+    if payload.get("lhv") == 2:
+        from src.security.provider_session import mfa_challenge_usable
+        return mfa_challenge_usable(payload)
+    jti = payload.get("jti")
+    if not jti or not isinstance(payload.get("exp"), int):
+        return False
+    return not await link_token_spent(db_session, jti)
+
+
+async def spend_mfa_pending_token(db_session: AsyncSession, token: str) -> bool:
+    """Record a pending token as used once its second factor is accepted.
+    False when it was already spent or carries no ``jti``."""
+    from src.services.auth.link_tokens import redeem_link_token
+
+    payload = decode_jwt(token) or {}
+    # Keep the existing provider ledger: switching stores could replay an
+    # already-spent challenge during a rolling upgrade. Native links use SQL.
+    if payload.get("lhv") == 2:
+        from src.security.provider_session import consume_mfa_challenge
+        consume_mfa_challenge(payload)
+        return True
+    jti, exp = payload.get("jti"), payload.get("exp")
+    if not jti or not isinstance(exp, int):
+        return False
+    return await redeem_link_token(db_session, jti, MFA_PENDING_PURPOSE, exp)
 
 
 def decode_mfa_pending_token(token: str) -> Optional[str]:
@@ -83,8 +129,18 @@ def decode_mfa_pending_provenance(token: str) -> tuple[Optional[str], Optional[i
     return payload.get(AMR_CLAIM), org_id
 
 
+def decode_mfa_pending_custom_domain(token: str) -> bool:
+    """Whether a pending token was started on an org's custom domain, so the
+    session completed from it stays bound to that org. Same caveat as
+    :func:`decode_mfa_pending_provenance`."""
+    return (decode_jwt(token) or {}).get(CUSTOM_DOMAIN_CLAIM) is True
+
+
 def mint_session_tokens(
-    email: str, amr: Optional[str] = None, org_id: Optional[int] = None,
+    email: str,
+    amr: Optional[str] = None,
+    org_id: Optional[int] = None,
+    custom_domain: bool = False,
     *, provider_claims: Optional[dict] = None,
 ) -> SessionIssueResult:
     """Mint a real session unconditionally. Only for callers that have already
@@ -93,8 +149,10 @@ def mint_session_tokens(
     ``amr`` records how the user authenticated and ``org_id`` records which org
     the session was established for; both are stamped into the token so the
     per-org auth-method / session-sharing policy can evaluate the session later.
+    ``custom_domain`` marks a session signed in on the org's own domain, which
+    that policy then holds to ``org_id`` alone.
     """
-    claims = {**session_claims(amr, org_id), **(provider_claims or {})}
+    claims = {**session_claims(amr, org_id, custom_domain=custom_domain), **(provider_claims or {})}
     return SessionIssueResult(
         mfa_required=False,
         access_token=create_access_token(data={"sub": email, "purpose": "session", **claims}),
@@ -107,6 +165,7 @@ async def issue_session_or_challenge(
     user: User,
     amr: Optional[str] = None,
     org_id: Optional[int] = None,
+    custom_domain: bool = False,
     *, provider_identity_id: Optional[int] = None,
 ) -> SessionIssueResult:
     """Mint a session, unless the user has a confirmed second factor, in which
@@ -121,6 +180,6 @@ async def issue_session_or_challenge(
     if await is_mfa_active(db_session, user.id):
         return SessionIssueResult(
             mfa_required=True,
-            mfa_token=create_mfa_pending_token(user.email, amr, org_id, provider_claims=provider_claims),
+            mfa_token=create_mfa_pending_token(user.email, amr, org_id, custom_domain, provider_claims=provider_claims),
         )
-    return mint_session_tokens(user.email, amr, org_id, provider_claims=provider_claims)
+    return mint_session_tokens(user.email, amr, org_id, custom_domain, provider_claims=provider_claims)

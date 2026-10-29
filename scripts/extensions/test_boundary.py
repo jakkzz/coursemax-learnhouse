@@ -59,6 +59,21 @@ class GitGateTests(unittest.TestCase):
         (self.native.parent / 'new_native.py').write_text('# outside boundary\n')
         self.assertEqual(self.gate(), 1)
 
+    def test_pinned_upstream_integration_does_not_allow_later_native_drift(self):
+        policy = json.loads(self.policy.read_text())
+        policy['upstream_baseline'] = policy['snapshot']
+        self.native.write_text('# Exact upstream update\n')
+        self.git('add', 'apps/api/src/security/auth.py')
+        self.commit()
+        policy['accepted_upstream_revision'] = self.git('rev-parse', 'HEAD').strip()
+        self.policy.write_text(json.dumps(policy))
+        self.assertEqual(self.gate(), 0)
+        self.native.write_text('# Unreviewed local edit after upstream\n')
+        self.assertEqual(self.gate(), 1)
+        self.git('add', 'apps/api/src/security/auth.py')
+        self.commit()
+        self.assertEqual(self.gate(), 1)
+
     def test_original_deletion_blocked(self):
         self.native.unlink()
         self.assertEqual(self.gate(), 1)
@@ -96,6 +111,22 @@ class BoundaryTests(unittest.TestCase):
     def test_hash_alone_is_not_exception(self):
         self.policy['exceptions']['src/security/auth.py'] = {'sha256': hashlib.sha256(b'new').hexdigest()}
         self.assertTrue(self.check([('M', 'src/security/auth.py')]))
+
+    def test_pinned_upstream_bytes_only(self):
+        path = 'src/security/auth.py'
+        allowed = {path: b'upstream'}
+        self.assertEqual(violations([('M', path)], self.policy, lambda _: b'upstream', allowed), [])
+        self.assertEqual(violations([('M', path)], self.policy, lambda _: b'edited', allowed), [path])
+        self.assertEqual(violations([('D', path)], self.policy, lambda _: None, allowed), [path])
+        self.assertEqual(violations([('D', path)], self.policy, lambda _: None, {path: None}), [])
+        self.assertEqual(violations([('M', path)], self.policy, lambda _: None, {path: None}), [path])
+
+    def test_upstream_cannot_erase_legacy_customization_or_exception(self):
+        path = 'src/security/auth.py'
+        for key, value in [('legacy_inventory', [{'path': path}]), ('exceptions', {path: {}})]:
+            policy = {**self.policy, key: value}
+            self.assertEqual(violations([('M', path)], policy, lambda _: b'upstream',
+                                        {path: b'upstream'}), [path])
 
     def test_owned_similar_prefix_is_denied(self):
         self.assertTrue(self.check([('A', 'src/route66_ext_bad/auth.py')]))

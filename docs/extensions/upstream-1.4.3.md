@@ -3,8 +3,10 @@
 Owner requested an upstream update while preserving our customizations. Integrated
 pinned upstream `2d75337273ac496c523db34541707f4268d4d644` (1.4.3) into the fork from
 `92df5b89`, rehearsed in the separate `coursemax/upstream-1.4.3` worktree before
-advancing staging source. Upstream main `3b13dae5` has the same tree. This is a
-source update, **not a live deployment**. Live remains the retained `88fea34b` image.
+advancing staging source. Upstream main `3b13dae5` has the same tree. Initially
+source-only, this integration is now deployed at source `7f2f997c`, image
+`4cbc54da`. See [the deployment record](upstream-1.4.3-deployment.md) for the actual
+bootstrap-schema upgrade, baked checks, live result and retained `88fea34b` rollback.
 
 ## Resolution
 
@@ -133,7 +135,8 @@ Compose inputs. Its owned launcher preserves native web/collab/Nginx processes a
 starts the composed API. The native Dockerfile copies the owned source/launcher.
 Do not pair this override with the old live image, which lacks these files. The
 untouched native `app.py` entrypoint alone does **not** install this HTTP guard;
-direct service calls likewise are not intercepted. No deployed command changed.
+direct service calls likewise are not intercepted. The deployed app now selects
+this owned launcher explicitly.
 
 Focused regressions cover reused-address access/refresh rejection, fresh Google
 sessions, persisted syllabus/version/event retention, zero protected-file deletion,
@@ -144,7 +147,8 @@ identity/roster regressions and 28 tooling checks pass**, plus the boundary gate
 Initial attempts stopped at the 3 GiB memory floor. After headroom recovered, the
 missing disposable venv was rebuilt from frozen `uv.lock` under the private evidence
 directory and both suites reran successfully. Failed/stopped attempts are not counted.
-Production image/lifecycle validation remains pending.
+These were source-checkpoint results. Baked/runtime and live-entry validation was
+subsequently completed as recorded below.
 
 Focused runner (with the matching test-image/venv environment variables):
 
@@ -153,20 +157,19 @@ LEARNHOUSE_TEST_ONLY=test_registration_rejects_previous_owner_email_sessions,tes
   bash deploy/staging/test_attendance_postgres.sh
 ```
 
-## Remaining before deploying this version
+## Deployment completed; remaining scope
 
-1. Recover recorded private runtime/Compose/release files: their named paths are
-   missing even though existing containers retain their configuration. Do not replace
-   credentials or recreate the app from guessed settings.
-2. Build a fresh matching API/web/collab runtime and full production web bundle;
-   historical same-base overlays cannot deploy this dependency/runtime upgrade.
-3. Rehearse the actual bootstrap-schema upgrade. Graph discovery and named-migration
-   tests do not prove a complete fresh/existing Alembic chain or live schema readiness.
-4. Include the owned runtime override above and verify the guard in the fresh baked
-   image. The source/HTTP fix is implemented; the old live image has not acquired it.
-5. Review existing background-backfill settings/resources, then exercise the compiled
-   EN/TH login/QR/teacher/student workflows and real provider/device acceptance as needed.
+The matching image and full production bundle are built and deployed. App-only
+configuration recovery, isolated bootstrap-schema restore/rehearsal, fresh backups,
+additive live upgrade and owned entrypoint verification are complete. All existing
+rows were preserved during migration; no Alembic stamp or account backfill occurred.
+Both periodic backfill intervals are explicitly zero. DB/Redis/gateway IDs and auth
+configuration remain unchanged; only the app was replaced and gateway DNS reloaded.
 
-Custom-page search metadata/new upstream Thai labels are follow-up UI integration,
-not proof that custom modules were removed. No app build/image replacement, migration,
-secret change, real institutional write, historical import or live deployment occurred.
+27 collab tests, 11 baked-runtime checks, 8,593 file checks, eight compiled persisted
+teacher/student EN/TH 1440/390 workflows and four live login-entry checks pass.
+Live health is 200. See [deployment and recovery details](upstream-1.4.3-deployment.md).
+
+Real provider/device/physical QR acceptance was not repeated. Custom-page search
+metadata/new upstream Thai labels remain a separate UI follow-up, not evidence of
+removed custom modules. No real institutional/content/student migration occurred.

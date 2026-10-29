@@ -111,9 +111,12 @@ async def complete_native_google(db, verified, *, org_id):
             raise HTTPException(503, 'Learner role needs review')
         from src.route66_ext.adapters.security_features_utils_usage import check_limits_with_usage
         await check_limits_with_usage('members', org_id, db)
-        now = datetime.now(timezone.utc).isoformat()
+        created_at = datetime.now(timezone.utc)
+        now = created_at.isoformat()
         user = User(username='learner_' + uuid4().hex, user_uuid='user_' + str(uuid4()),
                     first_name='', last_name='', email=email, password='', email_verified=True,
+                    # Native email-subject sessions must predate neither this account nor its owner.
+                    password_changed_at=created_at.replace(tzinfo=None),
                     email_verified_at=now, signup_method='google', creation_date=now, update_date=now)
         db.add(user)
         await db.flush()

@@ -60,6 +60,7 @@ docker run --rm --pull=never --network none --read-only "${VENV[@]}" \
   --memory 384m --cpus 0.5 --pids-limit 64 --tmpfs /tmp:rw,size=16m \
   -v "$SCRATCH:/scratch" \
   -v "$ROOT/apps/api/src:/app/api/src:ro" \
+  -v "$ROOT/apps/api/app.py:/app/api/app.py:ro" \
   -v "$ROOT/apps/api/config:/app/api/config:ro" \
   -v "$ROOT/apps/api/migrations:/app/api/migrations:ro" \
   -v "$ROOT/deploy/staging:/deployment:ro" \
@@ -89,9 +90,10 @@ if os.getenv("LEARNHOUSE_TEST_ARRIVAL_ONLY") == "1":
         "src.tests.services.test_attendance_policy", "src.tests.services.test_native_line_sessions",
     ]))
     suite.addTests(b.AttendanceTests(name) for name in b.AttendanceTests.__dict__ if name.startswith("test_"))
-elif names:  # focused run: exact SchoolCalendarTests names only
+elif names:  # Calendar method names or explicit unittest module/case paths.
     from src.route66_ext.tests.services import test_school_calendar as c
-    suite.addTests(c.SchoolCalendarTests(name) for name in names)
+    for name in names:
+        suite.addTests(loader.loadTestsFromName(name) if "." in name else [c.SchoolCalendarTests(name)])
 elif not only:
     suite.addTests(loader.loadTestsFromNames([
         "src.tests.services.test_native_google_sessions", "src.tests.services.test_native_line_sessions",
@@ -104,7 +106,8 @@ elif not only:
     suite.addTests(c.SchoolCalendarTests(name) for name in c.SchoolCalendarTests.__dict__ if name.startswith("test_"))
     suite.addTests(loader.loadTestsFromNames(["src.route66_ext.tests.services.test_calendar_plan", "src.route66_ext.tests.services.test_nrru_calendar_pdf",
         "src.route66_ext.tests.services.test_pdf_cells", "src.route66_ext.tests.services.test_calendar_url",
-        "src.route66_ext.tests.services.test_school_calendar.ScopeTests"]))
+        "src.route66_ext.tests.services.test_school_calendar.ScopeTests",
+        "src.route66_ext.tests.services.test_syllabus_retention"]))
 if extra and not names:
     from src.route66_ext.tests.services.test_learning_access import LearningAccessTests
     suite.addTests(LearningAccessTests(name) for name in LearningAccessTests.__dict__ if name.startswith("test_"))

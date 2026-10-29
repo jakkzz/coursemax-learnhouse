@@ -103,6 +103,56 @@ python -m pytest -p src.route66_ext.tests.sqlite_native_tests \
 # LEARNHOUSE_API_TEST_VENV for an isolated runtime with the updated lockfile.
 ```
 
+## Post-review fixes — extension-only
+
+The owner requested fixes without touching upstream source. Changes after merge
+`464c9426` stay in `src/route66_ext/`, owned deployment wiring and this record;
+no native file, route, handler, boundary exception or migration is changed.
+
+- Google registration initializes the native session cutoff with the new account's
+  UTC creation timestamp. Earlier email-subject access/refresh tokens cannot attach
+  to a recreated account. New provider sessions/refresh work; later sign-in does not
+  reset the cutoff. No existing accounts are backfilled or signed out.
+- `adapters/application:create_app` composes native FastAPI with the owned syllabus
+  retention middleware. Native authentication/DELETE permission checks precede a
+  veto based on immutable preparation events, not client-editable metadata. The
+  original chapter/activity handlers remain the sole deletion writers. The existing
+  academic advisory lock spans inspection through native commit/response; native
+  chapter reordering takes the same lock so shared links cannot change mid-check.
+  Authentication runs before locking because native API-token usage tracking may
+  commit. Ordinary deletions and removal of an extra shared link still work.
+- Native CSRF and CORS are registered outside the added middleware so its short-
+  circuit responses preserve origin policy. Native routes/lifespan stay unchanged.
+  This is supported application composition, not monkeypatching, route shadowing
+  or a production dependency override.
+
+**Runtime wiring:** from `apps/api`, use `python -m src.route66_ext` (or Uvicorn's
+`--factory src.route66_ext.adapters.application:create_app`). For the integrated
+staging image, add `deploy/staging/extension-runtime.compose.yaml` to the recovered
+Compose inputs. Its owned launcher preserves native web/collab/Nginx processes and
+starts the composed API. The native Dockerfile copies the owned source/launcher.
+Do not pair this override with the old live image, which lacks these files. The
+untouched native `app.py` entrypoint alone does **not** install this HTTP guard;
+direct service calls likewise are not intercepted. No deployed command changed.
+
+Focused regressions cover reused-address access/refresh rejection, fresh Google
+sessions, persisted syllabus/version/event retention, zero protected-file deletion,
+ordinary deletion, shared links, concurrent preparation/reordering, permission and
+CSRF denials, CORS, FastAPI integer path spellings, factory routes/lifespan and
+launcher contracts. Final results: **8 focused checks, 115 isolated PostgreSQL
+identity/roster regressions and 28 tooling checks pass**, plus the boundary gate.
+Initial attempts stopped at the 3 GiB memory floor. After headroom recovered, the
+missing disposable venv was rebuilt from frozen `uv.lock` under the private evidence
+directory and both suites reran successfully. Failed/stopped attempts are not counted.
+Production image/lifecycle validation remains pending.
+
+Focused runner (with the matching test-image/venv environment variables):
+
+```sh
+LEARNHOUSE_TEST_ONLY=test_registration_rejects_previous_owner_email_sessions,test_syllabus_deletion_retention_at_native_http_boundary,src.route66_ext.tests.services.test_syllabus_retention \
+  bash deploy/staging/test_attendance_postgres.sh
+```
+
 ## Remaining before deploying this version
 
 1. Recover recorded private runtime/Compose/release files: their named paths are
@@ -112,9 +162,8 @@ python -m pytest -p src.route66_ext.tests.sqlite_native_tests \
    historical same-base overlays cannot deploy this dependency/runtime upgrade.
 3. Rehearse the actual bootstrap-schema upgrade. Graph discovery and named-migration
    tests do not prove a complete fresh/existing Alembic chain or live schema readiness.
-4. Verify/fix new upstream chapter deletion against bound syllabus retention before
-   enabling this version for real content. The existing course-level guard survives,
-   but does not cover this new deletion path. No new deletion policy was invented here.
+4. Include the owned runtime override above and verify the guard in the fresh baked
+   image. The source/HTTP fix is implemented; the old live image has not acquired it.
 5. Review existing background-backfill settings/resources, then exercise the compiled
    EN/TH login/QR/teacher/student workflows and real provider/device acceptance as needed.
 

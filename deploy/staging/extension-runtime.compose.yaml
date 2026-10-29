@@ -1,0 +1,5 @@
+# Apply with the recovered staging Compose configuration and a matching 1.4.3 image.
+# The native Dockerfile already copies apps/api/src/, including this owned launcher.
+services:
+  app:
+    command: ["sh", "/app/api/src/route66_ext/start.sh"]

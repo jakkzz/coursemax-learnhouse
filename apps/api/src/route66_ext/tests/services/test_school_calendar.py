@@ -1304,6 +1304,12 @@ END; $$"""))
             self.assertEqual(removed_member.exception.status_code, 403)
             self.assertEqual((await db.exec(select(ResourceAuthor))).all(), [])
 
+    async def test_syllabus_deletion_retention_at_native_http_boundary(self):
+        # Start with genuinely prepared, edited and versioned syllabus content.
+        await self.test_native_syllabus_draft_is_course_owned_unpublished_and_not_overwritten()
+        from src.route66_ext.tests.services.syllabus_deletion_checks import check_native_deletion
+        await check_native_deletion(self)
+
 
 def static_scope():
     """The calendar feature does not import native assignment/grading modules."""

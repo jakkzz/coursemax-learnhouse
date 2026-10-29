@@ -119,6 +119,44 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
             user, result = await complete_native_google(db, verified, org_id=1)
             return user.id, result
 
+    async def test_registration_rejects_previous_owner_email_sessions(self):
+        from fastapi import Response
+        from src.routers.auth import refresh
+        from src.security.auth import create_refresh_token
+        proof = replace(self.google, verified_email='reused-address@example.invalid', subject='new-owner-subject')
+        async with self.sessions.begin() as db:
+            previous = User(username='previous_owner', user_uuid='user_previous_owner',
+                            email=proof.verified_email, password='', email_verified=True,
+                            first_name='Previous', last_name='Owner')
+            db.add(previous)
+            await db.flush()
+            previous_id = previous.id
+            old_claims = {'sub': previous.email, 'purpose': 'session', 'amr': 'password', 'sorg': 1}
+            old_token = create_access_token(old_claims)
+            old_refresh = create_refresh_token(old_claims)
+            await db.delete(previous)
+        user_id, result = await self.login(proof, intent='register')
+        self.assertNotEqual(previous_id, user_id)
+        async with self.sessions() as db:
+            cutoff = (await db.get(User, user_id)).password_changed_at
+            self.assertIsNotNone(cutoff)
+            with self.assertRaises(HTTPException) as denied:
+                await get_current_user(request(old_token), db)
+            self.assertEqual(denied.exception.status_code, 401)
+            current = await get_current_user(request(result.access_token), db)
+            self.assertEqual(current.id, user_id)
+        with patch('src.routers.auth.check_refresh_rate_limit', return_value=(True, 0)):
+            async with self.sessions() as db:
+                with self.assertRaises(HTTPException) as denied:
+                    await refresh(request(refresh=old_refresh), Response(), db)
+                self.assertEqual(denied.exception.status_code, 401)
+            async with self.sessions() as db:
+                fresh = await refresh(request(refresh=result.refresh_token), Response(), db)
+                self.assertEqual((await get_current_user(request(fresh['access_token']), db)).id, user_id)
+        await self.login(proof, intent='signin')
+        async with self.sessions() as db:
+            self.assertEqual((await db.get(User, user_id)).password_changed_at, cutoff)
+
     async def test_school_migration_matches_models_and_refuses_destructive_downgrade(self):
         import importlib.util
         from pathlib import Path

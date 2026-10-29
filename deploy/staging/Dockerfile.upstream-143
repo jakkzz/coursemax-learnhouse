@@ -1,0 +1,71 @@
+# Based on the pinned upstream 1.4.3 Dockerfile; owned bounded build/entrypoint only.
+# Build from a clean source archive with old-static/ copied from the retained image.
+FROM oven/bun:1.4.4-alpine AS frontend-deps
+RUN apk upgrade --no-cache && apk add --no-cache libc6-compat libstdc++
+WORKDIR /app
+COPY apps/web/package.json apps/web/bun.lock ./
+RUN bun install --frozen-lockfile
+
+FROM frontend-deps AS frontend-builder
+COPY --from=node:24.22.1-alpine3.24 /usr/local/bin/node /usr/local/bin/node
+COPY apps/web .
+ARG SOURCE_REVISION
+ENV NEXT_TELEMETRY_DISABLED=1 LEARNHOUSE_BUILD_NO_TELEMETRY=true \
+    LEARNHOUSE_BUILD_CPUS=1 LEARNHOUSE_BUILD_LOW_MEMORY=true \
+    LEARNHOUSE_BUILD_SEPARATE_TYPES=true LEARNHOUSE_DISABLE_EE=1 \
+    NODE_OPTIONS=--max-old-space-size=1536 BUILD_ID=${SOURCE_REVISION}
+RUN rm -f .env* && rm -rf ee
+RUN bun run build
+# Same generated routes, separate bounded type-check process; errors are not waived.
+RUN NODE_OPTIONS=--max-old-space-size=2048 node node_modules/typescript/bin/tsc --noEmit
+
+FROM oven/bun:1.4.4-alpine AS collab-builder
+WORKDIR /app
+COPY apps/collab/package.json apps/collab/bun.lock ./
+RUN bun install --frozen-lockfile
+COPY apps/collab/tsconfig.json ./
+COPY apps/collab/src/ ./src/
+COPY apps/collab/tests/ ./tests/
+RUN bun test tests && bun run build
+RUN bun install --frozen-lockfile --production
+
+FROM python:3.14.7-alpine3.24 AS runner
+COPY --from=node:24.22.1-alpine3.24 /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:24.22.1-alpine3.24 /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN apk upgrade --no-cache \
+    && apk add --no-cache nginx curl netcat-openbsd ca-certificates bash libstdc++ \
+    && ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && npm install -g pm2@7.1.0 && rm -rf /root/.npm && mkdir -p /run/nginx \
+    && addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+RUN python -m pip uninstall --yes pip && rm -rf /usr/local/lib/python3.14/ensurepip
+COPY --from=frontend-deps /usr/local/bin/bun /usr/local/bin/bun
+COPY --from=ghcr.io/astral-sh/uv:0.10.7 /uv /uvx /bin/
+WORKDIR /app/api
+COPY apps/api/uv.lock apps/api/pyproject.toml ./
+RUN uv sync --frozen --no-dev --no-install-project --no-cache
+COPY apps/api ./
+RUN rm -rf ee
+WORKDIR /app/web
+COPY --from=frontend-builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=frontend-builder --chown=nextjs:nodejs /app/public ./public
+COPY --chown=nextjs:nodejs old-static/ ./.next/static/
+COPY --from=frontend-builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --chown=nextjs:nodejs apps/web/server-wrapper.js ./
+WORKDIR /app/collab
+COPY --from=collab-builder /app/dist ./dist
+COPY --from=collab-builder /app/node_modules ./node_modules
+COPY apps/collab/package.json apps/collab/bun.lock ./
+WORKDIR /app
+COPY docker/nginx.conf /etc/nginx/http.d/default.conf
+COPY apps/api/docker-entrypoint.sh /app/api/docker-entrypoint.sh
+COPY docker/start.sh /app/start.sh
+RUN chmod +x /app/api/docker-entrypoint.sh /app/start.sh /app/api/bin/learnhouse-lms-import \
+    && ln -s /app/api/bin/learnhouse-lms-import /usr/local/bin/learnhouse-lms-import
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.source="https://github.com/jakkzz/coursemax-learnhouse" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}"
+ENV PORT=8000 LEARNHOUSE_PORT=9000 COLLAB_PORT=4000 HOSTNAME=0.0.0.0 \
+    LEARNHOUSE_OSS=true NEXT_PUBLIC_LEARNHOUSE_OSS=true PYTHONDONTWRITEBYTECODE=1 \
+    NEXT_TELEMETRY_DISABLED=1 NODE_ENV=production
+EXPOSE 80 9000 4000
+CMD ["sh", "/app/api/src/route66_ext/start.sh"]

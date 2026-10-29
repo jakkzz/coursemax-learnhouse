@@ -55,14 +55,20 @@ VENV=()
 if [[ -n ${LEARNHOUSE_API_TEST_VENV:-} ]]; then
   VENV=(-v "$LEARNHOUSE_API_TEST_VENV:/app/api/.venv:ro")
 fi
-docker run --rm --pull=never --network none --read-only "${VENV[@]}" \
+SOURCE=(
+  -v "$ROOT/apps/api/src:/app/api/src:ro"
+  -v "$ROOT/apps/api/app.py:/app/api/app.py:ro"
+  -v "$ROOT/apps/api/config:/app/api/config:ro"
+  -v "$ROOT/apps/api/migrations:/app/api/migrations:ro"
+)
+if [[ ${LEARNHOUSE_TEST_BAKED:-0} == 1 ]]; then
+  [[ -z ${LEARNHOUSE_API_TEST_VENV:-} ]] || { echo 'Baked proof must use the image dependencies' >&2; exit 1; }
+  SOURCE=()
+fi
+docker run --rm --pull=never --network none --read-only "${VENV[@]}" "${SOURCE[@]}" \
   --user "$(id -u):$(id -g)" --cap-drop ALL --security-opt no-new-privileges "${PRIVATE[@]}" \
   --memory 384m --cpus 0.5 --pids-limit 64 --tmpfs /tmp:rw,size=16m \
   -v "$SCRATCH:/scratch" \
-  -v "$ROOT/apps/api/src:/app/api/src:ro" \
-  -v "$ROOT/apps/api/app.py:/app/api/app.py:ro" \
-  -v "$ROOT/apps/api/config:/app/api/config:ro" \
-  -v "$ROOT/apps/api/migrations:/app/api/migrations:ro" \
   -v "$ROOT/deploy/staging:/deployment:ro" \
   -e TESTING=true -e LEARNHOUSE_AUTH_JWT_SECRET_KEY=synthetic-fixture-jwt-secret-32-chars \
   -e LEARNHOUSE_DOMAIN=learn.example.com -e LEARNHOUSE_SSL=true -e LEARNHOUSE_DISABLE_EE=1 \

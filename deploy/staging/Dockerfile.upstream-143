@@ -19,14 +19,15 @@ RUN bun run build
 # Same generated routes, separate bounded type-check process; errors are not waived.
 RUN NODE_OPTIONS=--max-old-space-size=2048 node node_modules/typescript/bin/tsc --noEmit
 
-FROM oven/bun:1.4.4-alpine AS collab-builder
+FROM node:24.22.1-alpine3.24 AS collab-builder
+COPY --from=frontend-deps /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /app
 COPY apps/collab/package.json apps/collab/bun.lock ./
 RUN bun install --frozen-lockfile
 COPY apps/collab/tsconfig.json ./
 COPY apps/collab/src/ ./src/
 COPY apps/collab/tests/ ./tests/
-RUN bun test tests && bun run build
+RUN bun run test && bun run build
 RUN bun install --frozen-lockfile --production
 
 FROM python:3.14.7-alpine3.24 AS runner

@@ -49,7 +49,7 @@ class RecoveryTests(unittest.TestCase):
     def test_matching_build_not_old_runtime_overlay(self):
         recipe = (ROOT / 'Dockerfile.upstream-143').read_text()
         for required in ('python:3.14.7-alpine3.24', 'node:24.22.1-alpine3.24', 'oven/bun:1.4.4-alpine',
-                         'uv sync --frozen', 'bun install --frozen-lockfile', 'bun test tests',
+                         'uv sync --frozen', 'bun install --frozen-lockfile', 'bun run test',
                          'node node_modules/typescript/bin/tsc --noEmit', '/app/api/src/route66_ext/start.sh',
                          'COPY --chown=nextjs:nodejs old-static/'):
             self.assertIn(required, recipe)

@@ -63,7 +63,11 @@ SOURCE=(
 )
 if [[ ${LEARNHOUSE_TEST_BAKED:-0} == 1 ]]; then
   [[ -z ${LEARNHOUSE_API_TEST_VENV:-} ]] || { echo 'Baked proof must use the image dependencies' >&2; exit 1; }
-  SOURCE=()
+  # Runtime images omit tests. Mount fixtures only, never runtime modules or a venv.
+  SOURCE=(
+    -v "$ROOT/apps/api/src/tests:/app/api/src/tests:ro"
+    -v "$ROOT/apps/api/src/route66_ext/tests:/app/api/src/route66_ext/tests:ro"
+  )
 fi
 docker run --rm --pull=never --network none --read-only "${VENV[@]}" "${SOURCE[@]}" \
   --user "$(id -u):$(id -g)" --cap-drop ALL --security-opt no-new-privileges "${PRIVATE[@]}" \

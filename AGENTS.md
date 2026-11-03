@@ -97,18 +97,20 @@ and shared services intact; real historical migration and cutover remain separat
 work. Prefer owned adapters/routes over native-core changes. Newest ../STATUS.md and
 current release pointer are authoritative over historical deployment headings.
 
-## Current source checkpoint — unattended refresh, release blocked
+## Current candidate — unattended refresh, deployment pending
 
-Owner authorized implementation after planning. The worker, shared acceptance,
-system-attributed history and EN/TH saved-roster controls are implemented in owned
-paths. 77 isolated backend checks, 28 component/browser flows and 28 tooling checks
-pass. Full Next bundle/types lack safe host RAM headroom; **not deployed**. Read
-`docs/extensions/unattended-roster-refresh.md` and newest root STATUS before resuming.
-Use a fresh latest-source archive, not the failed `14b84adf` snapshot. Migration
-`e6bc47a4da35` is rehearsed, not applied live. Keep initial review, native access
-repair and append-only history; source-reader compatibility is not full image/restore
-acceptance. Live remains the repair below. No new permission or activation flag is
-needed for routine continuation; resource gates and practical recovery still apply.
+Approved GitHub Actions run `41685386822` built/typechecked frontend `fa815717`.
+Candidate source `d58e4899` / image `003d5dd9` has the identical frontend Git tree,
+147 baked checks, eight native-auth/DB EN/TH workflows and verified packaging.
+Full isolated restore/idempotent migration/native bootstrap preserves every row in
+82 existing tables. Actual retained `3f19ea47` image auth/history reads pass with
+unchanged academic/identity state. See `docs/extensions/unattended-roster-refresh.md`
+and newest root STATUS for private evidence and guarded activation helpers.
+
+**Not deployed:** restart admission remains below the 3 GiB available-RAM floor.
+Migration `e6bc47a4da35` is not applied live; live remains the repair below. No rebuild,
+new permission or activation flag is needed. Preserve initial review, native access
+repair, append-only history and code-only rollback; never restore older data.
 
 ## Current runtime — 2026-11-03
 

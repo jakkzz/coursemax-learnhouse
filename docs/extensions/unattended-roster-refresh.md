@@ -1,4 +1,50 @@
-# Unattended roster refresh — plan and rehearsal
+# Unattended roster refresh — implementation and evidence
+
+## Current candidate — off-host build passed; deployment capacity pending
+
+Candidate source `d58e4899b45ce999caef5e2bed4d55ad9492f0e8`, image
+`003d5dd9c95817da36b0cf696df70d3e738829c6f3d23d7762f1d7556e725a5a`.
+Approved GitHub Actions run **41685386822** built and typechecked `fa815717`.
+Successful run/head, downloaded SHA256 and embedded BUILD_ID were verified.
+The candidate's only later code change fixes empty disposable FK teardown in a
+provider migration test; its frontend Git tree is identical
+(`5407a7686fd35d849fca35b588e9fc8f92a2cda5`). No frontend check was waived.
+
+- **147 baked** PostgreSQL/parser/HTTP/auth/lifecycle/regression checks pass.
+- **Eight packaged native-auth/DB browser workflows** pass: teacher/student × EN/TH
+  × 1440/390, actual Redis-led worker against a synthetic internal HTTPS registrar,
+  saved background changes, retained focus/drafts, explicit manual acceptance,
+  persisted pause/resume and student denial. Screenshots reviewed; no page errors,
+  horizontal overflow or collapsed status text. Existing 28 component scenarios
+  remain separate, broader fixture coverage.
+- **1,262 API files / 5,527 web entries** verified, with **2,630** old hashed assets
+  retained. Parent layers and runtime configuration are unchanged. Packaging
+  verification caught and rejected restrictive extraction modes and a nested-public
+  copy; corrected extraction preserves modes and merges directory contents.
+- A fresh full database restore applies `e6bc47a4da35` twice and runs native
+  bootstrap: every existing row in **82 tables**, including **48 academic events**,
+  remains unchanged; no Alembic stamp.
+- The **actual retained `3f19ea47` image** boots against restored synthetic scheduled
+  history. Native teacher/student login, manager roster/history reading and student
+  denial pass; academic/identity fingerprints are unchanged. The fixture waits for
+  API health as well as the web entry before browser checks.
+
+**Deployment remains pending**, not merely the build: app-restart admission repeatedly
+refused available RAM below 3 GiB. The candidate and recovered app-only configuration
+are prepared, but no live migration, service replacement, gateway reload or worker
+activation occurred. Live remains healthy `85a18e87` / `3f19ea47`. Do not rebuild or
+request routine permission; resume the guarded activation once capacity permits,
+take quiesced recovery snapshots, apply the named migration, replace only the app
+and verify live. Never restore older academic data.
+
+Private evidence/helpers: `~/.local/state/learnhouse-roster-gha-20261103/`, especially
+`candidate-verification.json`, `baked.log`, `browser-results.json`,
+`restore-rehearsal.log`, `parent-image-browser.json`, `persisted-*-parent.json`
+and `activate.sh`. The prepared `roster-d58e4899-20261103` directory is not the
+current release pointer. Synthetic checks do not establish real provider/device,
+institutional migration or broad CourseMax parity acceptance.
+
+## Historical planning and source checkpoints
 
 Original planning/rehearsal: 2026-11-03, baseline `46fa0d97` (runtime
 `85a18e87` / `3f19ea47`). The owner subsequently requested implementation of the
@@ -13,7 +59,7 @@ occupied 876,544 bytes, with both observations completing in about 20 seconds at
 rendered workflows, compatible rollback and deployment are still pending. Live
 remains unchanged; do not treat this source checkpoint as activation.
 
-## Implementation follow-up — validated source, release blocked
+### Earlier implementation follow-up — validated source, local build blocked
 
 The owner-approved implementation is wired through the owned router lifecycle and
 all three interactive import callers. It uses the existing engine/writer/access
@@ -22,7 +68,7 @@ controls and exactly one matching large-drop continuation. A recent-run partial
 index avoids scanning per-student history during status polling. No native hook,
 new pool/service, deployment flag or alternate roster/account writer was added.
 
-Observed final checks (2026-11-03):
+Observed source/component checkpoint (2026-11-03; superseded by packaged evidence above):
 
 - **77** isolated PostgreSQL/parser/HTTP/metadata/lifecycle/regression checks pass,
   including concurrent claims, expired/changed leases, one-connection fetching,

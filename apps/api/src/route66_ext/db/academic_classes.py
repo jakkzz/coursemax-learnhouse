@@ -4,7 +4,7 @@ These records never change native roles, content authorship or historical work.
 All mutations append AcademicClassEvent in the same transaction; no delete API.
 """
 from datetime import datetime, timezone
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, UniqueConstraint, CheckConstraint
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, UniqueConstraint, CheckConstraint, Index, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import SQLModel, Field
 
@@ -73,7 +73,11 @@ class AcademicRosterEntry(SQLModel, table=True):
 SCHEDULED_ACTOR_CHECK = "actor_user_id IS NOT NULL OR COALESCE((details->>'origin' = 'scheduled' AND details->>'refresh_run_id' ~ '^[0-9a-f]{32}$'), false)"
 
 class AcademicClassEvent(SQLModel, table=True):
-    __table_args__ = (CheckConstraint(SCHEDULED_ACTOR_CHECK, name='ck_academic_event_actor').ddl_if(dialect='postgresql'),)
+    __table_args__ = (
+        CheckConstraint(SCHEDULED_ACTOR_CHECK, name='ck_academic_event_actor').ddl_if(dialect='postgresql'),
+        Index('ix_academic_roster_refresh_history', 'class_id', 'id',
+              postgresql_where=text("kind = 'roster_refresh_finished'")).ddl_if(dialect='postgresql'),
+    )
     id: int | None = Field(default=None, primary_key=True)
     class_id: int | None = Field(default=None, foreign_key='academicclass.id', index=True)
     student_id: int | None = Field(default=None, foreign_key='schoolstudent.id')

@@ -97,6 +97,19 @@ and shared services intact; real historical migration and cutover remain separat
 work. Prefer owned adapters/routes over native-core changes. Newest ../STATUS.md and
 current release pointer are authoritative over historical deployment headings.
 
+## Current source checkpoint — unattended refresh, release blocked
+
+Owner authorized implementation after planning. The worker, shared acceptance,
+system-attributed history and EN/TH saved-roster controls are implemented in owned
+paths. 77 isolated backend checks, 28 component/browser flows and 28 tooling checks
+pass. Full Next bundle/types lack safe host RAM headroom; **not deployed**. Read
+`docs/extensions/unattended-roster-refresh.md` and newest root STATUS before resuming.
+Use a fresh latest-source archive, not the failed `14b84adf` snapshot. Migration
+`e6bc47a4da35` is rehearsed, not applied live. Keep initial review, native access
+repair and append-only history; source-reader compatibility is not full image/restore
+acceptance. Live remains the repair below. No new permission or activation flag is
+needed for routine continuation; resource gates and practical recovery still apply.
+
 ## Current runtime — 2026-11-03
 
 Upstream 1.4.3 is deployed with backend repair source `85a18e87`, image `3f19ea47`.

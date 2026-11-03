@@ -4,7 +4,7 @@ Original planning/rehearsal: 2026-11-03, baseline `46fa0d97` (runtime
 `85a18e87` / `3f19ea47`). The owner subsequently requested implementation of the
 revised plan. The historical rehearsal below remains distinct from runtime proof.
 
-Implementation checkpoint: owned worker, shared acceptance, system attribution,
+Historical source checkpoint `14b84adf`: owned worker, shared acceptance, system attribution,
 manager controls and shared EN/TH roster UI are written. **66 source-mounted
 PostgreSQL/HTTP/lifecycle/discovery regressions and 28 tooling tests pass.** The
 1,000-student fixture retained 1,002 scheduled events; initial plus scheduled history
@@ -12,6 +12,65 @@ occupied 876,544 bytes, with both observations completing in about 20 seconds at
 0.5 CPU. No evidence pruning/hash-only skipping was added. The full frontend build,
 rendered workflows, compatible rollback and deployment are still pending. Live
 remains unchanged; do not treat this source checkpoint as activation.
+
+## Implementation follow-up — validated source, release blocked
+
+The owner-approved implementation is wired through the owned router lifecycle and
+all three interactive import callers. It uses the existing engine/writer/access
+repair, SQL fencing, deployment Redis leadership, six-hour cadence, pause/check
+controls and exactly one matching large-drop continuation. A recent-run partial
+index avoids scanning per-student history during status polling. No native hook,
+new pool/service, deployment flag or alternate roster/account writer was added.
+
+Observed final checks (2026-11-03):
+
+- **77** isolated PostgreSQL/parser/HTTP/metadata/lifecycle/regression checks pass,
+  including concurrent claims, expired/changed leases, one-connection fetching,
+  crash/lost acknowledgement, real fixture-connection loss, manual/background races,
+  old-term unmatched/NULL-ID sources, authority loss and native access failure.
+- Named migration `e6bc47a4da35` follows `d5ab36f3c924`. It preserves human events,
+  adds constrained system attribution and operational state/history index, and
+  refuses downgrade over retained history/state. The exact `85a18e87` **source**
+  reader successfully reads new NULL-actor scheduled history and the manager roster
+  in the disposable database; this is not a new image/whole-backup restore claim.
+- **28** rendered component/browser flows pass at EN/TH 1440/390, including students,
+  official-only viewing, unmatched saved-roster navigation, 0/1/40/1,000 rows,
+  queued/failure/review/pause states, drafts/focus, intended withdrawal, wrong-class
+  responses and stopped polling. A mobile status-column collapse was caught and
+  fixed with an explicit width regression. Shared Interior controls are reused.
+- **28** tooling tests and the boundary gate pass. The design detector found no
+  mechanical issues. The 1,000-student fixture retains 1,002 scheduled events;
+  initial plus scheduled history, including indexes, occupies 892,928 bytes and
+  both observations take about 18 seconds at 0.5 CPU. Evidence is not pruned.
+
+Browser checks use actual roster components and synthetic HTTP responses, substituting
+unrelated shell/calendar owners and using the recorded native CSS artifact. They do
+**not** prove a new full Next bundle, native-shell typography, real UI-to-DB workflows,
+provider/device acceptance or owner usability approval. The visual review is inline.
+
+**Resource blocker:** the `vps-limited` full bundle was cancelled when host available
+RAM fell below 1.5 GiB. Separate generated-route checks succeeded, but full TypeScript
+checks exhausted 1,024/1,536 MiB heaps; the 2,048 MiB-heap attempt was stopped at the
+same host headroom limit. No successful full bundle/types or deployable artifact is
+claimed. The shared 4 GiB builder ceiling and admission floors were not weakened;
+only our build/test was stopped. No live service/schema/records changed.
+
+Live remains `85a18e87` / `3f19ea47`. Next: wait for adequate build headroom, archive
+the **latest** source (the failed private build snapshot is only `14b84adf`), complete
+bundle/types and compiled persisted workflows, then verified packaging, fresh
+protected recovery checks, named migration, bounded app-only deployment and live
+verification. Do not deploy the failed artifacts or restore older academic data.
+
+Private evidence: `~/.local/state/learnhouse-roster-refresh-20261103/`, especially
+`backend-final.log`, `rollback-reader.log`, `ui-3.log`, `ui-results.json`,
+`web-build.log`, `web-min-memory` and `types-{1,2,3,4}.log`.
+For the parent-reader check, place `git archive 85a18e87 apps/api` under
+`parent/` in `LEARNHOUSE_TEST_PRIVATE_SOURCE`; the reader itself is checked in at
+`apps/api/src/route66_ext/tests/services/roster_refresh_parent_reader.py`.
+Browser reproduction uses `apps/web/extensions/route66/tests/build-roster-refresh.mjs`
+with pinned dependencies in a bounded container, then `roster-refresh.browser.cjs`
+with `LEARNHOUSE_UI_EVIDENCE`, `LEARNHOUSE_NATIVE_WEB`, `PLAYWRIGHT_MODULE_PATH` and
+`CHROME_BIN`. No dependency install, real credentials or live registrar is needed.
 
 Audit scope: B02 roster/history, O02 periodic work and O05 official-source handling;
 regressions touch A05/B01 native eligibility. Identity-case resolution, attendance

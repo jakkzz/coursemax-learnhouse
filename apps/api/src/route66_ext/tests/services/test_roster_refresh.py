@@ -314,6 +314,7 @@ class RefreshTests(AcademicRosterTests):
             await connection.execute(text('DROP TABLE academicrosterrefresh'))
             await connection.execute(text('ALTER TABLE academicclassevent DROP CONSTRAINT ck_academic_event_actor'))
             await connection.execute(text('ALTER TABLE academicclassevent ALTER COLUMN actor_user_id SET NOT NULL'))
+            await connection.execute(text('DROP INDEX ix_academic_roster_refresh_history'))
             await connection.run_sync(migrate)
             await connection.run_sync(migrate)
         async with self.sessions.begin() as db:
@@ -331,6 +332,32 @@ class RefreshTests(AcademicRosterTests):
                 for p in await self.endpoint_context(db): stack.enter_context(p)
                 result = await api.roster(20, None, Response(), db)
                 self.assertEqual(result['events'][0]['details']['origin'], 'scheduled')
+
+    async def test_named_migration_and_retained_parent_reader(self):
+        import importlib.util, os, subprocess
+        from pathlib import Path
+        private = os.getenv('LEARNHOUSE_TEST_PRIVATE_SOURCE')
+        if not private or not (Path(private)/'parent/apps/api').is_dir():
+            self.skipTest('Provide the exact retained-parent source for the rollback reader proof')
+        await self.snapshot('6900000001')
+        async with self.engine.begin() as connection:
+            await connection.execute(text('DROP TABLE academicrosterrefresh'))
+            await connection.execute(text('ALTER TABLE academicclassevent DROP CONSTRAINT ck_academic_event_actor'))
+            await connection.execute(text('ALTER TABLE academicclassevent ALTER COLUMN actor_user_id SET NOT NULL'))
+            await connection.execute(text('DROP INDEX ix_academic_roster_refresh_history'))
+        spec = importlib.util.spec_from_file_location('named_refresh_migration', '/deployment/apply_roster_refresh_migration.py')
+        named = importlib.util.module_from_spec(spec); spec.loader.exec_module(named)
+        with patch.dict(os.environ, {'LEARNHOUSE_SQL_CONNECTION_STRING': 'postgresql://fixture@/fixture?host=/scratch&options=-csearch_path%3D'+self.schema}):
+            await asyncio.to_thread(named.main)
+        await self.due()
+        claim = await service.claim_one(self.sessions, 1)
+        await service.complete(self.sessions, 1, claim, self.rows('6900000001'), 'b'*64)
+        env = {**os.environ, 'PYTHONPATH': str(Path(private)/'parent/apps/api')}
+        result = await asyncio.to_thread(subprocess.run,
+            ['/app/api/.venv/bin/python', '-B', str(Path(__file__).with_name('roster_refresh_parent_reader.py')), self.schema],
+            cwd=str(Path(private)/'parent/apps/api'), env=env, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        print(result.stdout.strip())
 
     async def test_http_manager_controls_coalesce_and_deny_students(self):
         import httpx

@@ -149,7 +149,7 @@ async def initialise(sessions, org_id, now=None):
     async with sessions() as db, db.begin():
         rows = (await db.exec(select(AcademicClass).outerjoin(AcademicRosterRefresh,
             AcademicRosterRefresh.class_id == AcademicClass.id).where(AcademicClass.org_id == org_id,
-            AcademicClass.last_synced_at.is_not(None), AcademicRosterRefresh.class_id.is_(None)).limit(100))).all()
+            AcademicClass.last_synced_at.is_not(None), AcademicClass.last_source_hash.is_not(None), AcademicRosterRefresh.class_id.is_(None)).limit(100))).all()
         for cls in rows:
             due = max(cls.last_synced_at + INTERVAL, now + timedelta(seconds=1 + cls.id * 997 % int(INTERVAL.total_seconds())))
             await db.execute(insert(AcademicRosterRefresh).values(class_id=cls.id,
@@ -171,6 +171,7 @@ async def claim_one(sessions, org_id, now=None):
     async with sessions() as db, db.begin():
         state = (await db.exec(select(AcademicRosterRefresh).join(AcademicClass,
             AcademicClass.id == AcademicRosterRefresh.class_id).where(AcademicClass.org_id == org_id,
+            AcademicClass.last_synced_at.is_not(None), AcademicClass.last_source_hash.is_not(None),
             AcademicRosterRefresh.paused == False, AcademicRosterRefresh.next_check_at <= now,
             or_(AcademicRosterRefresh.lease_until.is_(None), AcademicRosterRefresh.lease_until <= now))
             .order_by(AcademicRosterRefresh.next_check_at, AcademicRosterRefresh.class_id)

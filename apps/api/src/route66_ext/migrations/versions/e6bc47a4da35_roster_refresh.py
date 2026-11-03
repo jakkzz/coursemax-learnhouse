@@ -23,6 +23,9 @@ def upgrade():
     if 'ck_academic_event_actor' not in checks:
         op.create_check_constraint('ck_academic_event_actor', 'academicclassevent', SCHEDULED_ACTOR_CHECK)
     AcademicRosterRefresh.__table__.create(connection, checkfirst=True)
+    if 'ix_academic_roster_refresh_history' not in {i['name'] for i in inspect(connection).get_indexes('academicclassevent')}:
+        op.create_index('ix_academic_roster_refresh_history', 'academicclassevent', ['class_id', 'id'],
+                        postgresql_where=text("kind = 'roster_refresh_finished'"))
 
 
 def downgrade():
@@ -32,5 +35,6 @@ def downgrade():
     if connection.execute(text('SELECT EXISTS (SELECT 1 FROM academicrosterrefresh)')).scalar():
         raise RuntimeError('Keep refresh state and approval evidence; schema downgrade requires an empty table')
     op.drop_table('academicrosterrefresh')
+    op.drop_index('ix_academic_roster_refresh_history', table_name='academicclassevent')
     op.drop_constraint('ck_academic_event_actor', 'academicclassevent', type_='check')
     op.alter_column('academicclassevent', 'actor_user_id', nullable=False)

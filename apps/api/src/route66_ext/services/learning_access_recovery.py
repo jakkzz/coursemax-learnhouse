@@ -8,6 +8,7 @@ from sqlmodel import select
 
 log = logging.getLogger(__name__)
 from src.route66_ext.db.academic_classes import AcademicClassEvent
+from src.route66_ext.services.academic_rosters import event as record_event
 from src.route66_ext.adapters import native_learning_access as native
 
 
@@ -38,9 +39,9 @@ async def release(db, actor_id, course_id, binding):
         elif member.get("action") == "removed": owned.discard(key)
     changes = await native.release_owned(db, binding, owned)
     for change in changes:
-        db.add(AcademicClassEvent(actor_user_id=actor_id, kind="learning_access_membership",
-            details={"course_id": course_id, "group_id": binding["group_id"], "membership": change,
-                     "authorization_event_id": binding["event_id"], "trigger": "access_recovery"}))
+        record_event(db, actor_id, "learning_access_membership",
+            {"course_id": course_id, "group_id": binding["group_id"], "membership": change,
+             "authorization_event_id": binding["event_id"], "trigger": "access_recovery"})
     await db.flush()
     return len(changes)
 
@@ -55,8 +56,8 @@ async def reconcile(db, actor_id, course_id):
                 return {"status": "not_configured", "removed_count": 0}
             counts = await access._sync(db, actor_id, course_id, binding["org_id"], binding)
             # Completion is evidence too, so the UI can clear a previous repair task.
-            db.add(AcademicClassEvent(actor_user_id=actor_id, kind="learning_access_ready",
-                details={"course_id": course_id, "authorization_event_id": binding["event_id"]}))
+            record_event(db, actor_id, "learning_access_ready",
+                {"course_id": course_id, "authorization_event_id": binding["event_id"]})
             await db.flush()
             return {"status": "ready", **counts}
     except Exception:
@@ -65,9 +66,9 @@ async def reconcile(db, actor_id, course_id):
         # evidence or an accepted roster. No new grants are made on this branch.
         async with db.begin_nested():
             removed = await release(db, actor_id, course_id, binding)
-            db.add(AcademicClassEvent(actor_user_id=actor_id, kind="learning_access_pending",
-                details={"course_id": course_id, "reason": "native_access_needs_repair",
-                         "removed_owned_count": removed,
-                         "authorization_event_id": binding["event_id"] if binding else None}))
+            record_event(db, actor_id, "learning_access_pending",
+                {"course_id": course_id, "reason": "native_access_needs_repair",
+                 "removed_owned_count": removed,
+                 "authorization_event_id": binding["event_id"] if binding else None})
             await db.flush()
         return {"status": "needs_repair", "removed_count": removed}

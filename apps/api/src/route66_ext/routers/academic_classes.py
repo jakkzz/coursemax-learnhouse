@@ -15,7 +15,7 @@ from src.route66_ext.adapters.db_users import User
 from src.route66_ext.db.school_identity import SchoolGoogleEvidence
 from src.route66_ext.db.provider_identity import ProviderIdentity
 from src.route66_ext.adapters.db_user_organizations import UserOrganization
-from src.route66_ext.services import academic_rosters as service
+from src.route66_ext.services import academic_rosters as service, roster_refresh as refresh
 
 router=APIRouter()
 class Body(BaseModel):
@@ -49,6 +49,7 @@ class Correction(ClassSetup):
 class Apply(Body):
     preview_id:str=Field(pattern=r'^[A-Za-z0-9_-]{32,64}$')
     confirm_changes:StrictBool
+    confirm_large_drop:StrictBool=False
 class ManualMember(Body):
     email:str=Field(min_length=3,max_length=320)
     reason:str=Field(min_length=5,max_length=500)
@@ -180,12 +181,11 @@ async def preview(class_id:int,request:Request,response:Response,db:AsyncSession
         except (ValueError,TimeoutError):raise HTTPException(503,'Registrar roster is unavailable or does not match this class. Retry from this class; no internal ID or URL is needed.') from None
         await db.refresh(cls);await service.can_manage(db,user,cls,config.org_id)
         if cls.version!=fetched_version:raise HTTPException(409,'Class changed while fetching its roster. Load a new preview.')
-        current=(await db.exec(select(AcademicRosterEntry,SchoolStudent).join(SchoolStudent,SchoolStudent.id==AcademicRosterEntry.student_id).where(AcademicRosterEntry.class_id==cls.id))).all()
-        incoming={r['student_number'] for r in rows};existing={p.student_number for e,p in current};missing=[(e,p) for e,p in current if e.source=='registry' and e.status=='active' and p.student_number not in incoming]
+        changes=await refresh.preview_changes(db,cls,rows)
         selected_source=service.source(cls)
-        token=secrets.token_urlsafe(32);payload={'user_id':user.id,'org_id':config.org_id,'class_id':cls.id,'version':cls.version,'source_hash':digest,'source_kind':selected_source['kind'],'source_url':selected_source['url'],'rows':rows}
+        token=secrets.token_urlsafe(32);payload={'user_id':user.id,'org_id':config.org_id,'class_id':cls.id,'version':cls.version,'source_hash':digest,'source_kind':selected_source['kind'],'source_url':selected_source['url'],'rows':rows,'requires_large_drop_review':changes['requires_large_drop_review']}
         await redis.set('lh:roster:'+config.deployment+':'+token,json.dumps(payload),ex=600)
-    return {'preview_id':token,'incoming_count':len(rows),'added_count':len(incoming-existing),'missing_count':len(missing),'withdraw_count':sum(e.missing_count>=1 for e,p in missing),'source_url':selected_source['url'],'source_kind':selected_source['kind'],'source_digest':digest,'expires_in':600,'version':cls.version}
+    return {'preview_id':token,**changes,'source_url':selected_source['url'],'source_kind':selected_source['kind'],'source_digest':digest,'expires_in':600,'version':cls.version}
 
 @router.post('/{class_id}/roster/apply')
 async def apply(class_id:int,body:Apply,request:Request,response:Response,db:AsyncSession=Depends(get_db_session)):
@@ -198,11 +198,15 @@ async def apply(class_id:int,body:Apply,request:Request,response:Response,db:Asy
         data=json.loads(raw)
         if (data['user_id'],data['org_id'],data['class_id'],data['version'])!=(user.id,config.org_id,cls.id,cls.version):raise HTTPException(409,'Class or permission changed. Load a new preview.')
         if cls.last_source_hash==data['source_hash'] and cls.last_synced_at and datetime.now(timezone.utc)-cls.last_synced_at<timedelta(minutes=30):raise HTTPException(409,'This roster was recently applied. Wait before checking another missing snapshot.')
+        if data.get('requires_large_drop_review') and not body.confirm_large_drop:
+            raise HTTPException(409,'Review and explicitly confirm this unusually large roster change')
         if await redis.eval("if redis.call('GET',KEYS[1]) == ARGV[1] then redis.call('DEL',KEYS[1]); return 1 end; return 0",1,key,raw)!=1:raise HTTPException(409,'Preview already used. Load a new preview.')
-        counts=await service.apply_roster(db,cls,data['rows'],data['source_hash'],user.id,
-            data.get('source_kind'),data.get('source_url'))
+        result=await refresh.accept(db,cls,data['rows'],data['source_hash'],user.id,
+            data.get('source_kind'),data.get('source_url'),confirm_large_drop=body.confirm_large_drop)
+        if result['outcome']!='applied':
+            raise HTTPException(409,'This snapshot needs a fresh review or was recently applied. Saved memberships are unchanged.')
         await commit(db)
-    return {'applied':True,'counts':counts,'version':cls.version}
+    return {'applied':True,'counts':result['counts'],'version':cls.version}
 
 @router.post('/{class_id}/roster/manual')
 async def manual(class_id:int,body:ManualMember,request:Request,response:Response,db:AsyncSession=Depends(get_db_session)):
@@ -261,6 +265,8 @@ from src.route66_ext.routers.learning_access import router as learning_access_ro
 router.include_router(learning_access_router)
 from src.route66_ext.routers.class_connections import router as class_connections_router
 router.include_router(class_connections_router)
+from src.route66_ext.routers.roster_refresh import router as roster_refresh_router
+router.include_router(roster_refresh_router)
 
 # Preserve private helper names through legacy compatibility imports.
 __all__ = [name for name in globals() if not name.startswith("__")]

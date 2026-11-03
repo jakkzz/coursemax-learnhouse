@@ -14,6 +14,15 @@ export type AcademicClassLink = {
   manageable: boolean; course_uuid: string; course_available: boolean
 }
 
+// Exact saved school class, independent of whether native content is matched.
+export function savedTeachingClass(context: RegistrarClassContext, classes: AcademicClassLink[]): AcademicClassLink | null {
+  const matches = classes.filter(c => c.registry_course_id === context.classRow.registry_course_id &&
+    c.academic_year === context.academic_year && c.semester === context.semester &&
+    c.section === context.classRow.section)
+  const match = matches.length === 1 ? matches[0] : null
+  return match && Number.isInteger(match.id) && match.id > 0 && match.manageable === true ? match : null
+}
+
 // Native course routes take the unprefixed UUID; getCourseMetadata adds course_.
 // Encode a single route segment, never infer native identity from a course name.
 export function nativeCoursePath(uuid: string): string {

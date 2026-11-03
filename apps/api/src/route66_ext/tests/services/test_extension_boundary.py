@@ -76,7 +76,7 @@ class DiscoveryTests(unittest.TestCase):
         modules = register_models()
         tables = set()
         # Modules added after extraction have no legacy native shim to preserve.
-        unshimmed = {'src.route66_ext.db.school_calendar'}
+        unshimmed = {'src.route66_ext.db.school_calendar', 'src.route66_ext.db.roster_refresh'}
         for owned in modules:
             legacy = None if owned.__name__ in unshimmed else importlib.import_module(owned.__name__.replace('src.route66_ext.', 'src.', 1))
             for name, value in vars(owned).items():
@@ -85,7 +85,7 @@ class DiscoveryTests(unittest.TestCase):
                         self.assertIs(getattr(legacy, name), value)
                     tables.add(value.__table__.name)
         self.assertEqual(tables, {
-            'academicclass', 'academicclassevent', 'academicrosterentry',
+            'academicclass', 'academicclassevent', 'academicrosterentry', 'academicrosterrefresh',
             'attendancechallenge', 'attendanceevent', 'attendancescan', 'attendancesession',
             'classschedule', 'courseregistrybinding', 'nrruteacheridentity',
             'provideridentity', 'provideridentityevent', 'providerprofileimport',
@@ -130,7 +130,8 @@ class DiscoveryTests(unittest.TestCase):
         from alembic.script import ScriptDirectory
         from src.route66_ext.migrations.config import migration_config
         script = ScriptDirectory.from_config(migration_config())
-        self.assertEqual(script.get_heads(), ["d5ab36f3c924"])
+        self.assertEqual(script.get_heads(), ["e6bc47a4da35"])
+        self.assertEqual(script.get_revision("e6bc47a4da35").down_revision, "d5ab36f3c924")
         self.assertEqual(script.get_revision("d5ab36f3c924").down_revision,
                          ("c4fa25e2b813", "e8f9a0b1c2d3"))
         self.assertEqual(script.get_revision("c4fa25e2b813").down_revision, "b3e9c4d1a702")

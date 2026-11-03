@@ -3,7 +3,7 @@
 One bounded advisory lock orders Google admission, roster imports and membership
 writes before user/identity locks. No native roles, account merges or grade writes.
 """
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone, timedelta
 from hashlib import sha256
 import re
@@ -28,9 +28,23 @@ LEGACY_MAX_BYTES=512*1024
 async def serialize(db):
     await db.execute(text('SELECT pg_advisory_xact_lock(664466, 1)'))
 
+@dataclass(frozen=True)
+class ScheduledActor:
+    run_id: str
+
+    def __post_init__(self):
+        if not re.fullmatch(r'[0-9a-f]{32}', self.run_id):
+            raise ValueError('Invalid scheduled run identifier')
+
+
 def event(db,actor,kind,details,cls=None,student=None):
-    db.add(AcademicClassEvent(actor_user_id=actor,kind=kind,details=details,
-        class_id=cls.id if cls else None,student_id=student.id if student else None))
+    if isinstance(actor, ScheduledActor):
+        details = {**details, 'origin': 'scheduled', 'refresh_run_id': actor.run_id}
+        actor = None
+    record = AcademicClassEvent(actor_user_id=actor,kind=kind,details=details,
+        class_id=cls.id if cls else None,student_id=student.id if student else None)
+    db.add(record)
+    return record
 
 async def active_claims(db):
     rows=(await db.exec(select(SchoolGoogleEvidence).join(ProviderIdentity,ProviderIdentity.id==SchoolGoogleEvidence.identity_id).where(

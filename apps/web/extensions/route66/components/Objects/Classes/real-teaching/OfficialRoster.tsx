@@ -9,7 +9,7 @@ import interior from '@/extensions/route66/components/interior/material.module.c
 
 type Student = { student_number: string; full_name_th: string; faculty: string; program: string; registry_status_code: string | null; display_position: number }
 type OfficialRosterData = { students: Student[]; fetched_at: string; source_url: string }
-export default function OfficialRoster({ context, th }: { context: RegistrarClassContext; th: boolean }) {
+export default function OfficialRoster({ context, th, onOpenSaved }: { context: RegistrarClassContext; th: boolean; onOpenSaved?: () => void }) {
   const [data, setData] = useState<OfficialRosterData | null>(null), [busy, setBusy] = useState(true), [error, setError] = useState(''), [attempt, setAttempt] = useState(0), [query, setQuery] = useState('')
   const searchId = useId()
   const { academic_year, semester, classRow: { registry_course_id, section } } = context
@@ -36,6 +36,7 @@ export default function OfficialRoster({ context, th }: { context: RegistrarClas
   const people = data?.students.filter(p => `${p.student_number} ${p.full_name_th} ${p.faculty ?? ''} ${p.program ?? ''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())) ?? []
   return <section className={styles.task} aria-labelledby="official-roster-title" aria-busy={busy}>
     <header className={styles.rosterHeading}><div><h2 id="official-roster-title">{t.title}</h2><p>{t.help}</p></div><Button size="icon" variant="outline" className="min-h-11 min-w-11" aria-label={t.refresh} title={t.refresh} disabled={busy} onClick={() => setAttempt(n => n + 1)}><RefreshCw size={18} aria-hidden="true" /></Button></header>
+    {onOpenSaved && <Button variant="outline" className="min-h-11" onClick={onOpenSaved}>{th ? 'เปิดรายชื่อที่บันทึกไว้' : 'Open saved roster'}</Button>}
     {busy && <p role="status">{t.loading}</p>}
     {error && <div role="alert" className={styles.rosterError}><p>{error === 'identity' ? t.identity : t.failed}</p>{error === 'identity' && <a href="/account/school-identity" className={styles.action}>{th ? 'ตรวจสอบข้อมูลสถานศึกษา' : 'Review school identity'}</a>}</div>}
     {data && <><div className={`${styles.rosterSearch} ${interior.well}`}><label htmlFor={searchId}>{t.search}</label><Input id={searchId} className="min-h-11" value={query} onChange={e => setQuery(e.target.value)} /><p role="status">{people.length} / {data.students.length} {t.count}</p></div>

@@ -235,7 +235,10 @@ async def setup_section(body: Setup, request: Request, response: Response,
         db.add(cls); await db.flush()
         roster.event(db, user.id, "class_created", {**facts, "course_id": body.course_id,
             "setup": "assigned_teacher"}, cls)
-        await roster.apply_roster(db, cls, rows, digest, user.id, selected["kind"], selected["url"])
+        from src.route66_ext.services.roster_refresh import accept
+        result = await accept(db, cls, rows, digest, user.id, selected["kind"], selected["url"])
+        if result['outcome'] not in ('applied', 'recently_applied'):
+            raise HTTPException(409, 'Open the saved roster to review this large change, then retry connecting')
         event = await own_section_request(db, user.id, config.org_id, body)
         if event and not await completed(db, event):
             roster.event(db, user.id, _CONNECTED, {"connection_request_id": event.id,
@@ -446,8 +449,11 @@ async def connect(connection_id: int, body: Connect, request: Request, response:
         reused_snapshot = bool(cls.last_synced_at and cls.last_source_hash == p["source_digest"]
             and datetime.now(timezone.utc) - cls.last_synced_at < timedelta(minutes=30))
         if not reused_snapshot:
-            await roster.apply_roster(db, cls, rows, p["source_digest"], user.id,
+            from src.route66_ext.services.roster_refresh import accept
+            result = await accept(db, cls, rows, p["source_digest"], user.id,
                 p["source_kind"], p["source_url"])
+            if result['outcome'] not in ('applied', 'recently_applied'):
+                raise HTTPException(409, 'Open the saved roster to review this large change, then retry connecting')
         roster.event(db, user.id, _CONNECTED, {"connection_request_id": event.id, "course_id": body.course_id,
             "teacher_id": event.actor_user_id, "official": d, "reviewed_fingerprint": body.expected_fingerprint,
             "source_kind": p["source_kind"], "source_url": p["source_url"],

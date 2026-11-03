@@ -15,8 +15,8 @@ import { SegmentedControl } from '@/extensions/route66/components/interior/Segme
 import palette from '../class-colors.module.css'
 
 type View = 'overview' | 'timetable' | 'roster'
-export default function RealTeachingWorkspace({ context, linked, linksKnown, th, onClose, onOpenRoster, onChanged, onOpenCalendars, calendarRefresh }: {
-  context: RegistrarClassContext; linked: AcademicClassLink | null; linksKnown: boolean; th: boolean
+export default function RealTeachingWorkspace({ context, linked, savedRoster, linksKnown, th, onClose, onOpenRoster, onChanged, onOpenCalendars, calendarRefresh }: {
+  context: RegistrarClassContext; linked: AcademicClassLink | null; savedRoster?: AcademicClassLink | null; linksKnown: boolean; th: boolean
   onClose: () => void; onOpenRoster: () => void; onChanged?: () => void; onOpenCalendars?: () => void; calendarRefresh?: number
 }) {
   const [view, setView] = useState<View>('overview'), [connecting, setConnecting] = useState(false), heading = useRef<HTMLHeadingElement>(null)
@@ -48,7 +48,7 @@ export default function RealTeachingWorkspace({ context, linked, linksKnown, th,
     {view === 'timetable' && <div className={styles.task} role="region" aria-label={t.timetable}><ClassSchedule context={context} th={th} onOpenCalendars={onOpenCalendars} refreshKey={calendarRefresh} onSaved={onChanged}/><h2 className="mt-8">{t.weekly}</h2><p>{t.scheduleHelp}</p>
       {c.meetings.length === 0 ? <p>{t.noMeetings}</p> : <ul className={styles.meetings}>{c.meetings.map((m, i) => <li key={i}><div className={styles.when}><span className={colors.day} data-weekday={weekdayKey(m.day)}><Clock3 size={14} aria-hidden="true" />{m.day}</span><strong>{m.start_time}–{m.end_time}</strong></div>{m.details && <p className={styles.details}><MapPin size={16} aria-hidden="true" /><span>{m.details}</span></p>}</li>)}</ul>}
     </div>}
-    {view === 'roster' && <OfficialRoster key={`${c.registry_course_id}/${context.academic_year}/${context.semester}/${c.section}`} context={context} th={th} />}
+    {view === 'roster' && <OfficialRoster key={`${c.registry_course_id}/${context.academic_year}/${context.semester}/${c.section}`} context={context} th={th} onOpenSaved={savedRoster ? onOpenRoster : undefined} />}
     {view !== 'roster' && <p className={styles.fetched}>{t.source} · {t.updated}: <time dateTime={context.fetched_at}>{new Date(context.fetched_at).toLocaleString(th ? 'th-TH' : 'en-GB')}</time></p>}
   </section>
 }

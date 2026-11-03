@@ -22,6 +22,7 @@ from src.db.users import User
 from src.route66_ext.db.provider_profile_import import ProviderProfileImport
 from src.route66_ext.db.school_identity import SchoolGoogleEvidence, NrruTeacherIdentity
 from src.route66_ext.db.academic_classes import ACADEMIC_TABLES
+from src.route66_ext.db.roster_refresh import AcademicRosterRefresh
 from src.route66_ext.db.class_attendance import ATTENDANCE_TABLES
 from src.db.courses.courses import Course
 from src.db.user_audit_events import UserAuditEvent
@@ -86,7 +87,7 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
     async def asyncSetUp(self):
         await super().asyncSetUp()
         async with self.engine.begin() as conn:
-            for table in (Organization.__table__, OrganizationConfig.__table__, Role.__table__, UserOrganization.__table__, ProviderProfileImport.__table__, SchoolGoogleEvidence.__table__, NrruTeacherIdentity.__table__, UserAuditEvent.__table__, Course.__table__, *ACADEMIC_TABLES, *ATTENDANCE_TABLES):
+            for table in (Organization.__table__, OrganizationConfig.__table__, Role.__table__, UserOrganization.__table__, ProviderProfileImport.__table__, SchoolGoogleEvidence.__table__, NrruTeacherIdentity.__table__, UserAuditEvent.__table__, Course.__table__, *ACADEMIC_TABLES, AcademicRosterRefresh.__table__, *ATTENDANCE_TABLES):
                 await conn.run_sync(table.create)
         async with self.sessions.begin() as db:
             db.add(Organization(id=1, name='Fixture', slug='default', email='fixture@example.com', org_uuid='org_fixture'))

@@ -70,11 +70,14 @@ class AcademicRosterEntry(SQLModel, table=True):
     missing_count: int = 0
     display_position: int
 
+SCHEDULED_ACTOR_CHECK = "actor_user_id IS NOT NULL OR COALESCE((details->>'origin' = 'scheduled' AND details->>'refresh_run_id' ~ '^[0-9a-f]{32}$'), false)"
+
 class AcademicClassEvent(SQLModel, table=True):
+    __table_args__ = (CheckConstraint(SCHEDULED_ACTOR_CHECK, name='ck_academic_event_actor').ddl_if(dialect='postgresql'),)
     id: int | None = Field(default=None, primary_key=True)
     class_id: int | None = Field(default=None, foreign_key='academicclass.id', index=True)
     student_id: int | None = Field(default=None, foreign_key='schoolstudent.id')
-    actor_user_id: int = Field(foreign_key='user.id')
+    actor_user_id: int | None = Field(default=None, foreign_key='user.id')
     kind: str = Field(max_length=80)
     details: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False))
     created_at: datetime = Field(default_factory=now, sa_column=Column(DateTime(timezone=True), nullable=False))
@@ -107,6 +110,9 @@ END; $$"""
 CLASS_ORG_TRIGGER = 'CREATE TRIGGER lh_academic_class_org BEFORE INSERT OR UPDATE ON academicclass FOR EACH ROW EXECUTE FUNCTION lh_academic_class_org()'
 for statement in (CLASS_ORG_FUNCTION, CLASS_ORG_TRIGGER):
     event.listen(AcademicClass.__table__, 'after_create', DDL(statement).execute_if(dialect='postgresql'))
+
+# Native model discovery reaches this owned module through the existing shim.
+from .roster_refresh import AcademicRosterRefresh
 
 # Preserve private helper names through legacy compatibility imports.
 __all__ = [name for name in globals() if not name.startswith("__")]

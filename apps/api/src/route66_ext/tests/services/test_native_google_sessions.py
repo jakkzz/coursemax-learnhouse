@@ -642,7 +642,7 @@ class NativeGoogleTests(fixture.ProviderIdentityPostgresTests):
         # Remove only empty FK-dependent disposable fixtures before testing
         # the historical provider migration; never drop production evidence.
         async with self.engine.begin() as conn:
-            for table in (*reversed(ATTENDANCE_TABLES), *reversed(ACADEMIC_TABLES), NrruTeacherIdentity.__table__, SchoolGoogleEvidence.__table__, ProviderProfileImport.__table__):
+            for table in (*reversed(ATTENDANCE_TABLES), AcademicRosterRefresh.__table__, *reversed(ACADEMIC_TABLES), NrruTeacherIdentity.__table__, SchoolGoogleEvidence.__table__, ProviderProfileImport.__table__):
                 await conn.run_sync(table.drop)
         await super().test_create_all_first_bootstrap_and_empty_downgrade()
 

@@ -224,6 +224,9 @@ async def delete_chapter(
         )
     await check_resource_access(request, db_session, current_user, course.course_uuid, AccessAction.DELETE)
 
+    from src.route66_ext.security.syllabus_retention import protect_deletion
+    await protect_deletion(request, db_session, 'chapters', chapter_id, current_user)
+
     # Remove all linked chapter activities
     statement = select(ChapterActivity).where(ChapterActivity.chapter_id == chapter.id)
     chapter_activities = (await db_session.execute(statement)).scalars().all()
@@ -604,6 +607,9 @@ async def reorder_chapters_and_activities(
     # RBAC check
     await check_resource_access(request, db_session, current_user, course.course_uuid, AccessAction.UPDATE)
 
+    from src.route66_ext.services.academic_rosters import serialize
+    await serialize(db_session)
+
     ###########
     # Chapters
     ###########
@@ -660,7 +666,8 @@ async def reorder_chapters_and_activities(
     for cc in existing_course_chapters:
         if cc.chapter_id not in chapter_ids_to_keep:
             await db_session.delete(cc)
-    await db_session.commit()
+    # Activity validation below must not leave a partially committed course tree.
+    await db_session.flush()
 
     ###########
     # Activities

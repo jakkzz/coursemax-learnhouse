@@ -175,9 +175,11 @@ async def preview(class_id:int,request:Request,response:Response,db:AsyncSession
     async with resources(config) as (redis,_):
         await throttle(redis,request,config,'roster-source-'+str(user.id))
         import asyncio
+        fetched_version=cls.version
         try:rows,digest=await asyncio.wait_for(service.fetch_roster(cls),timeout=10)
         except (ValueError,TimeoutError):raise HTTPException(503,'Registrar roster is unavailable or does not match this class. Retry from this class; no internal ID or URL is needed.') from None
         await db.refresh(cls);await service.can_manage(db,user,cls,config.org_id)
+        if cls.version!=fetched_version:raise HTTPException(409,'Class changed while fetching its roster. Load a new preview.')
         current=(await db.exec(select(AcademicRosterEntry,SchoolStudent).join(SchoolStudent,SchoolStudent.id==AcademicRosterEntry.student_id).where(AcademicRosterEntry.class_id==cls.id))).all()
         incoming={r['student_number'] for r in rows};existing={p.student_number for e,p in current};missing=[(e,p) for e,p in current if e.source=='registry' and e.status=='active' and p.student_number not in incoming]
         selected_source=service.source(cls)

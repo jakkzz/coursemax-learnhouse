@@ -1,17 +1,10 @@
 """Read native deletion targets and permissions; never replace native deletion writers."""
-from contextlib import asynccontextmanager
-
 from sqlmodel import select
-from src.core.events.database import get_db_session
 from src.db.courses.activities import Activity
 from src.db.courses.chapters import Chapter
 from src.db.courses.chapter_activities import ChapterActivity
 from src.db.courses.courses import Course
-from src.security.auth import get_current_user as authenticate
 from src.security.rbac import AccessAction, check_resource_access
-
-session = asynccontextmanager(get_db_session)
-
 
 async def deletion_targets(request, db, kind: str, identifier: int | str, user) -> list[str]:
     """Match native chapter/activity deletion, including shared-activity retention."""

@@ -6,6 +6,7 @@ import httpx
 from fastapi import FastAPI
 from sqlalchemy import text
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 from src.core.events.database import get_db_session
 from src.db.courses.activities import Activity
 from src.db.courses.activity_versions import ActivityVersion
@@ -31,7 +32,7 @@ async def check_native_deletion(case):
             yield db
 
     app.dependency_overrides[get_db_session] = database
-    install_retention(app, sessions=case.sessions)
+    install_retention(app)
     async with case.engine.begin() as conn:
         await conn.run_sync(CustomDomain.__table__.create)
     async with case.sessions.begin() as db:
@@ -67,7 +68,7 @@ async def check_native_deletion(case):
                                    org_id=1, order=1, creation_date='fixture', update_date='fixture'))
     origin = 'https://learn.example.com'
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=origin,
-                                 cookies={'LH_access': token}, headers={'Origin': origin}) as client:
+                                 cookies={'LH_access': token}, headers={'Origin': origin}, follow_redirects=True) as client:
         with patch('src.services.courses.transfer.storage_utils.delete_storage_directory') as files, \
              patch('src.core.events.database._async_session_factory', case.sessions), \
              patch('src.services.courses.chapters.enqueue_course', new=AsyncMock()):
@@ -89,12 +90,16 @@ async def check_native_deletion(case):
             case.assertEqual((await client.delete('/api/v1/chapters/999999')).status_code, 404)
             result = await client.delete('/api/v1/activities/activity_ordinary_direct')
             case.assertEqual(result.status_code, 200, result.text)
-            # Pause after native commit to prove serialization spans the ENTIRE native call.
-            committed, release, attempted = asyncio.Event(), asyncio.Event(), asyncio.Event()
+            # Hold the actual writer before commit: preparation and reordering
+            # must wait, but post-commit indexing/response need not hold the lock.
+            committing, release, attempted = asyncio.Event(), asyncio.Event(), asyncio.Event()
+            native_commit = AsyncSession.commit
 
-            async def pause_after_commit(*args):
-                committed.set()
-                await release.wait()
+            async def pause_before_commit(db):
+                if not committing.is_set():
+                    committing.set()
+                    await release.wait()
+                return await native_commit(db)
 
             async def competing_preparation():
                 async with case.sessions() as db:
@@ -105,16 +110,17 @@ async def check_native_deletion(case):
             ordering_attempted = asyncio.Event()
 
             async def guard_lock(db):
-                if committed.is_set():
+                if committing.is_set():
                     ordering_attempted.set()
                 await serialize(db)
 
             competing = reordering = None
-            with patch('src.services.courses.chapters.enqueue_course', new=pause_after_commit), \
-                 patch('src.route66_ext.security.syllabus_retention.serialize', new=guard_lock):
+            with patch.object(AsyncSession, 'commit', new=pause_before_commit), \
+                 patch('src.route66_ext.security.syllabus_retention.serialize', new=guard_lock), \
+                 patch('src.route66_ext.services.academic_rosters.serialize', new=guard_lock):
                 deleting = asyncio.create_task(client.delete(f'/api/v1/chapters/{ordinary.id}'))
                 try:
-                    await asyncio.wait_for(committed.wait(), 5)
+                    await asyncio.wait_for(committing.wait(), 5)
                     competing = asyncio.create_task(competing_preparation())
                     await attempted.wait()
                     with case.assertRaises(TimeoutError):

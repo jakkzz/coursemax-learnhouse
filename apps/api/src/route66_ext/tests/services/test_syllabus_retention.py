@@ -1,67 +1,32 @@
-"""Extension composition contracts; no native source edits or route replacement."""
-from contextlib import asynccontextmanager
+"""Owned transaction-hook and launcher contracts; no route replacement."""
 from pathlib import Path
 import subprocess
 import unittest
 from unittest.mock import AsyncMock, patch
 
 import httpx
-from src.route66_ext.security.syllabus_retention import deletion_target, reorders_activities
-
-
-class TargetTests(unittest.TestCase):
-    def test_exact_native_routes_and_integer_spellings(self):
-        for path, expected in [('/api/v1/chapters/1', ('chapters', 1)),
-                               ('/api/v1/chapters/+001/', ('chapters', 1)),
-                               ('/api/v1/chapters/1.0', ('chapters', 1)),
-                               ('/api/v1/activities/activity_a/', ('activities', 'activity_a'))]:
-            self.assertEqual(deletion_target({'type': 'http', 'method': 'DELETE', 'path': path}), expected)
-        for path in ('/api/v1/chapters/no', '/api/v1/chapters/', '/api/v1/activities/activity_a/versions/1',
-                     '/api/v1/courses/course_a', '/api/v1/activities/activity_a/bookmark'):
-            self.assertIsNone(deletion_target({'type': 'http', 'method': 'DELETE', 'path': path}))
-        self.assertIsNone(deletion_target({'type': 'lifespan'}))
-        self.assertIsNone(deletion_target({'type': 'http', 'method': 'GET', 'path': '/api/v1/chapters/1'}))
-
-    def test_only_reordering_needs_the_additional_shared_link_lock(self):
-        path = '/api/v1/chapters/course/course_a/order'
-        self.assertTrue(reorders_activities({'type': 'http', 'method': 'PUT', 'path': path}))
-        self.assertTrue(reorders_activities({'type': 'http', 'method': 'PUT', 'path': path + '/'}))
-        self.assertFalse(reorders_activities({'type': 'http', 'method': 'GET', 'path': path}))
-        self.assertFalse(reorders_activities({'type': 'http', 'method': 'PUT', 'path': '/api/v1/chapters/1'}))
-        self.assertFalse(reorders_activities({'type': 'websocket'}))
+from src.route66_ext.security import syllabus_retention as guard
 
 
 class RuntimeTests(unittest.IsolatedAsyncioTestCase):
-    async def test_native_auth_commits_cannot_release_the_guard_lock(self):
-        from starlette.responses import Response
-        from src.route66_ext.security.syllabus_retention import SyllabusRetentionMiddleware
+    async def test_guard_uses_the_writer_session_without_committing(self):
+        db = AsyncMock()
         order = []
 
-        @asynccontextmanager
-        async def session():
-            try:
-                yield object()
-            finally:
-                order.append('release')
-
-        async def authenticate(*args):
-            order.append('auth commit')
-            return object()
-
-        async def lock(*args):
+        async def lock(session):
+            self.assertIs(session, db)
             order.append('lock')
 
-        async def native(scope, receive, send):
-            order.append('native')
-            await Response(status_code=204)(scope, receive, send)
+        async def targets(request, session, kind, identifier, user):
+            self.assertIs(session, db)
+            order.append('targets')
+            return []
 
-        app = SyllabusRetentionMiddleware(native, sessions=session)
-        with patch('src.route66_ext.security.syllabus_retention.authenticate', new=authenticate), \
-             patch('src.route66_ext.security.syllabus_retention.serialize', new=lock), \
-             patch('src.route66_ext.security.syllabus_retention.deletion_targets', new=AsyncMock(return_value=[])):
-            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='https://learn.example.com') as client:
-                self.assertEqual((await client.delete('/api/v1/chapters/1')).status_code, 204)
-        self.assertEqual(order, ['auth commit', 'lock', 'native', 'release'])
+        with patch.object(guard, 'serialize', lock), patch.object(guard, 'deletion_targets', targets):
+            await guard.protect_deletion(None, db, 'chapters', 1, None)
+        self.assertEqual(order, ['lock', 'targets'])
+        db.commit.assert_not_awaited()
+        db.close.assert_not_awaited()
 
     async def test_factory_retains_native_routes_lifespan_and_http_behavior(self):
         from app import app as native
@@ -73,8 +38,9 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
             self.assertIs(app, native)
             self.assertEqual(app.routes, routes)
             self.assertIs(app.router.lifespan_context, lifespan)
-            self.assertEqual([m.cls.__name__ for m in app.user_middleware[:3]],
-                             ['CORSMiddleware', 'CSRFProtectionMiddleware', 'SyllabusRetentionMiddleware'])
+            self.assertEqual([m.cls.__name__ for m in app.user_middleware[:2]],
+                             ['CORSMiddleware', 'CSRFProtectionMiddleware'])
+            self.assertNotIn('SyllabusRetentionMiddleware', [m.cls.__name__ for m in app.user_middleware])
             async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='https://learn.example.com') as client:
                 response = await client.get('/')
                 self.assertEqual(response.status_code, 200)

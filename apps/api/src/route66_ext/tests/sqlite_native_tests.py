@@ -3,9 +3,26 @@
 Run pytest -p src.route66_ext.tests.sqlite_native_tests. PostgreSQL regex CHECKs
 cannot compile on SQLite when the extension router registers its models. Omit
 only those CHECKs in this test process; actual extension invariants are tested
-separately on PostgreSQL. Never import this plugin in the application.
+separately on PostgreSQL. Emulate only the advisory-lock SQL function for these
+single-connection SQLite tests; actual lock lifetime/concurrency is tested on
+PostgreSQL. Never import this plugin in the application.
 """
-from sqlalchemy import CheckConstraint
+from sqlalchemy import CheckConstraint, event
+from sqlalchemy.engine import Engine
+from sqlalchemy.dialects.sqlite.aiosqlite import AsyncAdapt_aiosqlite_connection
+
+
+def _sqlite_lock_function(connection, record):
+    if isinstance(connection, AsyncAdapt_aiosqlite_connection):
+        connection.create_function('pg_advisory_xact_lock', 2, lambda *args: None)
+
+
+def pytest_configure():
+    event.listen(Engine, 'connect', _sqlite_lock_function)
+
+
+def pytest_unconfigure():
+    event.remove(Engine, 'connect', _sqlite_lock_function)
 
 
 def pytest_collection_modifyitems():

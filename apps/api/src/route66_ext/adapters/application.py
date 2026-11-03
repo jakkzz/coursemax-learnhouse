@@ -1,12 +1,10 @@
-"""Supported FastAPI/Uvicorn composition; no native handlers or routes are patched."""
+"""Supported FastAPI/Uvicorn composition; native writers call owned retention hooks."""
 
-def install_retention(app, **middleware_options):
+def install_retention(app):
     from src.core.middleware.cors import configure_cors
     from src.security.csrf import CSRFProtectionMiddleware
-    from src.route66_ext.security.syllabus_retention import SyllabusRetentionMiddleware
-
-    app.add_middleware(SyllabusRetentionMiddleware, **middleware_options)
-    # Keep native origin policy outside our short-circuit responses as well.
+    # Retention uses the native request transaction, never a second middleware
+    # session. Keep the existing origin policy and launcher composition unchanged.
     app.add_middleware(CSRFProtectionMiddleware)
     configure_cors(app)
     return app

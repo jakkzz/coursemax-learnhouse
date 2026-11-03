@@ -392,6 +392,9 @@ async def delete_activity(
 
     await check_resource_access(request, db_session, current_user, course.course_uuid, AccessAction.DELETE)
 
+    from src.route66_ext.security.syllabus_retention import protect_deletion
+    await protect_deletion(request, db_session, 'activities', activity_uuid, current_user)
+
     # Clean up content files from storage
     from src.db.organizations import Organization
     org_statement = select(Organization).where(Organization.id == course.org_id)

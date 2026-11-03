@@ -21,6 +21,20 @@
     ".impeccable/"
   ],
   "exceptions": {
+    "apps/api/src/services/courses/chapters.py": {
+      "reason": "Exact owned pre-deletion retention delegate and reorder serialization in the native request transaction; replace the intermediate commit with flush so invalid activity input rolls back the entire course tree. Removes the extra middleware connection without weakening retention or permissions.",
+      "approval_reference": "Owner requested fixing all three reported review defects, rehearsal, implementation and deployment on 2026-11-03; exact seams and rejected alternatives recorded in docs/extensions/review-fixes-2026-11-03.md.",
+      "tests": ["isolated PostgreSQL failed-reorder rollback and six concurrent HTTP reorders with pool_size=1", "native permission/CSRF, protected syllabus/files/versions, ordinary/shared-activity deletion and concurrent preparation"],
+      "replacement_plan": "Retain these exact transaction-local delegates until upstream provides a pre-delete hook and atomic reordering; never restore the two-session middleware or partial commit.",
+      "sha256": "ec85e779caa00439d5792a559eda8c1009b744dfb8dafb872432b3aa2c4b8932"
+    },
+    "apps/api/src/services/courses/activities/activities.py": {
+      "reason": "Exact owned pre-deletion retention delegate using the already-authorized native writer session before storage deletion; no additional connection, duplicate route or replacement writer.",
+      "approval_reference": "Owner requested fixing all three reported review defects, rehearsal, implementation and deployment on 2026-11-03; reviewed transaction-local alternative in docs/extensions/review-fixes-2026-11-03.md.",
+      "tests": ["isolated PostgreSQL native HTTP syllabus deletion denials before files/versions change", "ordinary deletion, learner/anonymous/CSRF denial and shared-activity preservation"],
+      "replacement_plan": "Keep this exact pre-side-effect delegate until upstream has an equivalent supported native hook; preserve one request transaction and current authorization.",
+      "sha256": "acc09ecb0e909f180912a988b33c5f7568cf6fd4cca35e6ef359d853f986cbcf"
+    },
     "apps/api/src/routers/auth.py": {
       "reason": "Reviewed upstream 1.4.3 integration retains retired email-only Google, provider refresh/logout ownership and native custom-domain/link fixes.",
       "approval_reference": "Owner request to update upstream while keeping customization; docs/extensions/upstream-1.4.3.md.",

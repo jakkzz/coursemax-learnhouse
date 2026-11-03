@@ -1,7 +1,7 @@
 # Review fixes — 2026-11-03
 
 Owner requested: plan all three fixes, rehearse, revise the plan, implement,
-commit/push and deploy. Starting source `5975d917`; live image `4cbc54da`.
+commit/push and deploy. Starting source `5975d917`; parent image `4cbc54da`.
 This is a backend-only repair: no schema, frontend, account, roster import,
 provider configuration or shared-infrastructure changes.
 
@@ -85,11 +85,37 @@ checks pass; exact exceptions cover only the two reviewed native service files.
 
 The final source rerun passes 10 focused PostgreSQL/HTTP/launcher checks, including
 explicit denial before lock acquisition. Private evidence:
-`~/.local/state/learnhouse-review-20261103/`. No live changes yet.
+`~/.local/state/learnhouse-review-20261103/`. No live changes at this checkpoint.
 
 A packaging preflight refused 2.90 GiB available RAM; work waited until recovery.
 With 3.49 GiB available, the current image was archived and all 60 OCI blobs verified
 against its exact configuration `4cbc54da`. `Dockerfile.review-fixes` uses that local
 verified OCI context through the shared limited builder: no registry pull, dependency
 installation or frontend rebuild. Preserve this parent archive for code-only recovery.
-Baked acceptance and activation are pending.
+## Completed release
+
+Source `85a18e871470da61cb445df4a5a25d115236f457` is committed/pushed to the owner
+fork. Image `3f19ea47d26f9719a451220278bc695369fcfee66acd1a9f8c2232dc1a40d138`
+is deployed and healthy at `https://learn.route66.click`. All 93 baked isolated
+PostgreSQL/HTTP/auth/launcher checks pass without source mounts. All 136 packaged
+API files match source. Parent layers/runtime settings match; the overlay copies
+only owned API code/tests and the two reviewed native files. Frontend/dependencies
+are inherited unchanged. The limited build's minimum available RAM was 3.425 GiB;
+the shared builder was stopped under its lock after use.
+
+After waiting for the project memory floor, activation passed at 3.56 GiB available
+RAM / 40.78 GiB disk. Fresh quiesced database/content backups are checksummed and
+archive-readable; no new full restore rehearsal was needed for this code-only fix.
+Only the app was replaced and the existing gateway reloaded. DB/Redis/gateway IDs,
+mounts, runtime environment, networks and resource settings are preserved. Normalized
+before/after schema dumps match exactly. No migration, import, grant, backfill,
+provider change, messaging, cleanup or data restoration was performed.
+
+Live verification: 136 API hashes match, app healthy, health/login return 200, four
+private school/classes/attendance/calendar endpoints return 401, and existing
+Google public-registration / LINE-link / LIFF capability responses remain enabled.
+Current pointer: `~/.local/state/learnhouse-launch/releases/review-85a18e87-20261103`.
+The protected release includes `rollback.compose.json` for exact compatible parent
+`4cbc54da`; keep its image and verified complete archive. Roll back **code only**,
+never older academic data. No rollback was needed. Real institutional/provider/device
+acceptance and unrelated feature parity were not repeated or claimed.

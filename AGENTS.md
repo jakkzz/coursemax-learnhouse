@@ -97,15 +97,23 @@ and shared services intact; real historical migration and cutover remain separat
 work. Prefer owned adapters/routes over native-core changes. Newest ../STATUS.md and
 current release pointer are authoritative over historical deployment headings.
 
-## Current upstream source — 2026-10-29
+## Current runtime — 2026-11-03
 
-Upstream 1.4.3 (`2d753372`) is integrated with our customizations; this is not a
-live upgrade. See `docs/extensions/upstream-1.4.3.md` for conflict resolutions,
-updated dependency tests and remaining deployment work. Live remains `88fea34b`.
+Upstream 1.4.3 is deployed with backend repair source `85a18e87`, image `3f19ea47`.
+See `docs/extensions/review-fixes-2026-11-03.md` for the rehearsed/revised plan,
+93 baked checks, native unit regressions and verified app-only release. Stale roster
+previews now conflict; reorder is atomic; deletion retention runs in the native
+writer's transaction, not an HTTP middleware's second session. Preserve the exact
+reviewed hooks in both native course-service files and the owned launcher/CORS/CSRF.
+
 The historical boundary snapshot stays pinned; exact upstream-byte acceptance
 cannot overwrite retained custom hooks. Use the composed migration entrypoint,
-not an assumed native-only `upgrade head`. Recorded private runtime/release files
-are missing: recover them before any recreation; do not generate new secrets.
+not an assumed native-only `upgrade head`. Private release configuration is recovered;
+use the current release pointer, never guess configuration or generate new secrets.
+The parent `4cbc54da` and verified archive are retained for code-only rollback;
+never restore older academic data. Schema/frontend/dependencies/auth settings are
+unchanged by this repair. See `docs/extensions/upstream-1.4.3-deployment.md` for the
+preceding upgrade and its separate migration/older rollback constraints.
 
 ## Historical extraction baseline
 

@@ -21,6 +21,13 @@
     ".impeccable/"
   ],
   "exceptions": {
+    ".github/workflows/route66-web-artifact.yaml": {
+      "reason": "Minimal GitHub discovery file for the owner-approved off-host frontend build. Reuses the owned Dockerfile and its full bundle/type checks; exports a revision-bound archive only, without deployment, registry publication or live credentials.",
+      "approval_reference": "Owner approved trying a GitHub Actions frontend build after the shared-host RAM safety stop, 2026-11-03. Exact scope and alternatives are recorded in docs/extensions/unattended-roster-refresh.md.",
+      "tests": ["scripts/extensions/test_web_artifact.py", "YAML structure and embedded Bash syntax checks", "GitHub build result and downloaded revision/checksum verification before packaging"],
+      "replacement_plan": "Keep this exact discovery file delegating to the owned build recipe. No broad workflow allowlist or upstream workflow edit; update the reviewed content hash if this integration changes.",
+      "sha256": "55ec6d2bb1fcbc57312a2db66ea5ef9dcdd0a683f01093d159cbc09e20599198"
+    },
     "apps/api/src/services/courses/chapters.py": {
       "reason": "Exact owned pre-deletion retention delegate and reorder serialization in the native request transaction; replace the intermediate commit with flush so invalid activity input rolls back the entire course tree. Removes the extra middleware connection without weakening retention or permissions.",
       "approval_reference": "Owner requested fixing all three reported review defects, rehearsal, implementation and deployment on 2026-11-03; exact seams and rejected alternatives recorded in docs/extensions/review-fixes-2026-11-03.md.",

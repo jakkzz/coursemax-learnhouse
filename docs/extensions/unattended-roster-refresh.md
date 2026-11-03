@@ -61,6 +61,24 @@ bundle/types and compiled persisted workflows, then verified packaging, fresh
 protected recovery checks, named migration, bounded app-only deployment and live
 verification. Do not deploy the failed artifacts or restore older academic data.
 
+### Approved off-host build continuation
+
+After a fresh `42838c21` local retry also stopped at 1.46 GiB available RAM, the
+owner approved trying GitHub Actions. `.github/workflows/route66-web-artifact.yaml`
+is the one exact reviewed discovery exception; snapshot/prefix policy is unchanged.
+The existing upstream community workflow was not reused because it also builds
+other services/architectures and publishes to the upstream registry namespace.
+
+The new fork-only workflow runs on the standard hosted Ubuntu runner, keeps the
+4 GiB/no-added-swap/2-CPU/single-step builder limits, and calls the existing owned
+`Dockerfile.upstream-143` web-artifact target. Full bundling and non-waived types must
+both succeed. It uploads a tar archive preserving links/modes, its SHA256 and source
+revision. Only read access to public source is requested; no production credentials,
+server access, registry publication or automatic deployment. Existing unrelated
+workflows are unchanged. Verify the successful run/head SHA, downloaded checksum
+and embedded BUILD_ID before local packaging. Off-host success is not deployment
+or database acceptance; normal candidate/recovery/live checks still follow.
+
 Private evidence: `~/.local/state/learnhouse-roster-refresh-20261103/`, especially
 `backend-final.log`, `rollback-reader.log`, `ui-3.log`, `ui-results.json`,
 `web-build.log`, `web-min-memory` and `types-{1,2,3,4}.log`.

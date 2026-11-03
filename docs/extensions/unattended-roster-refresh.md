@@ -1,16 +1,18 @@
 # Unattended roster refresh — implementation and evidence
 
-## Current candidate — off-host build passed; deployment capacity pending
+## Current release — deployed 2026-11-03 19:42 UTC
 
-Candidate source `d58e4899b45ce999caef5e2bed4d55ad9492f0e8`, image
-`003d5dd9c95817da36b0cf696df70d3e738829c6f3d23d7762f1d7556e725a5a`.
+Live source `d58e4899b45ce999caef5e2bed4d55ad9492f0e8`, image
+`d85f488bdd6ac9123c3ab239fedba8c905c413d726775d9f96b367280485e91e`, healthy at
+`https://learn.route66.click`; current release `roster-d58e4899-20261103`.
 Approved GitHub Actions run **41685386822** built and typechecked `fa815717`.
 Successful run/head, downloaded SHA256 and embedded BUILD_ID were verified.
 The candidate's only later code change fixes empty disposable FK teardown in a
 provider migration test; its frontend Git tree is identical
 (`5407a7686fd35d849fca35b588e9fc8f92a2cda5`). No frontend check was waived.
 
-- **147 baked** PostgreSQL/parser/HTTP/auth/lifecycle/regression checks pass.
+- **147 baked** PostgreSQL/parser/HTTP/auth/lifecycle/regression checks pass for
+  the unchanged runtime payload; see the image recovery note below.
 - **Eight packaged native-auth/DB browser workflows** pass: teacher/student × EN/TH
   × 1440/390, actual Redis-led worker against a synthetic internal HTTPS registrar,
   saved background changes, retained focus/drafts, explicit manual acceptance,
@@ -29,20 +31,38 @@ provider migration test; its frontend Git tree is identical
   denial pass; academic/identity fingerprints are unchanged. The fixture waits for
   API health as well as the web entry before browser checks.
 
-**Deployment remains pending**, not merely the build: app-restart admission repeatedly
-refused available RAM below 3 GiB. The candidate and recovered app-only configuration
-are prepared, but no live migration, service replacement, gateway reload or worker
-activation occurred. Live remains healthy `85a18e87` / `3f19ea47`. Do not rebuild or
-request routine permission; resume the guarded activation once capacity permits,
-take quiesced recovery snapshots, apply the named migration, replace only the app
-and verify live. Never restore older academic data.
+**Deployed after the owner's “deploy it anyway” instruction.** This permitted a
+one-time restart-gate exception, not weaker build/runtime limits. Actual admission
+was RAM3.00GiB/disk39.82GiB; minimum observed RAM2.90GiB. Global policy is unchanged.
+
+The previously verified `003d5dd9` image and builder state were no longer in the local
+Docker store. After unchanged build gates passed, the same retained artifacts were
+repackaged without compiling Next again. Image `d85f488b` reverified every API/web
+file/link/mode, old static asset and parent configuration/layer prefix, and was saved/
+checksummed. The 147 baked/eight persisted workflow results above precede this
+identical-payload repackage; they were not rerun as a new complete matrix.
+
+Fresh quiesced DB/schema/content snapshots are protected. The named live migration
+preserved every existing row in 82 tables, including 48 academic events, with no
+stamp. Only app replaced/gateway reloaded; environment, limits, mounts and DB/Redis/
+gateway identities remain unchanged. Live verifies 1,262 API hashes, frontend BUILD_ID,
+schema/index/immutable guard and Redis worker leadership. Four live EN/TH 1440/390
+entry checks pass: Google/LINE/password controls, private-route denial, no page errors
+or horizontal overflow. No real account session was copied or teacher impersonated.
+
+One eligible roster was registered, unpaused, due 2026-11-03 19:58 UTC (04 Nov 02:58
+Bangkok); the actual registrar result was still pending at initial verification.
+Keep the compatible `3f19ea47` parent/archive and current data for code-only rollback.
+Never downgrade or restore older academic data.
 
 Private evidence/helpers: `~/.local/state/learnhouse-roster-gha-20261103/`, especially
 `candidate-verification.json`, `baked.log`, `browser-results.json`,
 `restore-rehearsal.log`, `parent-image-browser.json`, `persisted-*-parent.json`
-and `activate.sh`. The prepared `roster-d58e4899-20261103` directory is not the
-current release pointer. Synthetic checks do not establish real provider/device,
-institutional migration or broad CourseMax parity acceptance.
+and `activation-result.json`, `live-entry-results.json`, `candidate.image.tar.sha256`.
+The active release holds `live-verification.json`, `migration.log`, protected backup
+checksums and the one-time owner override record. Synthetic/live-entry checks do not
+establish real provider/device, institutional migration or broad CourseMax parity
+acceptance.
 
 ## Historical planning and source checkpoints
 

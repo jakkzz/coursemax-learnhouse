@@ -79,8 +79,9 @@ IDs or all-group imports. Owned migration discovery composes native wrappers wit
 new owned versions; unversioned bootstrap deployment uses the checked named runner,
 never ad-hoc DDL or an inferred native-version stamp. See
 `docs/extensions/nrru-automatic-acquisition.md` and newest deployment record.
-Unattended refresh and dated-calendar semantics remain unfinished; weekly timetable
-facts alone do not create dated sessions. Historical migration stays last.
+Unattended refresh is deployed as recorded below. Wider calendar parity remains
+separate; weekly timetable facts alone do not create dated sessions. Historical
+migration stays last.
 
 ## End-to-end delivery (owner instruction, 2026-10-15)
 
@@ -97,22 +98,26 @@ and shared services intact; real historical migration and cutover remain separat
 work. Prefer owned adapters/routes over native-core changes. Newest ../STATUS.md and
 current release pointer are authoritative over historical deployment headings.
 
-## Current candidate — unattended refresh, deployment pending
+## Current runtime — unattended roster refresh, 2026-11-03
 
-Approved GitHub Actions run `41685386822` built/typechecked frontend `fa815717`.
-Candidate source `d58e4899` / image `003d5dd9` has the identical frontend Git tree,
-147 baked checks, eight native-auth/DB EN/TH workflows and verified packaging.
-Full isolated restore/idempotent migration/native bootstrap preserves every row in
-82 existing tables. Actual retained `3f19ea47` image auth/history reads pass with
-unchanged academic/identity state. See `docs/extensions/unattended-roster-refresh.md`
-and newest root STATUS for private evidence and guarded activation helpers.
+Live source `d58e4899`, image `d85f488b`, healthy; release `roster-d58e4899-20261103`.
+Six-hour worker and EN/TH saved-roster controls are active. GitHub run `41685386822`
+built/typechecked frontend `fa815717`, identical to this source's frontend tree.
+The original verified image disappeared locally; identical payload was repackaged
+under unchanged build gates and verified again, then saved/checksummed. Its existing
+147 baked/eight persisted native-auth checks remain scoped evidence; four live entry
+checks, API hashes, BUILD_ID, schema and worker leadership verify after deployment.
 
-**Not deployed:** restart admission remains below the 3 GiB available-RAM floor.
-Migration `e6bc47a4da35` is not applied live; live remains the repair below. No rebuild,
-new permission or activation flag is needed. Preserve initial review, native access
-repair, append-only history and code-only rollback; never restore older data.
+Named migration `e6bc47a4da35` preserved all rows in 82 existing tables/48 events,
+without stamping. Only app replaced/gateway reloaded; runtime settings and peer IDs
+preserved. Full isolated restore and actual retained `3f19ea47` auth/history reads
+pass. Keep protected snapshots and code-only rollback; never restore older data.
+Owner allowed a one-time restart-gate exception (admission3.00GiB, minimum2.90GiB);
+global resource defaults are unchanged. See `docs/extensions/unattended-roster-refresh.md`
+and newest root STATUS. Initial review, manual membership, native access repair and
+append-only history remain; first actual scheduled result was pending at verification.
 
-## Current runtime — 2026-11-03
+## Previous runtime — three review repairs, 2026-11-03
 
 Upstream 1.4.3 is deployed with backend repair source `85a18e87`, image `3f19ea47`.
 See `docs/extensions/review-fixes-2026-11-03.md` for the rehearsed/revised plan,

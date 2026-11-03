@@ -1,6 +1,26 @@
 # Internal extension deployment records
 
-## Latest: shared Interior controls deployed — 2026-10-17
+## Latest: unattended roster refresh deployed — 2026-11-03
+
+Source `d58e4899`, image `d85f488b`, healthy at `https://learn.route66.click`;
+current release `roster-d58e4899-20261103`. Six-hour fenced worker and EN/TH saved-roster
+controls are active. See [implementation/release evidence](unattended-roster-refresh.md)
+for GitHub bundle/types, unchanged-payload 147 baked/eight persisted workflows,
+verified packaging, full restore/retained-image recovery and four live entry checks.
+
+Named `e6bc47a4da35` migration preserved every existing row in 82 tables/48 events
+without stamping. Only app replaced/gateway reloaded; runtime settings, limits,
+mounts and DB/Redis/gateway IDs preserved. Live API hashes, BUILD_ID, schema and Redis
+leadership verify. First actual scheduled registrar result was pending at initial
+verification; no real-provider or broad institutional acceptance is implied.
+
+Owner allowed this release's one-time restart-gate exception; actual admission3.00GiB,
+minimum2.90GiB. Global gates/runtime caps are unchanged. Fresh quiesced snapshots and
+the actual compatible `3f19ea47` parent/archive are retained, plus a saved new image.
+Code-only rollback preserves new scheduled history; never restore older data.
+Private evidence: `~/.local/state/learnhouse-roster-gha-20261103/` and current release.
+
+## Previous: shared Interior controls deployed — 2026-10-17
 
 Source/menu revision `88fea34b` is live at `https://learn.route66.click` in
 `coursemax-learnhouse:interior-controls-88fea34b-20261017`, image

@@ -34,6 +34,7 @@ function people(count){return Array.from({length:count},(_,i)=>({id:i+1,student_
    else if(p==='/connections/requests')result={requests:[],can_connect:false};
    else if(p==='/connections/official-roster')result={students:rows,fetched_at:'2026-11-03T10:00:00Z',source_url:'https://fixture.invalid/official'};
    else if(p.endsWith('/learning-access/status')){accessRequests++;result={status:'ready',can_configure:false};}
+   else if(p==='/20/identity-reviews')result={cases:[]};
    else if(p==='/20/roster')result={class_id:20,version,students:rows,events:[]};
    else if(p==='/20/roster/refresh'){
     checks++;if(transportFail){transportFail=false;return route.fulfill({status:503,json:{detail:'Synthetic status outage'}})}

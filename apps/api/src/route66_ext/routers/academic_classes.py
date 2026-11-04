@@ -257,8 +257,10 @@ async def flag(class_id:int,entry_id:int,body:Flag,request:Request,response:Resp
     private(response);user,config,_=await context(request,db);boundary(request,config);await service.serialize(db);cls=await staff_class(db,user,config.org_id,class_id)
     entry=await db.get(AcademicRosterEntry,entry_id)
     if not entry or entry.class_id!=class_id:raise HTTPException(404,'Roster entry not found')
-    service.event(db,user.id,'identity_review_requested',{'entry_id':entry_id,'reason':body.reason},cls,await db.get(SchoolStudent,entry.student_id));await commit(db)
-    return {'flagged':True,'identity_changed':False}
+    from src.route66_ext.services.identity_reviews import request_review
+    case=await request_review(db,user.id,config.org_id,await db.get(SchoolStudent,entry.student_id),body.reason,cls,entry_id)
+    await commit(db)
+    return {'flagged':True,'identity_changed':False,'case_id':case.id}
 
 # Reuse the existing extension mount; no native router/bootstrap hook is added.
 from src.route66_ext.routers.learning_access import router as learning_access_router
@@ -267,6 +269,8 @@ from src.route66_ext.routers.class_connections import router as class_connection
 router.include_router(class_connections_router)
 from src.route66_ext.routers.roster_refresh import router as roster_refresh_router
 router.include_router(roster_refresh_router)
+from src.route66_ext.routers.identity_reviews import router as identity_reviews_router
+router.include_router(identity_reviews_router)
 
 # Preserve private helper names through legacy compatibility imports.
 __all__ = [name for name in globals() if not name.startswith("__")]

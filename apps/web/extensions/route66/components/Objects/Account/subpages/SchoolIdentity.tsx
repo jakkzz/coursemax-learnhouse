@@ -12,6 +12,7 @@ import styles from './school-identity.module.css'
 import SchoolTimetable from './SchoolTimetable'
 import SchoolWorkspaceNav from './SchoolWorkspaceNav'
 import StudentRegistrarDetails from './StudentRegistrarDetails'
+import { OwnIdentityReview } from '../../Classes/IdentityReviews'
 
 type Candidate = { officer_id: string; officer_code: string; name_th: string; name_en: string }
 type Status = { eligible: boolean; search_hint: string | null; needs_google_signin: boolean; school_kind: 'student' | 'staff' | null; student_number_hint: string | null; directory_identity: Candidate | null; courses: { id:number; course_name:string }[]; student_match_status:string|null; student_profile:{student_number:string;full_name_th:string;faculty:string;program:string}|null }
@@ -34,18 +35,19 @@ export default function SchoolIdentity({ classes = false }: { classes?: boolean 
  const t = words[th ? 'th' : 'en'], teacher = teacherWords[th ? 'th' : 'en']
  const [status,setStatus] = useState<Status | null>(null), [error,setError] = useState(''), [busy,setBusy] = useState(false), [retry,setRetry] = useState(0)
  const [search,setSearch] = useState<{search_id:string;candidates:Candidate[]} | null>(null), [selected,setSelected] = useState(''), [own,setOwn] = useState(false)
- useEffect(()=>{if(!mounted)return;const controller=new AbortController();setStatus(null);setError('');const timeout=setTimeout(()=>{setError(t.failed);controller.abort()},12000)
-  fetch('/api/v1/school-identity/me',{credentials:'include',cache:'no-store',signal:controller.signal}).then(async r=>{if(!r.ok)throw Error();const data=await r.json();if(!controller.signal.aborted)setStatus(data)}).catch(()=>{if(!controller.signal.aborted)setError(t.failed)}).finally(()=>clearTimeout(timeout))
+ useEffect(()=>{if(!mounted)return;const controller=new AbortController();setError('');const timeout=setTimeout(()=>{setError(t.failed);controller.abort()},12000)
+  fetch('/api/v1/school-identity/me',{credentials:'include',cache:'no-store',signal:controller.signal}).then(async r=>{if(!r.ok){if(r.status===401||r.status===403)setStatus(null);throw Error()}const data=await r.json();if(!controller.signal.aborted)setStatus(data)}).catch(()=>{if(!controller.signal.aborted)setError(t.failed)}).finally(()=>clearTimeout(timeout))
   return()=>{clearTimeout(timeout);controller.abort()}
  },[mounted,retry,t.failed])
  const find=async()=>{setBusy(true);setError('');setSearch(null);setSelected('');setOwn(false);try{const r=await fetch('/api/v1/school-identity/search',{method:'POST',credentials:'include'});if(!r.ok)throw Error();setSearch(await r.json())}catch{setError(t.unavailable)}finally{setBusy(false)}}
  const confirm=async()=>{setBusy(true);setError('');try{const r=await fetch('/api/v1/school-identity/confirm',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({search_id:search?.search_id,officer_id:selected,confirm_own_name:own})});if(!r.ok)throw Error();setSearch(null);setRetry(n=>n+1);window.dispatchEvent(new Event('lh-school-identity-changed'));setTimeout(()=>toast.success(t.confirmed),0)}catch{setError(t.conflict)}finally{setBusy(false)}}
  const google=async()=>{setBusy(true);setError('');try{const r=await fetch('/api/auth/google/start',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({intent:'signin',return_path:classes?'/classes':'/account/school-identity'})});const result=await r.json();if(!r.ok||new URL(result.url).origin!=='https://accounts.google.com')throw Error();sessionStorage.setItem('lh_google_intent','signin');window.location.assign(result.url)}catch{setError(t.failed);setBusy(false)}}
- const state = error?'failed':!status?'loading':status.directory_identity||status.student_match_status==='matched'?'confirmed':status.school_kind==='student'?'waiting':status.needs_google_signin?'signin':status.eligible?'search':'ineligible'
+ const state = error?'failed':!status?'loading':status.directory_identity||status.student_match_status==='matched'?'confirmed':status.student_match_status==='conflict'?'review':status.school_kind==='student'?'waiting':status.needs_google_signin?'signin':status.eligible?'search':'ineligible'
  const banner = {
   loading:{tone:'bg-neutral-100 text-neutral-700',icon:<Loader2 size={14} className="animate-spin"/>,label:t.stateLoading},
   failed:{tone:'bg-red-50 text-red-700',icon:<AlertTriangle size={14}/>,label:t.stateFailed},
   confirmed:{tone:'bg-emerald-50 text-emerald-700',icon:<BadgeCheck size={14}/>,label:t.stateConfirmed},
+  review:{tone:'bg-amber-50 text-amber-800',icon:<AlertTriangle size={14}/>,label:th?'ต้องตรวจสอบตัวตน':'Identity review needed'},
   waiting:{tone:'bg-amber-50 text-amber-800',icon:<Clock3 size={14}/>,label:t.stateWaiting},
   signin:{tone:'bg-blue-50 text-blue-700',icon:<ShieldCheck size={14}/>,label:t.stateSignin},
   search:{tone:'bg-blue-50 text-blue-700',icon:<Search size={14}/>,label:t.stateSearch},
@@ -68,6 +70,8 @@ export default function SchoolIdentity({ classes = false }: { classes?: boolean 
     {classes&&status?.eligible&&<div className="space-y-2"><h2 className="text-lg font-semibold">{t.noCourses}</h2><p className="flex max-w-prose gap-2.5 text-sm leading-relaxed text-neutral-700"><Info size={16} className="mt-0.5 shrink-0 text-neutral-500"/>{t.noCoursesHelp}</p></div>}
    </div>
   </div>
+  {status&&!status.directory_identity&&<OwnIdentityReview th={th} onRefresh={()=>setRetry(n=>n+1)}/>}
+  {status?.student_match_status==='conflict'&&<Button variant="outline" disabled={busy} onClick={google}>{t.google}</Button>}
   {classes&&status?.directory_identity&&<SchoolTimetable staffId={status.directory_identity.officer_id}/>}
   {status?.school_kind!=='student'&&<a className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-blue-700 underline underline-offset-4 hover:text-blue-900" href="https://reg.nrru.ac.th/registrar/teach_time.asp?avs671304179=1" target="_blank" rel="noopener noreferrer">{t.source}<ExternalLink size={14}/></a>}
  </section>

@@ -195,6 +195,14 @@ class ArrivalTests(AttendanceTests):
                 entry.status='withdrawn';db.add(entry)
                 from src.route66_ext.db.academic_classes import AcademicClass
                 cls=await db.get(AcademicClass,20);cls.version+=1;db.add(cls)
+            # Withdrawal preserves own historical reads; it must not become a scan right.
+            historical = json.loads((await anext(stream)).split('data: ', 1)[1])
+            self.assertFalse(historical['manageable'])
+            self.assertEqual(historical['own']['receipts'][0]['receipt_id'], accepted.json()['receipt']['receipt_id'])
+            async with self.sessions.begin() as db:
+                student = await db.get(SchoolStudent, entry.student_id)
+                student.user_id = None; db.add(student)
+                cls = await db.get(AcademicClass, 20); cls.version += 1; db.add(cls)
             lost = await anext(stream)
             self.assertIn('event: access_lost',lost);self.assertNotIn('students',lost)
         finally:

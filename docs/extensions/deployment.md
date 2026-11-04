@@ -1,6 +1,18 @@
 # Internal extension deployment records
 
-## Pending source: attendance corrections/history/CSV — 2026-11-04
+## Latest: attendance corrections/history/CSV deployed — 2026-11-04
+
+Source `f23ccdf0`, image `6fe00d32`, release `attendance-f23ccdf0-20261104`, healthy.
+See [scope, checks and recovery](attendance-corrections-reporting.md). Full bundle/types,
+60 baked checks, two persisted native-auth teacher/student EN1440/TH390 workflows,
+actual correction-aware fallback with15 stable fingerprints and four live checks pass.
+1267 API/5536 web/2681 retained static files verify live. No migration. Only app
+replaced/gateway reloaded; runtime/schema/env/peers unchanged. Normal admission,
+minimum activation RAM2.694GiB. Fresh snapshots and complete saved OCI images retained.
+Use tested `88335321` correction-aware code rollback, never old API/data. No real
+attendance mutation, genuine provider/device or scheduled-source-failure acceptance.
+
+## Previous pending-source checkpoint (superseded) — 2026-11-04
 
 Implemented/pushed `f23ccdf0`, **not deployed**. See
 [implementation and resource boundary](attendance-corrections-reporting.md).

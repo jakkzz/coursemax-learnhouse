@@ -2,7 +2,7 @@
 
 2026-11-04. **Historical planning/rehearsal checkpoint.**
 Follow-up: [implementation source and delivery status](attendance-corrections-reporting.md).
-The slice is now implemented/pushed but not yet deployed; the evidence below records
+The slice is now implemented, pushed and deployed; the evidence below records
 what was known at planning time, not the latest implementation results.
 Baseline: fork `4782e92b`, live source `e142f6e3`, image `310ed40a`.
 Audit scope: **B05/B06/B07 → LH-04**, chiefly B07. These IDs remain in progress.

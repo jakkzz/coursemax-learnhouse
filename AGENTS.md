@@ -98,7 +98,26 @@ and shared services intact; real historical migration and cutover remain separat
 work. Prefer owned adapters/routes over native-core changes. Newest ../STATUS.md and
 current release pointer are authoritative over historical deployment headings.
 
-## Latest source checkpoint — attendance corrections/history/CSV, 2026-11-04
+## Latest deployment — attendance corrections/history/CSV, 2026-11-04 12:01 UTC
+
+Live source `f23ccdf0`, image `6fe00d32`, release `attendance-f23ccdf0-20261104`,
+healthy. Web/BUILD_ID `41c8163e` has the identical source web tree. Teacher corrections,
+own/teacher history, honest coverage/shared summary and CSV are active. No migration,
+new account/enrollment writer or real attendance test mutation. App only replaced/
+gateway reloaded; launcher/schema/env/limits/mounts and DB/Redis/gateway IDs unchanged.
+
+Full bundle/types,60 baked checks, two persisted EN1440/TH390 teacher/student workflows
+(four actor journeys), three actual-fallback native read journeys/15 unchanged state
+fingerprints and four live entry/denial checks pass.1267 API files/5536 web entries/
+2681 retained assets verified live. Fresh quiesced recovery snapshots and complete
+OCI images (candidate80/fallback78 blobs) retained. Rollback uses correction-aware
+`88335321`, never unaware old API or old data. Normal admission3.15GiB/28.47GiB;
+activation minimum2.694GiB, no override. Earlier disk-blocked notes are superseded.
+See `docs/extensions/attendance-corrections-reporting.md`; private evidence
+`~/.local/state/learnhouse-attendance-implementation-20261104/`. Leave, real-provider/
+device acceptance and real scheduled-source-failure diagnosis remain separate.
+
+## Previous source checkpoint — attendance corrections/history/CSV, 2026-11-04
 
 Four sequential GPT-5.6-sol agents delivered source `f23ccdf0`, not deployed.
 Full GitHub bundle/types at identical web tree41c8163e,36 DB/HTTP/policy checks,

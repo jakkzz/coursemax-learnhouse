@@ -1,10 +1,12 @@
-# Attendance corrections, history and CSV — implementation checkpoint
+# Attendance corrections, history and CSV — deployed
 
-2026-11-04. **Implemented and pushed; not deployed.**
+2026-11-04 12:01 UTC. **Deployed and verified.**
 Application source `f23ccdf0157a77d55b070a9e121c7df0b058c87f` (feature `41c8163e`
 plus a backend-test-only refinement). Successful web artifact source `41c8163e`;
 both `apps/web` trees equal `b0c5d685733ac2e48c76cd01e0cc22806b69338f`.
-Live remains `e142f6e3` / `310ed40a`, release `ui-repairs-e142f6e3-20261104`.
+Live source `f23ccdf0`, image `6fe00d32`, release `attendance-f23ccdf0-20261104`.
+Web source/BUILD_ID remains the exact successful artifact `41c8163e`.
+Correction-aware fallback is `88335321` (same new API, retained `e142f6e3` frontend).
 
 ## Delivered source behavior
 
@@ -53,14 +55,22 @@ Private prompts/sessions/handoffs/logs:
 ## Observed validation
 
 - GitHub **41820493946** passed full frontend bundle/types at exact web source.
-- **36 PostgreSQL/HTTP/policy checks pass**:10 correction/reporting tests (including
-  two reviewers, lost acknowledgement, rollback, snapshot timing,205 sessions,
- 1000 members with fewer than30 SQL statements per summary/export), one withdrawn
-  class projection check and25 actual pure-policy checks.
-- Existing attendance/arrival regression run: **23/24 passed**. Its remaining test
-  still expected withdrawal to revoke historical reading. Refined it to assert own
-  history continues after withdrawal and true identity loss closes the stream;
-  that exact test then passed separately. Do not call this a fresh24-test rerun.
+- **60 baked PostgreSQL/HTTP/policy checks pass** in the final candidate:10 correction/
+  reporting tests (concurrency, lost acknowledgement, rollback, snapshot timing,205
+  sessions and1000 members with fewer than30 SQL statements per summary/export),
+  one withdrawn-class projection,25 pure policy and24 existing attendance/arrival
+  regressions. This fresh complete run supersedes the earlier23/24 plus isolated retry.
+- **Two packaged native-auth teacher/student workflows (four actor journeys)** pass
+  at EN1440/TH390: actual QR scan, correction, committed phone/receipt update, own
+  history, matching manager summary/CSV, reset; withdrawn own-history navigation
+  remains available and new scans are denied. Persisted six decisions/two original
+  scans, unchanged native roles and QR session version.
+- **Actual correction-aware fallback** passes three native-auth read journeys;
+  corrected history, own receipts and summary remain readable, with all15 academic/
+  attendance/identity/access fingerprints identical across the code-only change.
+- **Four live anonymous entry/denial checks** pass EN/TH ×1440/390: providers/password
+  visible; report/history/CSV and valid anonymous decision writes all denied401;
+  no page errors/overflow. No real account or attendance mutation for acceptance.
 - **Five component browser workflows pass** using actual attendance components,
   synthetic same-origin HTTP/SSE and pinned native CSS: English desktop teacher
   correction/stale/auth/lost-ack/race/export flow, Thai mobile manager report/export,
@@ -73,37 +83,35 @@ Private prompts/sessions/handoffs/logs:
   device/provider or a new full audit. Final localized coverage copy is typechecked;
   the retained visual captures precede that small text refinement.
 
-## Resource boundary and remaining delivery
+## Deployment, resources and recovery
 
-The shared lock was respected throughout; refused attempts waited. Package preparation
-was admitted at25.09GiB free, with normal RAM headroom. Afterwards free disk was
-**24.43GiB**, below the global25GiB build floor. Six bounded rechecks later
-found about24.997GiB—still below the same unchanged floor. Packaging/build, packaged native-auth
-proof and app activation must wait for normal capacity. Do not lower the threshold,
-prune retained images/evidence, clear swap, or restart other workloads to force it.
-No candidate image was built and no live records/services/schema were changed.
+The earlier source checkpoint waited below25GiB; no gate was weakened. Capacity
+recovered before the owner's deployment request. Candidate build minimum available
+RAM3.021GiB; fallback3.076GiB. Activation admission RAM3.15GiB/disk28.47GiB passed
+normal gates; minimum observed during activation **2.694GiB**, no override.
+Only app replaced/gateway reloaded. Owned launcher, schema, environment, limits,
+mounts and DB/Redis/gateway identities verify unchanged. Fresh quiesced DB/schema/
+content snapshots and checksums pass; no migration/stamp/backfill or real-data test.
+The roster worker retains Redis leadership; actual source acquisition is not asserted.
 
-Already retained: verified GitHub artifact/checksum/source, prepared web overlay,
-source snapshot and exact current-image OCI layout. Its76 blobs are hash-verified;
-identical immutable blobs are hard-linked to retained recovery files, not duplicated
-or modified. Complete layout restore command is in `parent-layout-verification.json`.
-The normal current rollback archive is also retained. No existing folder/image pruned.
+Candidate verification and live re-verification cover **1267 API files,5536 web
+entries,2681 retained static assets**, source/BUILD_ID, parent layers and runtime
+configuration. Complete recoverable OCI layouts are retained: parent76, candidate80,
+fallback78 verified blobs. Identical immutable blobs are hard-linked to retained
+recovery files, never modified. Restore commands are in each layout proof; the
+existing complete parent archive is also retained. No folders/images were pruned.
+Fixtures were torn down and the idle owned builder stopped.
 
-Once admitted:
+The release's `rollback.compose.json` selects tested correction-aware image
+`88335321`, **not** the old unaware API. Keep new decisions/scans/history intact;
+never restore an older database or reset decisions for code rollback. Full old
+`310ed40a` is retained for provenance, not a safe post-decision reader.
 
-1. Build/verify the candidate from the prepared parent plus owned API/web overlay
-   with maintenance wrapper and `--builder vps-limited`; verify all required bytes,
-   modes, runtime configuration and retained assets. Save a complete recoverable image.
-2. Build a **correction-aware fallback** (new API projection on retained frontend),
-   then exercise actual native-auth teacher/student correction → current/receipt/
-   history → matching CSV → reset at EN1440/TH390 in isolated stores.
-3. Rehearse that actual fallback reading new synthetic decision history without any
-   data restoration or fingerprint drift. Current old API ignores decisions and is
-   **not** a valid rollback after the first new decision.
-4. Fresh recovery snapshots and ordinary app-only deployment; bounded live entry/
-   permission and byte/configuration checks. Do not create real attendance as a test.
+One isolated seed attempt used two asyncio loops with the same engine and failed;
+combined it into one loop, recreated only disposable fixtures and reran successfully.
+This was fixture plumbing, not an application or production defect.
 
-These are concrete unfinished delivery checks, not new owner approvals or flags.
+Implementation, packaging, recovery rehearsal and bounded deployment are complete.
 The [rehearsed plan](attendance-corrections-reporting-plan.md) remains the scope;
 B05/B06/B07 are not accepted parity. Real scheduled roster acquisition, leave and
 broader provider/device/historical-migration acceptance remain separate.

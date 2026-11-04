@@ -110,7 +110,7 @@ function luminance(rgb){const a=rgb.match(/[\d.]+/g).slice(0,3).map(Number).map(
     }else if(role==='schedule'){
      await page.getByRole('button',{name:t('Open class: 990001 P1','ดูชั้นเรียน: 990001 P1'),exact:true}).click();
      const schedule=page.getByRole('radio',{name:t('Schedule','ตารางเรียน'),exact:true});await schedule.click();
-     await page.getByLabel(t('School calendar','ปฏิทินการศึกษา'),{exact:true}).selectOption('10');
+     await page.getByRole('combobox',{name:t('School calendar','ปฏิทินการศึกษา'),exact:true}).selectOption('10');
      const date=page.getByLabel(t('First course week starts','วันเริ่มสัปดาห์แรกของรายวิชา'),{exact:true});await date.fill('2026-08-03');
      await page.getByRole('radio',{name:t('Details','รายละเอียด'),exact:true}).click();await expect(date).toBeHidden();
      await page.getByRole('radio',{name:t('Official roster','รายชื่อจากทะเบียน'),exact:true}).click();await expect(date).toBeHidden();
@@ -130,12 +130,12 @@ function luminance(rgb){const a=rgb.match(/[\d.]+/g).slice(0,3).map(Number).map(
      result.checks.push('return from saved roster preserves schedule draft');
     }else if(role==='calendar'){
      await page.getByRole('tab',{name:t('School calendar','ปฏิทินการศึกษา'),exact:true}).click();
-     await page.getByLabel(t('Academic year','ปีการศึกษา'),{exact:true}).selectOption('2569');
-     await page.getByLabel(t('Visibility','การใช้งาน'),{exact:true}).selectOption('teacher');
+     await page.getByRole('combobox',{name:t('Academic year','ปีการศึกษา'),exact:true}).selectOption('2569');
+     await page.getByRole('combobox',{name:t('Visibility','การใช้งาน'),exact:true}).selectOption('teacher');
      await expect(page.getByText(t('No calendars match these filters.','ไม่พบปฏิทินที่ตรงกับตัวกรอง'),{exact:true})).toBeVisible();
      await page.getByRole('button',{name:t('Clear filters','ล้างตัวกรอง'),exact:true}).click();
      await expect(page.getByRole('button',{name:t('View calendar','ดูปฏิทิน'),exact:true})).toHaveCount(2);
-     await expect(page.getByLabel(t('Academic year','ปีการศึกษา'),{exact:true})).toBeFocused();result.checks.push('localized filter no-match, clear and focus recovery');
+     await expect(page.getByRole('combobox',{name:t('Academic year','ปีการศึกษา'),exact:true})).toBeFocused();result.checks.push('localized filter no-match, clear and focus recovery');
     }else{
      const link=page.getByRole('link',{name:role==='google'?t('Cancel','ยกเลิก'):t('Back to account security','กลับไปที่ความปลอดภัยของบัญชี'),exact:true});
      await link.waitFor();const box=await link.boundingBox();assert(box.height>=44);result.touchHeight=box.height;result.checks.push('auth recovery target >=44px');

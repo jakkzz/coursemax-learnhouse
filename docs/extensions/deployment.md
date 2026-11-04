@@ -1,6 +1,17 @@
 # Internal extension deployment records
 
-## Latest: student identity reviews deployed — 2026-11-04
+## Latest: custom UI repairs deployed — 2026-11-04
+
+Live `e142f6e3` / `310ed40a`, release `ui-repairs-e142f6e3-20261104`, healthy.
+All eight audit findings repaired; see [scope and evidence](custom-ui-repairs.md).
+Frontend-only overlay, all API bytes/schema/launcher/runtime/peer IDs preserved.
+Full bundle/types, 46 source/31 tooling, 15 focused/40 regression component flows,
+two packaged persisted workflows/six actor journeys and four live entry checks pass.
+Normal gates, activation minimum3.073GiB; fresh snapshots and complete saved images.
+Retain `b73530fb` code-only rollback, never restore old academic data. No new full
+audit score, real-provider acceptance or scheduled-source-failure fix is claimed.
+
+## Previous: student identity reviews deployed — 2026-11-04
 
 Source `53d3d248`, image `b73530fb`, healthy; current release
 `identity-53d3d248-20261104`. Students request review, teachers track roster flags,

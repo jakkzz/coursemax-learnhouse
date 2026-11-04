@@ -98,7 +98,22 @@ and shared services intact; real historical migration and cutover remain separat
 work. Prefer owned adapters/routes over native-core changes. Newest ../STATUS.md and
 current release pointer are authoritative over historical deployment headings.
 
-## Current runtime — student identity reviews, 2026-11-04
+## Latest deployment — custom UI repairs, 2026-11-04
+
+Live `e142f6e3` / `310ed40a`, release `ui-repairs-e142f6e3-20261104`, healthy.
+All eight custom UI audit findings repaired: mounted drafts, member focus/return,
+shared control contrast, operation-specific retries, visible load errors, canonical
+schedule-to-roster review, 44px auth recovery links and calendar filter recovery.
+Full bundle/types, 46 source +31 tooling checks, 15 focused +40 regression component
+flows, two packaged persisted workflows/six actor journeys and four live entry checks
+pass. Frontend only; all 1,265 API files/schema/env/launcher/limits/mounts/peer IDs
+unchanged. Fresh recovery snapshots and saved images verified; retain `b73530fb`
+code-only rollback, never older data. Normal admission, activation minimum3.073GiB.
+See `docs/extensions/custom-ui-repairs.md`; private evidence
+`~/.local/state/learnhouse-ui-repairs-20261104/`. No fresh full-audit score or genuine
+provider/device acceptance; real scheduled source failure remains unresolved.
+
+## Previous runtime — student identity reviews, 2026-11-04
 
 Live `53d3d248` / `b73530fb`, release `identity-53d3d248-20261104`. Student requests,
 teacher receipts and existing-superadministrator decisions use the academic journal,

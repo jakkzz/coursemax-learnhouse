@@ -18,14 +18,14 @@ function people(count){return Array.from({length:count},(_,i)=>({id:i+1,student_
  const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN,args:['--disable-dev-shm-usage']});
  const results=[];
  try{
- for(const lang of ['en','th'])for(const width of [1440,390])for(const role of ['teacher','student','official','unmatched','rows-0','rows-1','rows-1000']){
+ for(const lang of ['en','th'])for(const width of [1440,390])for(const role of ['teacher','student','withdrawn','official','unmatched','rows-0','rows-1','rows-1000']){
   const th=lang==='th',t=(en,thai)=>th?thai:en,name=`${role}-${lang}-${width}`;
   const context=await browser.newContext({viewport:{width,height:950},timezoneId:'Asia/Bangkok',reducedMotion:'reduce'}),page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.clock.install({time:new Date('2026-11-03T10:00:00Z')});
   const edge=role.startsWith('rows-'),count=edge?Number(role.slice(5)):40;
   let rows=people(count),version=1,status='ready',paused=false,control=0,checks=0,posts=[],wrongClass=false,transportFail=false,accessRequests=0;
-  const cls=()=>({id:20,course_id:role==='unmatched'?null:10,course_uuid:role==='unmatched'?'':'course_fixture',course_name:'Synthetic roster class',course_available:true,academic_year:2569,semester:1,section:'P1',manageable:role!=='student',version,active_count:rows.length,last_synced_at:count?'2026-11-03T04:00:00Z':null,registry_course_id:'100',registry_class_id:'200'});
+  const cls=()=>({id:20,course_id:role==='unmatched'?null:10,course_uuid:role==='unmatched'?'':'course_fixture',course_name:'Synthetic roster class',course_available:role!=='withdrawn',academic_year:2569,semester:1,section:'P1',manageable:!['student','withdrawn'].includes(role),own_attendance_history_only:role==='withdrawn',version,active_count:rows.length,last_synced_at:count?'2026-11-03T04:00:00Z':null,registry_course_id:'100',registry_class_id:'200'});
   await page.route('**/api/v1/**',async route=>{
    const request=route.request(),p=new URL(request.url()).pathname.replace('/api/v1/academic-classes',''),method=request.method();let result={};
    if(method==='POST')posts.push({path:p,body:request.postDataJSON()});
@@ -60,10 +60,14 @@ function people(count){return Array.from({length:count},(_,i)=>({id:i+1,student_
     await expect(page.locator('#saved-roster-title')).toBeVisible();
     await expect(page.getByRole('button',{name:t('Check now','ตรวจสอบตอนนี้'),exact:true})).toBeEnabled();
     assert.equal(accessRequests,0,'An unmatched school class is not native content');
+   }else if(role==='withdrawn'){
+    const ownHistory=page.getByRole('link',{name:t('My attendance','การเข้าเรียนของฉัน'),exact:true});await expect(ownHistory).toHaveAttribute('href','/attendance?class=20');
+    assert.equal(await page.getByRole('button',{name:t('Open schedule','เปิดตารางเรียน'),exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:t('Manage roster','จัดการรายชื่อ'),exact:true}).count(),0);assert.equal(await page.getByRole('link',{name:t('Open released course','เปิดรายวิชาที่เผยแพร่แล้ว'),exact:true}).count(),0);
+    await page.getByRole('tab',{name:t('LearnHouse classes','ชั้นเรียน LearnHouse'),exact:true}).click();await expect(ownHistory).toHaveAttribute('href','/attendance?class=20');assert.equal(await page.getByText(t('Course content is not available to this account','บัญชีนี้ยังเปิดเนื้อหารายวิชาไม่ได้'),{exact:true}).count(),0);
    }else{
     await page.getByRole('tab',{name:t('LearnHouse classes','ชั้นเรียน LearnHouse'),exact:true}).click();
     if(role==='student'){
-     await expect(page.getByRole('heading',{name:'Synthetic roster class',exact:true})).toBeVisible();
+     await expect(page.getByRole('heading',{name:'Synthetic roster class',exact:true})).toBeVisible();await expect(page.getByRole('link',{name:t('Open released course','เปิดรายวิชาที่เผยแพร่แล้ว'),exact:true})).toBeVisible();
      assert.equal(await page.getByRole('button',{name:t('Manage roster','จัดการรายชื่อ'),exact:true}).count(),0);
      assert.equal(checks,0);assert.equal(await page.getByText('Synthetic Student 1',{exact:false}).count(),0);
     }else if(edge){

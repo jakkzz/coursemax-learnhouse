@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { attendanceCopy } from '../components/Objects/Classes/attendance-copy'
-import { attendanceEntryPath, attendanceLoginDestination, attendanceRequest, attendanceReturn, attendanceRetryLogin, attendanceSignInPath, forgetContinuation, handoffHandle, pendingScan, rememberContinuation, reserveScan } from '../components/Objects/Classes/attendance-client'
+import { attendanceDownload, attendanceEntryPath, attendanceLoginDestination, attendanceRequest, attendanceReturn, attendanceRetryLogin, attendanceSignInPath, forgetContinuation, handoffHandle, pendingScan, rememberContinuation, reserveScan } from '../components/Objects/Classes/attendance-client'
 
 const token='q'.repeat(43),handle='h'.repeat(43),path='/attendance/check-in?handoff='+handle
 const originalFetch=globalThis.fetch
@@ -68,6 +68,15 @@ test('receipt/ended/claim/provider recovery messages stay distinct',async()=>{
   globalThis.fetch=(async()=>new Response(JSON.stringify({detail:{code}}),{status}))
   await expect(attendanceRequest('/receipts/synthetic',attendanceCopy.en)).rejects.toThrow(message)
  }
+})
+test('stale correction errors retain the reviewed token and CSV stays credentialed',async()=>{
+ globalThis.fetch=(async(input,options)=>{
+  expect(options.credentials).toBe('include');expect(options.cache).toBe('no-store')
+  if(String(input).endsWith('.csv'))return new Response('synthetic csv',{status:200,headers:{'Content-Type':'text/csv'}})
+  return new Response(JSON.stringify({detail:{code:'stale_evidence',current_token:'b'.repeat(64)}}),{status:409})
+ })
+ try{await attendanceRequest('/sessions/1/decisions',attendanceCopy.en,{})}catch(error){expect(error.code).toBe('stale_evidence');expect(error.currentToken).toBe('b'.repeat(64));expect(error.message).toBe(attendanceCopy.en.staleEvidence)}
+ expect(await (await attendanceDownload('/classes/1/summary.csv',attendanceCopy.en)).text()).toBe('synthetic csv')
 })
 test('storage failure cannot prevent capture or native sign-in navigation',()=>{
  Object.assign(globalThis,{sessionStorage:{getItem:()=>{throw new Error()},setItem:()=>{throw new Error()},removeItem:()=>{throw new Error()}}})

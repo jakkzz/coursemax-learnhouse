@@ -162,7 +162,7 @@ class ArrivalTests(AttendanceTests):
         self.assertEqual(created.status_code,200,created.text);self.session_id=created.json()['id']
         self.actor = 1
         result = await self.client.get(f'/api/v1/attendance/sessions/{self.session_id}')
-        self.assertEqual(result.json()['own']['status'], 'unrecorded')
+        self.assertEqual(result.json()['own']['status'], 'unknown')
         self.assertEqual(result.json()['own']['receipts'], [])
 
     async def test_stream_pushes_committed_own_state_and_releases_connections(self):

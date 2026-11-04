@@ -348,7 +348,7 @@ class RehearsalTests(unittest.TestCase):
                         if isinstance(call, ast.Call) and ((isinstance(call.func, ast.Name) and call.func.id == 'scan_projection') or
                             (isinstance(call.func, ast.Attribute) and call.func.attr == 'scan_projection')):
                             callers.add(node.name)
-        self.assertEqual(callers, {'accept_scan', 'session_snapshot', 'receipt'})
+        self.assertEqual(callers, {'accept_scan', 'record_decision', 'session_snapshot', 'receipt'})
 
 
 if __name__ == '__main__':

@@ -1,13 +1,15 @@
 """Native-session attendance and anonymous transient scan reservation; no messaging."""
 import asyncio
+from contextlib import asynccontextmanager
 import json
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func
+from sqlalchemy import func, text
 from redis.exceptions import RedisError
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator, model_validator
 from sqlmodel import select
@@ -19,6 +21,7 @@ from src.route66_ext.routers.academic_classes import staff_class, commit
 from src.route66_ext.db.class_attendance import AttendanceSession, AttendanceScan, AttendanceEvent
 from src.route66_ext.db.academic_classes import AcademicClass, AcademicRosterEntry, SchoolStudent
 from src.route66_ext.services import academic_rosters as roster
+from src.route66_ext.services import attendance_reporting as reporting
 from src.route66_ext.services import class_attendance as service
 from src.route66_ext.services.attendance_policy import SessionPolicy, _utc
 from src.route66_ext.services.attendance_handoff import Handoffs
@@ -93,9 +96,42 @@ class CompleteScan(BaseModel):
     handoff: str = Field(pattern=r'^[A-Za-z0-9_-]{43}$')
 
 
+class AttendanceDecision(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    roster_entry_id: StrictInt = Field(gt=0)
+    status: str = Field(pattern=r'^(present|late|absent|excused|reset)$')
+    reason: str = Field(min_length=5, max_length=500)
+    expected_token: str = Field(pattern=r'^[0-9a-f]{64}$')
+    request_id: UUID
+
+    @field_validator('reason')
+    @classmethod
+    def decision_reason(cls, value):
+        value = value.strip()
+        if len(value) < 5:
+            raise ValueError('Enter a meaningful reason')
+        return value
+
+
 def session_dto(row):
     return {k: getattr(row, k) for k in ('id', 'class_id', 'title', 'starts_at', 'ends_at', 'timezone', 'grace_minutes', 'late_threshold_minutes', 'state', 'version',
                                          'calendar_kind', 'academic_week', 'slot_key', 'nominal_on', 'replaces_session_id', 'mode', 'location', 'note')}
+
+
+@asynccontextmanager
+async def report_read_snapshot():
+    async with AsyncSession(engine, expire_on_commit=False) as db:
+        async with db.begin():
+            await db.execute(text('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY'))
+            as_of = (await db.execute(text('SELECT statement_timestamp()'))).scalar_one()
+            yield db, as_of
+
+
+def report_value(callable_):
+    try:
+        return callable_()
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
 
 
 @router.get('/classes/{class_id}/sessions')
@@ -114,7 +150,7 @@ async def sessions(class_id: int, request: Request, response: Response, session:
         if error.status_code != 403:
             raise
         manageable = False
-        await service.member(db, cls, actor)
+        await service.member(db, cls, actor, require_active=False)
     rows = (await db.exec(select(AttendanceSession).where(AttendanceSession.class_id == class_id).order_by(AttendanceSession.starts_at.desc()).limit(200))).all()
     if session is not None and session not in {r.id for r in rows}:
         # A linked session beyond the recent page stays reachable under the same class authority.
@@ -123,6 +159,74 @@ async def sessions(class_id: int, request: Request, response: Response, session:
             raise HTTPException(404, 'Attendance session not found')
         rows = [*rows, selected]
     return {'class_id': cls.id, 'course_name': course.name if course else cls.registry_title or cls.registry_course_code, 'section': cls.section, 'manageable': manageable, 'sessions': [session_dto(r) for r in rows]}
+
+
+@router.get('/classes/{class_id}/summary')
+async def attendance_summary(class_id: int, request: Request, response: Response,
+                             from_date: date | None = Query(default=None, alias='from'),
+                             to_date: date | None = Query(default=None, alias='to')):
+    private(response)
+    async with report_read_snapshot() as (db, as_of):
+        actor, config, _ = await context(request, db)
+        cls = await db.get(AcademicClass, class_id)
+        if cls is None:
+            raise HTTPException(404, 'Class not found')
+        await roster.can_manage(db, actor, cls, config.org_id)
+        data = await reporting.load_class_data(db, cls)
+        return report_value(lambda: reporting.class_summary(data, as_of, from_date, to_date))
+
+
+@router.get('/classes/{class_id}/history')
+async def attendance_history(class_id: int, request: Request, response: Response,
+                             roster_entry_id: int = Query(gt=0), before: str | None = Query(default=None, max_length=300)):
+    private(response)
+    async with report_read_snapshot() as (db, as_of):
+        actor, config, _ = await context(request, db)
+        cls = await db.get(AcademicClass, class_id)
+        if cls is None:
+            raise HTTPException(404, 'Class not found')
+        await roster.can_manage(db, actor, cls, config.org_id)
+        data = await reporting.load_class_data(db, cls)
+        member_row = next(((entry, student) for entry, student in data.entries if entry.id == roster_entry_id), None)
+        if member_row is None:
+            raise HTTPException(404, 'Roster entry not found')
+        return report_value(lambda: reporting.manager_history(data, *member_row, as_of, before))
+
+
+@router.get('/classes/{class_id}/own')
+async def own_attendance(class_id: int, request: Request, response: Response,
+                         from_date: date | None = Query(default=None, alias='from'),
+                         to_date: date | None = Query(default=None, alias='to'),
+                         before: str | None = Query(default=None, max_length=300)):
+    private(response)
+    async with report_read_snapshot() as (db, as_of):
+        actor, config, _ = await context(request, db)
+        cls = await db.get(AcademicClass, class_id)
+        if cls is None:
+            raise HTTPException(404, 'Class not found')
+        await roster.class_course(db, cls, config.org_id)
+        entry, student = await service.member(db, cls, actor, require_active=False)
+        data = await reporting.load_class_data(db, cls)
+        return report_value(lambda: reporting.own_report(
+            data, entry, student, as_of, from_date, to_date, before))
+
+
+@router.get('/classes/{class_id}/summary.csv')
+async def attendance_summary_csv(class_id: int, request: Request,
+                                 from_date: date | None = Query(default=None, alias='from'),
+                                 to_date: date | None = Query(default=None, alias='to')):
+    async with report_read_snapshot() as (db, as_of):
+        actor, config, _ = await context(request, db)
+        cls = await db.get(AcademicClass, class_id)
+        if cls is None:
+            raise HTTPException(404, 'Class not found')
+        await roster.can_manage(db, actor, cls, config.org_id)
+        data = await reporting.load_class_data(db, cls)
+        report = report_value(lambda: reporting.class_summary(data, as_of, from_date, to_date))
+        content = reporting.summary_csv(report)
+    return Response(content=content, media_type='text/csv', headers={
+        'Cache-Control': 'private, no-store', 'Vary': 'Cookie, Authorization',
+        'Content-Disposition': 'attachment; filename="attendance-summary.csv"'})
 
 
 @router.post('/classes/{class_id}/sessions')
@@ -163,8 +267,6 @@ async def session_snapshot(request, db, session_id):
     # Read the cursor before the projection so a concurrent commit is not skipped.
     cursor = await attendance_head(db, session_id)
     row, cls = await service.session_scope(db, session_id, config.org_id)
-    collected = (await db.exec(select(AttendanceEvent.id).where(
-        AttendanceEvent.session_id == row.id, AttendanceEvent.kind == 'checkin_opened').limit(1))).first() is not None
     manageable = True
     try:
         await roster.can_manage(db, actor, cls, config.org_id)
@@ -173,17 +275,34 @@ async def session_snapshot(request, db, session_id):
             raise
         manageable = False
     now = datetime.now(timezone.utc)
-    if not manageable:
-        entry, _ = await service.member(db, cls, actor)
-        own = service.scan_projection(row, await service.scans_for(db, row.id, entry.id), now, collected=collected)
-        return {'session': session_dto(row), 'manageable': False, 'own': own, 'cursor': cursor, 'as_of': now}
-    entries = (await db.exec(select(AcademicRosterEntry, SchoolStudent).join(SchoolStudent, SchoolStudent.id == AcademicRosterEntry.student_id).where(AcademicRosterEntry.class_id == cls.id).order_by(AcademicRosterEntry.display_position))).all()
+    entries = (await db.exec(select(AcademicRosterEntry, SchoolStudent).join(
+        SchoolStudent, SchoolStudent.id == AcademicRosterEntry.student_id
+    ).where(AcademicRosterEntry.class_id == cls.id).order_by(AcademicRosterEntry.display_position))).all()
     scans = await service.scans_for(db, row.id)
-    events = (await db.exec(select(AttendanceEvent).where(AttendanceEvent.session_id == row.id).order_by(AttendanceEvent.id.desc()).limit(30))).all()
+    decisions = await service.decisions_for(db, row.id)
+    collected = await service.collection_started(db, row.id, scans)
+    timelines = await reporting.load_membership_timelines(db, cls.id, list(entries))
+    scans_by_entry = {}
+    for scan in scans:
+        scans_by_entry.setdefault(scan.roster_entry_id, []).append(scan)
+    decisions_by_entry = {}
+    for event in decisions:
+        decisions_by_entry.setdefault(event.details.get('roster_entry_id'), []).append(event)
+    if not manageable:
+        entry, _ = await service.member(db, cls, actor, require_active=False)
+        own = service.scan_projection(row, scans_by_entry.get(entry.id, []), now,
+            decisions=decisions_by_entry.get(entry.id, []), collected=collected,
+            eligibility=timelines[entry.id].at(row.starts_at), class_version=cls.version, roster_entry_id=entry.id)
+        return {'session': session_dto(row), 'manageable': False, 'own': own, 'cursor': cursor, 'as_of': now}
+    events = (await db.exec(select(AttendanceEvent).where(
+        AttendanceEvent.session_id == row.id).order_by(AttendanceEvent.id.desc()).limit(30))).all()
     return {'session': session_dto(row), 'manageable': True, 'cursor': cursor, 'as_of': now, 'students': [
         {'roster_entry_id': entry.id, 'name': student.full_name_th, 'student_number': student.student_number,
-         'membership': entry.status, **service.scan_projection(row, [s for s in scans if s.roster_entry_id == entry.id], now, collected=collected)}
-        for entry, student in entries], 'events': [{'id': e.id, 'kind': e.kind, 'created_at': e.created_at, 'details': e.details} for e in events]}
+         'membership': entry.status, **service.scan_projection(row, scans_by_entry.get(entry.id, []), now,
+             decisions=decisions_by_entry.get(entry.id, []), collected=collected,
+             eligibility=timelines[entry.id].at(row.starts_at), class_version=cls.version, roster_entry_id=entry.id)}
+        for entry, student in entries],
+        'events': [{'id': event.id, 'kind': event.kind, 'created_at': event.created_at, 'details': event.details} for event in events]}
 
 
 def clock_phase(snapshot, now=None):
@@ -242,6 +361,22 @@ async def change_state(session_id: int, body: ChangeState, request: Request, res
     service.audit(db, row, actor, 'session_state_changed', {'from': before, 'to': row.state, 'reason': body.reason, 'version': row.version})
     await commit(db)
     return session_dto(row)
+
+
+@router.post('/sessions/{session_id}/decisions')
+async def decide(session_id: int, body: AttendanceDecision, request: Request, response: Response,
+                 db: AsyncSession = Depends(get_db_session)):
+    private(response)
+    now = datetime.now(timezone.utc)
+    actor, config, _ = await context(request, db)
+    boundary(request, config)
+    await roster.serialize(db)
+    row, cls = await service.session_scope(db, session_id, config.org_id)
+    decision, projection, retried = await service.record_decision(db, row, cls, body.roster_entry_id,
+        actor, config.org_id, status=body.status, reason=body.reason,
+        expected_token=body.expected_token, request_id=str(body.request_id), now=now)
+    await commit(db)
+    return {'decision': service.decision_dto(decision), 'projection': projection, 'retried': retried}
 
 
 @router.post('/sessions/{session_id}/open')
@@ -326,12 +461,19 @@ async def complete(body: CompleteScan, request: Request, response: Response, db:
 async def receipt(receipt_id: str, request: Request, response: Response, db: AsyncSession = Depends(get_db_session)):
     private(response)
     actor, config, _ = await context(request, db)
-    scan = (await db.exec(select(AttendanceScan).where(AttendanceScan.receipt_id == receipt_id, AttendanceScan.actor_user_id == actor.id))).first()
+    scan = (await db.exec(select(AttendanceScan).where(
+        AttendanceScan.receipt_id == receipt_id, AttendanceScan.actor_user_id == actor.id))).first()
     if not scan:
         raise HTTPException(404, 'Receipt not found')
-    row, _ = await service.session_scope(db, scan.session_id, config.org_id)
-    own = service.scan_projection(row, await service.scans_for(db, row.id, scan.roster_entry_id), datetime.now(timezone.utc))
-    return service.own_receipt(scan, row, own['status'])
+    row, cls = await service.session_scope(db, scan.session_id, config.org_id)
+    entry, _ = await service.member(db, cls, actor, require_active=False)
+    if entry.id != scan.roster_entry_id:
+        raise HTTPException(404, 'Receipt not found')
+    scans = await service.scans_for(db, row.id, entry.id)
+    decisions = await service.decisions_for(db, row.id, entry.id)
+    own = service.scan_projection(row, scans, datetime.now(timezone.utc), decisions=decisions,
+        collected=True, eligibility=entry.status, class_version=cls.version, roster_entry_id=entry.id)
+    return service.receipt_from_projection(scan, own)
 
 # Preserve private helper names through legacy compatibility imports.
 __all__ = [name for name in globals() if not name.startswith("__")]

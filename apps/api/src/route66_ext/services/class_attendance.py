@@ -5,6 +5,7 @@ membership imports/revocation and check-in cannot race. Never resolve by email.
 """
 from datetime import datetime, timezone
 from hashlib import sha256
+import json
 import secrets
 from uuid import uuid4
 from fastapi import HTTPException
@@ -60,23 +61,120 @@ async def scans_for(db, session_id, entry_id=None):
     return (await db.exec(query.order_by(AttendanceScan.arrived_at, AttendanceScan.id))).all()
 
 
-def own_receipt(scan, session, effective_status=None):
+async def decisions_for(db, session_id, entry_id=None):
+    rows = (await db.exec(select(AttendanceEvent).where(
+        AttendanceEvent.session_id == session_id, AttendanceEvent.kind == 'attendance_decided'
+    ).order_by(AttendanceEvent.id))).all()
+    return rows if entry_id is None else [row for row in rows if row.details.get('roster_entry_id') == entry_id]
+
+
+async def collection_started(db, session_id, scans=()):
+    if scans:
+        return True
+    return (await db.exec(select(AttendanceEvent.id).where(
+        AttendanceEvent.session_id == session_id, AttendanceEvent.kind == 'checkin_opened').limit(1))).first() is not None
+
+
+def latest_decision(decisions):
+    return max(decisions, key=lambda row: row.id) if decisions else None
+
+
+def decision_dto(row):
+    if row is None:
+        return None
+    return {'id': row.id, 'status': row.details['status'], 'reason': row.details['reason'],
+            'request_id': row.details['request_id'], 'previous_decision_id': row.details.get('previous_decision_id'),
+            'actor_user_id': row.actor_user_id, 'decided_at': row.created_at}
+
+
+def evidence_token(session, class_version, roster_entry_id, scans, decisions):
+    latest = latest_decision(decisions)
+    evidence = {'session_id': session.id, 'session_version': session.version, 'class_id': session.class_id,
+        'class_version': class_version, 'roster_entry_id': roster_entry_id,
+        'latest_decision_id': latest.id if latest else None,
+        'scans': [(row.id, row.receipt_id, _utc(row.arrived_at).isoformat(), row.kind, row.computed_status)
+                  for row in sorted(scans, key=lambda item: item.id)]}
+    return sha256(json.dumps(evidence, separators=(',', ':'), sort_keys=True).encode()).hexdigest()
+
+
+def own_receipt(scan, session, effective_status=None, decision=None):
     return {'receipt_id': scan.receipt_id, 'session_id': session.id, 'class_id': session.class_id,
             'session_title': session.title, 'arrived_at': scan.arrived_at, 'kind': scan.kind,
             'computed_status': scan.computed_status, 'session_state': session.state,
             'effective_status': effective_status or ('no_class' if session.state == 'no_class' else scan.computed_status),
-            'starts_at': session.starts_at, 'ends_at': session.ends_at, 'timezone': session.timezone}
+            'decision': decision, 'starts_at': session.starts_at, 'ends_at': session.ends_at, 'timezone': session.timezone}
 
 
-def scan_projection(session, scans, now, *, collected=False):
-    earliest = min(scans, key=lambda s: (_utc(s.arrived_at), s.id)) if scans else None
-    status = 'no_class' if session.state == 'no_class' else earliest.computed_status if earliest else missing_attendance_status(policy(session), now=now)
-    if status == 'absent' and not collected:
-        status = 'unrecorded'  # Calendar backfill is not evidence of attendance collection.
-    return {'status': status,
+def scan_projection(session, scans, now, *, decisions=(), collected=False, eligibility='active', class_version=0,
+                    roster_entry_id=None):
+    earliest = min(scans, key=lambda row: (_utc(row.arrived_at), row.id)) if scans else None
+    latest = max(decisions, key=lambda row: row.id) if decisions else None
+    decided = decision_dto(latest) if latest else None
+    override = latest.details.get('status') if latest else None
+    collected = collected or bool(scans)
+    if session.state == 'no_class':
+        status = 'no_class'
+    elif override and override != 'reset':
+        status = override
+    elif earliest:
+        status = earliest.computed_status
+    elif eligibility == 'withdrawn':
+        status = 'not_eligible'
+    elif eligibility != 'active':
+        status = 'unknown'
+    else:
+        status = missing_attendance_status(policy(session), now=now)
+        if status == 'absent' and not collected:
+            status = 'unrecorded'  # Calendar backfill is not evidence of attendance collection.
+    token = evidence_token(session, class_version, roster_entry_id, scans, decisions) if roster_entry_id is not None else None
+    return {'status': status, 'effective_status': status, 'evidence_token': token, 'decision': decided,
             'first_arrived_at': earliest.arrived_at if earliest else None,
-            'last_heartbeat_at': max((s.arrived_at for s in scans if s.kind == 'heartbeat'), default=None),
-            'receipts': [own_receipt(s, session, status) for s in scans]}
+            'last_heartbeat_at': max((row.arrived_at for row in scans if row.kind == 'heartbeat'), default=None),
+            'receipts': [own_receipt(row, session, status, decided) for row in scans]}
+
+
+def receipt_from_projection(scan, projection):
+    return next(row for row in projection['receipts'] if row['receipt_id'] == scan.receipt_id)
+
+
+async def record_decision(db, session, cls, entry_id, actor, org_id, *, status, reason, expected_token, request_id, now):
+    await staff(db, session, cls, actor, org_id)
+    entry = await db.get(AcademicRosterEntry, entry_id)
+    if entry is None or entry.class_id != cls.id:
+        raise HTTPException(404, 'Roster entry not found')
+    prior = (await db.exec(select(AttendanceEvent).where(
+        AttendanceEvent.session_id == session.id, AttendanceEvent.kind == 'attendance_decided',
+        AttendanceEvent.details['request_id'].as_string() == request_id).order_by(AttendanceEvent.id))).all()
+    scans = await scans_for(db, session.id, entry.id)
+    decisions = await decisions_for(db, session.id, entry.id)
+    collected = await collection_started(db, session.id, scans)
+    from src.route66_ext.services import attendance_reporting
+    student = await db.get(SchoolStudent, entry.student_id)
+    timelines = await attendance_reporting.load_membership_timelines(db, cls.id, [(entry, student)])
+    eligibility = timelines[entry.id].at(session.starts_at)
+    projection = scan_projection(session, scans, now, decisions=decisions, collected=collected,
+        eligibility=eligibility, class_version=cls.version, roster_entry_id=entry.id)
+    if prior:
+        exact = len(prior) == 1 and prior[0].session_id == session.id and prior[0].actor_user_id == actor.id and prior[0].details.get('roster_entry_id') == entry.id and prior[0].details.get('status') == status and prior[0].details.get('reason') == reason and prior[0].details.get('expected_token') == expected_token
+        if not exact:
+            raise HTTPException(409, {'code': 'request_id_collision', 'message': 'This request ID already belongs to another attendance decision.'})
+        return prior[0], projection, True
+    if session.state == 'no_class':
+        raise HTTPException(409, {'code': 'no_class', 'message': 'Attendance decisions are unavailable while this session is no-class.'})
+    if _utc(now) < _utc(session.starts_at):
+        raise HTTPException(409, {'code': 'future_session', 'message': 'Future attendance cannot be corrected.'})
+    if projection['evidence_token'] != expected_token:
+        raise HTTPException(409, {'code': 'stale_evidence', 'message': 'Attendance evidence changed. Reload before reviewing this correction.',
+                                  'current_token': projection['evidence_token']})
+    previous = latest_decision(decisions)
+    row = AttendanceEvent(session_id=session.id, actor_user_id=actor.id, kind='attendance_decided', details={
+        'roster_entry_id': entry.id, 'status': status, 'reason': reason, 'expected_token': expected_token,
+        'request_id': request_id, 'previous_decision_id': previous.id if previous else None})
+    db.add(row)
+    await db.flush()
+    projection = scan_projection(session, scans, now, decisions=[*decisions, row], collected=collected,
+        eligibility=eligibility, class_version=cls.version, roster_entry_id=entry.id)
+    return row, projection, False
 
 
 async def open_challenge(db, session, cls, actor, org_id, kind, now):
@@ -124,12 +222,15 @@ async def accept_scan(db, token, actor, org_id, arrived_at, *, reservation=None)
     # Authority is still rechecked above. It does not create new evidence after expiry.
     old = (await db.exec(select(AttendanceScan).where(AttendanceScan.challenge_id == challenge.id, AttendanceScan.roster_entry_id == entry.id))).first()
     existing = await scans_for(db, session.id, entry.id)
+    decisions = await decisions_for(db, session.id, entry.id)
     if reservation and (reservation.owner != actor.id or reservation.session_id != session.id):
         raise HTTPException(403, {'code': 'handoff_claimed'})
     if old:
         if old.actor_user_id != actor.id:
             raise HTTPException(403, {'code': 'roster_changed'})
-        return own_receipt(old, session, scan_projection(session, existing, arrived_at)['status']), False
+        projection = scan_projection(session, existing, arrived_at, decisions=decisions, collected=True,
+            eligibility=entry.status, class_version=cls.version, roster_entry_id=entry.id)
+        return receipt_from_projection(old, projection), False
     if reservation:
         if (reservation.session_id != session.id or reservation.session_version != session.version
             or not _utc(challenge.created_at) <= reservation.arrived_at <= arrived_at
@@ -149,7 +250,9 @@ async def accept_scan(db, token, actor, org_id, arrived_at, *, reservation=None)
     db.add(scan)
     await db.flush()
     audit(db, session, actor, 'checkin_recorded', {'receipt_id': scan.receipt_id, 'roster_entry_id': entry.id, 'kind': scan.kind})
-    return own_receipt(scan, session, scan_projection(session, [*existing, scan], arrived_at)['status']), True
+    projection = scan_projection(session, [*existing, scan], arrived_at, decisions=decisions, collected=True,
+        eligibility=entry.status, class_version=cls.version, roster_entry_id=entry.id)
+    return receipt_from_projection(scan, projection), True
 
 # Preserve private helper names through legacy compatibility imports.
 __all__ = [name for name in globals() if not name.startswith("__")]

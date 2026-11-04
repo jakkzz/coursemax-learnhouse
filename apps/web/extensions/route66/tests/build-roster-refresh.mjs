@@ -10,6 +10,7 @@ const result = await Bun.build({
     build.onResolve({ filter: /.*/ }, args => {
       const p = args.path
       if (!fixtures.includes('CustomUiRepairs') && ['./TeacherTimetable', './SchoolTimetable', './calendar/CalendarLibrary', './calendar/ClassSchedule', '../calendar/ClassSchedule'].includes(p)) return { path: 'unrelated', namespace: 'fixture' }
+      if (p === 'qrcode') return { path: Bun.resolveSync('qrcode/lib/browser.js', dependencies) }
       if (p === 'next/link') return { path: 'link', namespace: 'fixture' }
       if (p === '@/extensions/route66/adapters/ui') return { path: 'ui', namespace: 'fixture' }
       if (p.startsWith('@/')) return { path: Bun.resolveSync(web + '/' + p.slice(2), args.resolveDir) }
@@ -17,7 +18,7 @@ const result = await Bun.build({
       if (!p.startsWith('.') && !p.startsWith('/')) try { return { path: Bun.resolveSync(p, dependencies) } } catch {}
     })
     build.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ loader: 'tsx', contents:
-      args.path === 'ui' ? `export {Button} from ${JSON.stringify(web + '/extensions/route66/components/interior/Button.tsx')};export {Input} from ${JSON.stringify(web + '/components/ui/input.tsx')};import React from 'react';import material from ${JSON.stringify(web + '/extensions/route66/components/interior/material.module.css')};export function AuthLayout({children}){return <div className={material.scope+' '+material.authFrame}>{children}</div>}` :
+      args.path === 'ui' ? `export {Button} from ${JSON.stringify(web + '/extensions/route66/components/interior/Button.tsx')};export {Input} from ${JSON.stringify(web + '/components/ui/input.tsx')};import React from 'react';import material from ${JSON.stringify(web + '/extensions/route66/components/interior/material.module.css')};export function AuthLayout({children}){return <div className={material.scope+' '+material.authFrame}>{children}</div>}export function Dialog({open,children}){return open?<>{children}</>:null}export function DialogContent({children,...props}){return <section {...props}>{children}</section>}export function DialogTitle({children}){return <h2>{children}</h2>}export function DialogDescription({children}){return <p>{children}</p>}` :
       args.path === 'link' ? `import React from 'react';export default function Link({children,...props}){return <a {...props}>{children}</a>}` :
       'export default function Unrelated(){return null}',
     }))

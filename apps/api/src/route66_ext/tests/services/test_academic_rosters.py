@@ -226,17 +226,23 @@ class AcademicRosterTests(NativeGoogleTests):
     async def test_nine_digit_hint_does_not_get_padded_or_matched(self):
         await self.claim(number='690000001');await self.snapshot('0690000001')
         async with self.sessions() as db:self.assertIsNone((await db.exec(select(SchoolStudent))).one().user_id)
-    async def test_classes_query_is_own_only_and_withdrawal_removes_current_access(self):
+    async def test_classes_query_retains_withdrawn_own_history_without_current_access(self):
         await self.claim();await self.snapshot('6900000001')
+        async with self.sessions.begin() as db:
+            course=await db.get(Course,10);course.public=True;course.published=True;db.add(course)
         async with self.sessions() as db:
             user=await db.get(User,1);e=(await db.exec(select(SchoolGoogleEvidence).where(SchoolGoogleEvidence.user_id==1))).one()
             async def ctx(*args):return user,SimpleNamespace(org_id=1),e
-            with patch.object(api,'context',ctx):self.assertEqual(len((await api.classes(None,Response(),db))['classes']),1)
+            with patch.object(api,'context',ctx):active=(await api.classes(None,Response(),db))['classes']
+            self.assertEqual(len(active),1);self.assertFalse(active[0]['own_attendance_history_only']);self.assertTrue(active[0]['course_available'])
         await self.snapshot('6900000002');await self.snapshot('6900000002')
         async with self.sessions() as db:
             user=await db.get(User,1);e=(await db.exec(select(SchoolGoogleEvidence).where(SchoolGoogleEvidence.user_id==1))).one()
             async def ctx(*args):return user,SimpleNamespace(org_id=1),e
-            with patch.object(api,'context',ctx):self.assertEqual((await api.classes(None,Response(),db))['classes'],[])
+            with patch.object(api,'context',ctx):data=await api.classes(None,Response(),db)
+            self.assertEqual(len(data['classes']),1)
+            self.assertEqual((data['classes'][0]['own_attendance_history_only'],data['classes'][0]['manageable'],data['classes'][0]['course_available']), (True,False,False))
+            self.assertFalse(data['can_create'])
     async def endpoint_context(self,db,user_id=2):
         from contextlib import asynccontextmanager
         from unittest.mock import AsyncMock

@@ -11,6 +11,8 @@
 .check { display:grid; place-items:center; width:3rem; height:3rem; border:2px solid currentColor; border-radius:50%; margin-bottom:1rem; }
 .celebrate .check path { stroke-dasharray:32; stroke-dashoffset:0; animation:recorded 420ms cubic-bezier(0.16,1,0.3,1); }
 .arrival { animation:arrival 1200ms ease-out; }
+.result { border-radius:0.375rem; }
+.result:focus { outline:2px solid #4568ff; outline-offset:3px; }
 @keyframes recorded { from { stroke-dashoffset:32; } to { stroke-dashoffset:0; } }
 @keyframes arrival { from { background:#d1fae5; } to { background:transparent; } }
 @media(min-width:1100px) { .liveLayout { grid-template-columns:minmax(22rem,0.9fr) minmax(0,1.1fr); } }

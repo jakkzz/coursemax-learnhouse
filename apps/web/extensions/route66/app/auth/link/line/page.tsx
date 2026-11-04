@@ -71,7 +71,7 @@ export default function LinkLinePage() {
       </>}
       {disconnected && <p role="status" className="text-sm leading-relaxed">{t('auth.line_disconnected')}</p>}
       {error && <p role="alert" className="text-sm leading-relaxed">{t('auth.line_retry')}</p>}
-      <Link href="/account/security" className="block text-sm underline underline-offset-4">{t('auth.line_back_security')}</Link>
+      <Link href="/account/security" className="inline-flex min-h-11 items-center text-sm underline underline-offset-4">{t('auth.line_back_security')}</Link>
     </main>
   </AuthLayout>
 }

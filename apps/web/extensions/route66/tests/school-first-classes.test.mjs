@@ -5,7 +5,7 @@ const read = file => readFileSync(new URL('../components/Objects/' + file, impor
 
 test('official school classes are the default and native classes remain a separate source', () => {
   const source = read('Classes/ClassesWorkspace.tsx')
-  assert.match(source, /useState<'school'\|'learnhouse'>\('school'\)/)
+  assert.match(source, /useState<'school'\|'learnhouse'\|'identity'>\('school'\)/)
   assert.match(source, /aria-label=\{th\?'พื้นที่ชั้นเรียน':'Class workspace'\}/)
   assert.match(source, /value="learnhouse" forceMount hidden=\{sourceView!=='learnhouse'\}/)
   assert.match(source, /value="classes" forceMount hidden=\{sourceView!=='school'\|\|calendarOpen\}/)

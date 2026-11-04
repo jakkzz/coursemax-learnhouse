@@ -3,10 +3,13 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 const source = file => readFileSync(new URL('../' + file, import.meta.url), 'utf8')
 
-test('one workspace rail owns separate mounted school, LearnHouse and calendar panels', () => {
+test('one workspace rail owns mounted school, LearnHouse, calendar and authorized review panels', () => {
  const workspace = source('components/Objects/Classes/ClassesWorkspace.tsx')
  assert.equal((workspace.match(/<TabsList /g) ?? []).length, 1)
- assert.equal((workspace.match(/<TabsTrigger /g) ?? []).length, 3)
+ assert.equal((workspace.match(/<TabsTrigger /g) ?? []).length, 4)
+ assert.match(workspace, /catalog\?\.can_assign_teachers&&<TabsTrigger value="identity"/)
+ assert.match(workspace, /value="identity" forceMount hidden=\{sourceView!=='identity'\}/)
+ assert.match(workspace, /identityVisited&&<IdentityReviewInbox/)
  assert.doesNotMatch(workspace, /SchoolWorkspaceNav|school\.sources|NRRU class list|workspace\.intro/)
  assert.match(workspace, /<TabsList[^>]+aria-label=\{th\?'พื้นที่ชั้นเรียน':'Class workspace'\}/)
  assert.match(workspace, /<TabsContent value="calendar" forceMount hidden=\{sourceView!=='school'\|\|!calendarOpen\}/)

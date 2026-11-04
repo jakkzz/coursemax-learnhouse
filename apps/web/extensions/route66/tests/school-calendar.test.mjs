@@ -175,8 +175,9 @@ test('calendar selection and preview do not automatically mutate sessions or stu
  assert.match(s, /fingerprint: preview.fingerprint, reviewed/)
  assert.match(s, /expected_version: preview.version/)
  assert.match(s, /disabled=\{busy \|\| !reviewed \|\| Boolean\(preview.errors\?\.length\)\}/)
- assert.match(s, /disabled=\{busy \|\| !rosterReviewed\}/)
- assert.match(s, /confirm_changes: rosterReviewed/)
+ assert.match(s, /onOpenRoster\(saved.class_id!\)/)
+ assert.match(s, /Review saved roster/)
+ assert.doesNotMatch(s, /rosterRequest|roster\/apply|confirm_changes|rosterReviewed/)
  assert.doesNotMatch(s, /assignment_id|assignment_uuid|due_date/)
 })
 test('shared calendar and school-only class schedules stay inside native account shell', () => {

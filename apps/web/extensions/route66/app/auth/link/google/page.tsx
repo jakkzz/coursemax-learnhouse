@@ -47,7 +47,7 @@ export default function LinkGooglePage() {
         <Button type="submit" disabled={busy} loading={busy} loadingLabel={t('common.loading')} className="w-full">
           {t('auth.google_link_continue', { defaultValue: 'Choose the Google account to link' })}
         </Button>
-        <Link href="/home" className="block text-center text-sm underline underline-offset-4">{t('common.cancel')}</Link>
+        <Link href="/home" className="flex min-h-11 items-center justify-center text-sm underline underline-offset-4">{t('common.cancel')}</Link>
       </form>
     </AuthLayout>
   )

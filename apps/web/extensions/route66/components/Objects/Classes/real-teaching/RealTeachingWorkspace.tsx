@@ -17,9 +17,9 @@ import palette from '../class-colors.module.css'
 type View = 'overview' | 'timetable' | 'roster'
 export default function RealTeachingWorkspace({ context, linked, savedRoster, linksKnown, th, onClose, onOpenRoster, onChanged, onOpenCalendars, calendarRefresh }: {
   context: RegistrarClassContext; linked: AcademicClassLink | null; savedRoster?: AcademicClassLink | null; linksKnown: boolean; th: boolean
-  onClose: () => void; onOpenRoster: () => void; onChanged?: () => void; onOpenCalendars?: () => void; calendarRefresh?: number
+  onClose: () => void; onOpenRoster: (classId: number) => void; onChanged?: () => void; onOpenCalendars?: () => void; calendarRefresh?: number
 }) {
-  const [view, setView] = useState<View>('overview'), [connecting, setConnecting] = useState(false), heading = useRef<HTMLHeadingElement>(null)
+  const [view, setView] = useState<View>('overview'), [scheduleVisited, setScheduleVisited] = useState(false), [connecting, setConnecting] = useState(false), heading = useRef<HTMLHeadingElement>(null)
   useEffect(() => { window.scrollTo(0, 0); heading.current?.focus({ preventScroll: true }) }, [])
   const c = context.classRow
   const t = th ? {
@@ -38,17 +38,17 @@ export default function RealTeachingWorkspace({ context, linked, savedRoster, li
   return <section className={`${styles.workspace} ${palette.workspace}`} aria-labelledby="real-class-title">
     <Button variant="ghost" className="min-h-11" onClick={onClose}><ArrowLeft size={16} aria-hidden="true" />{t.back}</Button>
     <header className={styles.heading}><h1 id="real-class-title" ref={heading} tabIndex={-1}>{c.title}</h1><p>{c.course_code} · {context.semester}/{context.academic_year} · {t.section} {c.section}</p></header>
-    <SegmentedControl className={styles.tasks} label={t.tasks} value={view} onValueChange={setView} options={(['overview', 'timetable', 'roster'] as const).map(key => ({ value: key, label: t[key] }))} />
+    <SegmentedControl className={styles.tasks} label={t.tasks} value={view} onValueChange={value => { setView(value); if (value === 'timetable') setScheduleVisited(true) }} options={(['overview', 'timetable', 'roster'] as const).map(key => ({ value: key, label: t[key] }))} />
     {view === 'overview' && <div className={styles.task} role="region" aria-label={t.overview}>
       <h2>{t.overview}</h2><dl className={styles.facts}>{[[t.code, c.course_code], [t.section, c.section], [t.term, `${context.semester}/${context.academic_year}`], ...(context.teacher_name ? [[t.teacher, context.teacher_name]] : [])].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
       <section className={styles.learningLink} aria-labelledby="learning-class-title"><h2 id="learning-class-title">{t.learning}</h2>
-        {!linksKnown ? <><p role="status">{t.loading}</p><Button variant="outline" className="mt-3 min-h-11" onClick={onChanged}>{t.retry}</Button></> : linked ? <><p className={styles.matched}><CheckCircle2 size={16} aria-hidden="true" />{t.matched}</p><div className={styles.handoffs}><Button variant="outline" className="min-h-11" onClick={onOpenRoster}>{t.openRoster}</Button><Link className={styles.action} href={`/attendance?class=${linked.id}`}>{t.openSchedule}</Link>{linked.course_available && <Link className={styles.action} href={nativeCoursePath(linked.course_uuid)}>{t.openCourse}</Link>}</div></> : <><p>{t.separate}</p><p>{t.separateHelp}</p><details onToggle={e => setConnecting(e.currentTarget.open)}><summary>{t.connect}</summary>{connecting && <SectionConnection context={context} th={th} onChanged={onChanged ?? (() => {})} onOpenCalendars={onOpenCalendars} />}</details></>}
+        {!linksKnown ? <><p role="status">{t.loading}</p><Button variant="outline" className="mt-3 min-h-11" onClick={onChanged}>{t.retry}</Button></> : linked ? <><p className={styles.matched}><CheckCircle2 size={16} aria-hidden="true" />{t.matched}</p><div className={styles.handoffs}><Button variant="outline" className="min-h-11" onClick={() => onOpenRoster(linked.id)}>{t.openRoster}</Button><Link className={styles.action} href={`/attendance?class=${linked.id}`}>{t.openSchedule}</Link>{linked.course_available && <Link className={styles.action} href={nativeCoursePath(linked.course_uuid)}>{t.openCourse}</Link>}</div></> : <><p>{t.separate}</p><p>{t.separateHelp}</p><details onToggle={e => setConnecting(e.currentTarget.open)}><summary>{t.connect}</summary>{connecting && <SectionConnection context={context} th={th} onChanged={onChanged ?? (() => {})} onOpenCalendars={onOpenCalendars} />}</details></>}
       </section>
     </div>}
-    {view === 'timetable' && <div className={styles.task} role="region" aria-label={t.timetable}><ClassSchedule context={context} th={th} onOpenCalendars={onOpenCalendars} refreshKey={calendarRefresh} onSaved={onChanged}/><h2 className="mt-8">{t.weekly}</h2><p>{t.scheduleHelp}</p>
+    {scheduleVisited && <div hidden={view !== 'timetable'} className={styles.task} role="region" aria-label={t.timetable}><ClassSchedule context={context} th={th} onOpenCalendars={onOpenCalendars} onOpenRoster={onOpenRoster} refreshKey={calendarRefresh} onSaved={onChanged}/><h2 className="mt-8">{t.weekly}</h2><p>{t.scheduleHelp}</p>
       {c.meetings.length === 0 ? <p>{t.noMeetings}</p> : <ul className={styles.meetings}>{c.meetings.map((m, i) => <li key={i}><div className={styles.when}><span className={colors.day} data-weekday={weekdayKey(m.day)}><Clock3 size={14} aria-hidden="true" />{m.day}</span><strong>{m.start_time}–{m.end_time}</strong></div>{m.details && <p className={styles.details}><MapPin size={16} aria-hidden="true" /><span>{m.details}</span></p>}</li>)}</ul>}
     </div>}
-    {view === 'roster' && <OfficialRoster key={`${c.registry_course_id}/${context.academic_year}/${context.semester}/${c.section}`} context={context} th={th} onOpenSaved={savedRoster ? onOpenRoster : undefined} />}
+    {view === 'roster' && <OfficialRoster key={`${c.registry_course_id}/${context.academic_year}/${context.semester}/${c.section}`} context={context} th={th} onOpenSaved={savedRoster ? () => onOpenRoster(savedRoster.id) : undefined} />}
     {view !== 'roster' && <p className={styles.fetched}>{t.source} · {t.updated}: <time dateTime={context.fetched_at}>{new Date(context.fetched_at).toLocaleString(th ? 'th-TH' : 'en-GB')}</time></p>}
   </section>
 }

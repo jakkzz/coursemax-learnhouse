@@ -9,14 +9,18 @@ test('opening a class automatically reads its saved roster with cancellation', (
   assert.match(source, /!roster&&!error&&<p role="status">\{t.loadingRoster\}/)
 })
 
-test('registrar refresh uses an accessible icon rather than an initial-load action', () => {
-  assert.match(source, /<Button variant="outline" size="icon" className="min-h-11 min-w-11" aria-label=\{t.refreshRoster\} title=\{t.refreshRoster\} aria-busy=\{busy\} disabled=\{busy\} onClick=\{\(\)=>void loadPreview\(\)\}><RefreshCw size=\{18\} aria-hidden="true" \/><\/Button>/)
-  assert.match(source, /refreshRoster:'Refresh roster'/)
-  assert.match(source, /refreshRoster:'อัปเดตรายชื่อ'/)
+test('saved roster delegates checking and review to the shared refresh control', () => {
+  assert.match(source, /sourceView==='learnhouse'&&<RosterRefreshStatus/)
+  assert.match(source, /disabled=\{busy\} onReview=\{loadPreview\}/)
+  const status = readFileSync(new URL('../components/Objects/Classes/RosterRefreshStatus.tsx', import.meta.url), 'utf8')
+  assert.match(status, /review \? t.review : failure \? t.retry : t.check/)
+  assert.match(status, /aria-live="polite"/)
+  assert.match(status, /review: 'ตรวจสอบการเปลี่ยนแปลง'/)
   assert.doesNotMatch(source, /Load official roster|t\.loadRoster/)
 })
 
 test('refresh retains the existing preview and explicit apply path', () => {
-  assert.match(source, /async function loadPreview\(\).*?setPreview\(await request\(`\/\$\{selected\}\/roster\/preview`,\{\}\)\)/s)
-  assert.match(source, /disabled=\{busy\|\|!reviewed\}.*?roster\/apply/s)
+  assert.match(source, /async function loadPreview\(\).*?const value=await request\(`\/\$\{id\}\/roster\/preview`,\{\}\).*?selectedRef.current===id.*?setPreview\(value\)/s)
+  assert.match(source, /disabled=\{busy\|\|!reviewed\|\|previewStale\}.*?roster\/apply/s)
+  assert.match(source, /confirm_large_drop:preview.requires_large_drop_review===true&&reviewed/)
 })

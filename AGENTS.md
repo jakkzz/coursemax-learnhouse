@@ -98,6 +98,20 @@ and shared services intact; real historical migration and cutover remain separat
 work. Prefer owned adapters/routes over native-core changes. Newest ../STATUS.md and
 current release pointer are authoritative over historical deployment headings.
 
+## Latest source checkpoint — attendance corrections/history/CSV, 2026-11-04
+
+Four sequential GPT-5.6-sol agents delivered source `f23ccdf0`, not deployed.
+Full GitHub bundle/types at identical web tree41c8163e,36 DB/HTTP/policy checks,
+23 baseline passes +one refined stream check, five component flows, seven client
+checks/52 assertions,26 source/20 rehearsal/31 tooling checks pass. See
+`docs/extensions/attendance-corrections-reporting.md` and newest private STATUS.
+Package prep is ready; disk is below shared25GiB (~24.997GiB), so candidate/fallback
+build, native-auth packaged proof and activation must wait. No gate relaxation,
+cleanup/prune, migration, live attendance mutation or service change. Live remains
+below. New decisions require correction-aware fallback code, not the old API that
+ignores them. Parent layout/artifact/proofs retained in
+`~/.local/state/learnhouse-attendance-implementation-20261104/`.
+
 ## Latest deployment — custom UI repairs, 2026-11-04
 
 Live `e142f6e3` / `310ed40a`, release `ui-repairs-e142f6e3-20261104`, healthy.

@@ -1,5 +1,15 @@
 # Internal extension deployment records
 
+## Pending source: attendance corrections/history/CSV — 2026-11-04
+
+Implemented/pushed `f23ccdf0`, **not deployed**. See
+[implementation and resource boundary](attendance-corrections-reporting.md).
+Full off-host bundle/types and focused DB/component tests pass; package preparation
+is retained. Shared free disk is below25GiB, so no local candidate/fallback build or
+app activation. Need actual correction-aware fallback/native-auth packaged proof
+before delivery; never roll back new decisions to the old unaware API or old data.
+Current release remains the deployed UI repair below.
+
 ## Latest: custom UI repairs deployed — 2026-11-04
 
 Live `e142f6e3` / `310ed40a`, release `ui-repairs-e142f6e3-20261104`, healthy.

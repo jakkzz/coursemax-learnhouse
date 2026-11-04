@@ -98,7 +98,25 @@ and shared services intact; real historical migration and cutover remain separat
 work. Prefer owned adapters/routes over native-core changes. Newest ../STATUS.md and
 current release pointer are authoritative over historical deployment headings.
 
-## Current runtime — unattended roster refresh, 2026-11-03
+## Current runtime — student identity reviews, 2026-11-04
+
+Live `53d3d248` / `b73530fb`, release `identity-53d3d248-20261104`. Student requests,
+teacher receipts and existing-superadministrator decisions use the academic journal,
+exact-match writer and native READ repair; no new table/role/account writer. Do not
+treat unchanged closure as resolved ownership or allow merges/transfers. Private
+reviewer evidence stays out of student/teacher DTOs and raw class history.
+
+Full bundle/types, 56 baked checks, 40 component flows, two packaged EN/TH workflows
+(six native-auth actor journeys),actual retained `d85f488b` compatibility and four
+live entry checks pass. Normal admission passed; schema/runtime settings/peer IDs
+are unchanged. Protected snapshots and saved current/parent images retained; code-
+only rollback never restores old data. Fixtures must copy the actual owned launcher,
+not fall back to native `app.py`. See `docs/extensions/identity-reviews.md` and newest
+STATUS. Genuine provider/student and remaining staff identity parity remain open.
+Existing roster worker remains active; two real source_failed results were observed.
+Owner confirmed the roster file and moved on, not a successful acquisition claim.
+
+## Previous runtime — unattended roster refresh, 2026-11-03
 
 Live source `d58e4899`, image `d85f488b`, healthy; release `roster-d58e4899-20261103`.
 Six-hour worker and EN/TH saved-roster controls are active. GitHub run `41685386822`

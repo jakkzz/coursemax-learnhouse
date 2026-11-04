@@ -2,8 +2,9 @@
 
 ## Current scope — 2026-11-04
 
-Source implementation; full frontend build, packaged/native-auth workflow and live
-deployment are pending. The preceding roster-refresh release remains live.
+Deployed at 2026-11-04 04:58 UTC: source `53d3d248`, image `b73530fb`, healthy at
+`https://learn.route66.click`; release `identity-53d3d248-20261104`. This is the
+student-record review slice, not full identity/provider acceptance.
 
 - Students request review from Account → School identity or a conflicted My classes
   view. The server attaches their verified-number/owned roster record; no IDs to type.
@@ -56,17 +57,33 @@ institutional proof method: conflicting evidence cannot be approved.
 
 Private evidence: `~/.local/state/learnhouse-identity-reviews-20261104/`.
 
-- 45 isolated PostgreSQL/HTTP/parser/roster checks passed, including 13 review/access
+- Final image passes 56 baked PostgreSQL/HTTP/parser/roster/boundary checks, including
+  13 review/access
   tests: persisted requests and decisions, duplicate/stale/concurrent decisions,
   own-only/org scope, role denial, no ownership merge, deferred exact matching,
   School → My classes → native private-course READ, and optional access failure
-  preserving an unrelated manual grant. The latest duplicate-report refinement is
-  rerun with the focused review selection.
+  preserving an unrelated manual grant. Earlier source selection passed 45 checks;
+  the duplicate-report refinement also passes the focused 13-test selection.
 - 12 real-component teacher/admin/student EN/TH 1440/390 flows and 28 existing roster
   component regressions passed. Synthetic HTTP is not native-auth acceptance.
 - Shared Interior controls/native tabs retained; mobile administrator navigation uses
   two rows rather than splitting the LearnHouse name. Inline review, not independent.
-- Boundary and 31 tooling checks pass. No schema changes or real-data test shortcuts.
+- GitHub run `41772137685` passes full bundle/types. Packaged EN1440/TH390 workflows
+  cover six native-auth student/teacher/admin journeys: four persistent requests/
+  decisions, two exact matches, School → My classes → native private-course READ,
+  teacher receipts, private-note exclusion and student denial. The fixture was
+  corrected to copy the actual owned launcher before these passing checks.
+- Actual parent `d85f488b` reads the resulting synthetic history and private course;
+  all eleven academic/identity/access fingerprints match before/after code rollback.
+- 1,265 API files, 5,530 web entries and 2,646 retained assets verified. Saved image
+  archive contains all 74 blobs. Four live EN/TH entry/denial checks, API hashes,
+  BUILD_ID, unchanged schema/runtime/peer IDs and existing worker leadership pass.
+- Normal admission RAM 3.41GiB/disk 31.57GiB; observed minimum 3.407GiB. Only app replaced
+  and gateway reloaded, no migration or capacity override. Fresh quiesced DB/schema/
+  content checksums pass. Keep compatible parent/current archives and current data;
+  rollback is code-only and never deletes review or scheduled history.
+- Boundary and 31 tooling checks pass. No real-data test shortcuts or real provider/
+  device acceptance; a genuine student must still participate in that acceptance.
 
 ## Separate roster-refresh issue
 

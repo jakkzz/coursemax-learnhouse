@@ -1,6 +1,28 @@
 # Internal extension deployment records
 
-## Latest: unattended roster refresh deployed — 2026-11-03
+## Latest: student identity reviews deployed — 2026-11-04
+
+Source `53d3d248`, image `b73530fb`, healthy; current release
+`identity-53d3d248-20261104`. Students request review, teachers track roster flags,
+and existing administrators recheck an exact verified match or close unchanged.
+See [scope and evidence](identity-reviews.md). No schema migration, identity transfer,
+merge, role grant or second writer. Only app replaced/gateway reloaded; owned API
+launcher, schema, env, limits, mounts and peer IDs preserved.
+
+Full GitHub bundle/types, 56 baked checks, 40 component flows, two packaged EN1440/TH390
+workflows (six native-auth actor journeys) and four live entry/denial checks pass.
+1,265 API files, 5,530 web entries, 2,646 retained static assets and BUILD_ID verified.
+Actual retained `d85f488b` preserves synthetic review history, matched ownership,
+rosters and private-course READ with eleven unchanged state fingerprints.
+Fresh quiesced DB/schema/content snapshots and saved current/parent images verified;
+code-only rollback, never old data. No real-provider/device acceptance is implied.
+
+Normal admission RAM 3.41GiB/disk 31.57GiB; minimum observed 3.407GiB, no exception.
+Private evidence: `~/.local/state/learnhouse-identity-reviews-20261104/`.
+The existing worker still leads; earlier real source_failed outcomes are unresolved,
+despite owner confirmation of the source file. No registrar/roster fix in this release.
+
+## Previous: unattended roster refresh deployed — 2026-11-03
 
 Source `d58e4899`, image `d85f488b`, healthy at `https://learn.route66.click`;
 current release `roster-d58e4899-20261103`. Six-hour fenced worker and EN/TH saved-roster

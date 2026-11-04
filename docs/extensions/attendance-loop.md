@@ -222,6 +222,16 @@ success icon. The cached upstream root DESIGN.md is absent; fetch/read its pinne
 version before copying implementation. Record license/provenance for copied source.
 No new animation or transport dependency is needed.
 
+## Next slice: corrections, history and CSV — rehearsed 2026-11-04
+
+The [bounded implementation plan](attendance-corrections-reporting-plan.md) carries
+this design forward: append-only decisions, every effective-result caller, observed
+historical coverage, one aggregate/export and complete teacher/student tasks.
+25 existing policy, 20 offline specification and seven current-image PostgreSQL/HTTP
+foundation checks pass. This is planning only, not a new runtime or accepted B07 slice.
+Leave follows through the same decision writer. Older readers ignore new decisions,
+so correction-aware code rollback must be established before shipping this slice.
+
 ## SSOT — one owner for each fact
 
 | Fact | Authority / planned use |

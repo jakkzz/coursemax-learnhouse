@@ -8,8 +8,13 @@ import { useOrg } from '@components/Contexts/OrgContext'
 import { OrgJoinBanner, OrgJoinBannerProvider } from '@components/Objects/Banners/OrgJoinBanner'
 import { OrgMFAPolicyGate } from '@components/Objects/Banners/OrgMFAPolicyGate'
 import { PodcastPlayerProvider } from '@components/Contexts/PodcastPlayerContext'
+import { SiteCommandPaletteProvider } from '@components/Objects/Search/SiteCommandPaletteContext'
+import { ShortcutsProvider } from '@/lib/shortcuts/ShortcutsContext'
+import GlobalShortcuts from '@components/Objects/Shortcuts/GlobalShortcuts'
 import dynamic from 'next/dynamic'
 const PodcastPlayer = dynamic(() => import('@components/Objects/Podcasts/PodcastPlayer'), { ssr: false })
+const SiteCommandPalette = dynamic(() => import('@components/Objects/Search/SiteCommandPalette'), { ssr: false })
+const ShortcutHelp = dynamic(() => import('@components/Objects/Shortcuts/ShortcutHelp'), { ssr: false })
 import Image from 'next/image'
 import Link from 'next/link'
 import { PageViewTracker } from '@components/Analytics/PageViewTracker'
@@ -104,6 +109,7 @@ function LayoutContent({ children, orgslug }: { children: ReactNode; orgslug: st
   // Pages that use a full-bleed layout (no footer/watermark)
   const noFooterPaths = ['copilot']
   const isFullBleedPage = noFooterPaths.some((p) => pathParts.includes(p))
+  const isAccountPage = pathParts.includes('account')
 
   return (
     <div
@@ -111,7 +117,7 @@ function LayoutContent({ children, orgslug }: { children: ReactNode; orgslug: st
       // font-family in Arabic, where Tajawal replaces the org's custom face
       // outright. An inline style beats any normal rule, so the override has to
       // target this element specifically.
-      className="lh-org-font-root flex flex-col min-h-screen"
+      className={`lh-org-font-root flex flex-col min-h-screen ${isAccountPage ? 'pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-0' : ''}`}
       style={{
         backgroundColor: primaryColor ? hexToRgba(primaryColor, 0.05) : 'transparent',
         ...(customFont ? { fontFamily: `'${customFont}', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif` } : {}),
@@ -126,7 +132,10 @@ function LayoutContent({ children, orgslug }: { children: ReactNode; orgslug: st
         {children}
       </div>
       {!isFullBleedPage && !chromeless && <OrgFooter />}
-      {!isFullBleedPage && !chromeless && <Watermark />}
+      {!isFullBleedPage && !chromeless && <Watermark inFlow={isAccountPage || pathParts.includes('classes') || pathParts.includes('attendance')} />}
+      {!chromeless && <SiteCommandPalette />}
+      {!chromeless && <GlobalShortcuts />}
+      {!chromeless && <ShortcutHelp />}
     </div>
   )
 }
@@ -148,9 +157,13 @@ export default function RootLayout(
       <SessionGate>
       <OrgJoinBannerProvider>
         <PodcastPlayerProvider>
-          <LayoutContent orgslug={params?.orgslug}>
-            {children}
-          </LayoutContent>
+          <SiteCommandPaletteProvider>
+            <ShortcutsProvider>
+              <LayoutContent orgslug={params?.orgslug}>
+                {children}
+              </LayoutContent>
+            </ShortcutsProvider>
+          </SiteCommandPaletteProvider>
           <PodcastPlayer />
         </PodcastPlayerProvider>
       </OrgJoinBannerProvider>

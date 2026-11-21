@@ -1,0 +1,6 @@
+# Frontend-only timetable color refinement on the exact teacher-workspace parent.
+FROM coursemax-learnhouse:7fe104c9
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.source="https://github.com/jakkzz/coursemax-learnhouse" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}"
+ADD web-delta.tar.gz /app/web/

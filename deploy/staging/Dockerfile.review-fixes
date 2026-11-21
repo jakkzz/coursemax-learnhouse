@@ -1,0 +1,9 @@
+# API-only overlay. Supply the verified current image as the named OCI context:
+# --build-context parent=oci-layout:///absolute/parent-layout@sha256:MANIFEST
+# Build with maintenance build and --builder vps-limited; never rebuild the web here.
+FROM parent
+ARG SOURCE_REVISION
+COPY --chown=1000:1000 apps/api/src/route66_ext/ /app/api/src/route66_ext/
+COPY --chown=1000:1000 apps/api/src/services/courses/chapters.py /app/api/src/services/courses/chapters.py
+COPY --chown=1000:1000 apps/api/src/services/courses/activities/activities.py /app/api/src/services/courses/activities/activities.py
+LABEL org.opencontainers.image.revision="${SOURCE_REVISION}"

@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { usePlan } from '@components/Hooks/usePlan'
 import { getDeploymentMode } from '@services/config/config'
 
-function Watermark() {
+function Watermark({ inFlow = false }: { inFlow?: boolean }) {
     const { t } = useTranslation()
     const org = useOrg() as any
 
@@ -24,8 +24,8 @@ function Watermark() {
     if (!showWatermark) return null
 
     return (
-        <div className='fixed bottom-8 end-8 z-50'>
-            <Link href={`https://www.learnhouse.app/?source=in-app`} className="flex items-center cursor-pointer bg-white/80 backdrop-blur-lg text-gray-700 rounded-2xl p-2 light-shadow text-xs px-5 font-semibold space-x-2">
+        <div className={inFlow ? 'flex justify-center px-4 py-6' : 'fixed bottom-8 end-8 z-50'}>
+            <Link href={`https://www.learnhouse.app/?source=in-app`} className={`flex items-center gap-2 px-5 py-2 text-xs font-semibold text-gray-700 focus-visible:outline-2 focus-visible:outline-neutral-900 focus-visible:outline-offset-2 ${inFlow ? 'min-h-11' : 'cursor-pointer bg-white/80 backdrop-blur-lg rounded-2xl light-shadow'}`}>
                 <p>{t('common.made_with')}</p>
                 <Image unoptimized src={lrnTextLogo} alt="logo" quality={100} width={95} />
             </Link>

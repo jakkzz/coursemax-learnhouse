@@ -7,12 +7,12 @@ import { AccountSidebar } from '@components/Objects/Account/AccountSidebar'
 import { AccountActionsMobile } from '@components/Objects/Account/AccountActionsMobile'
 import { User } from 'lucide-react'
 import { getUriWithOrg } from '@services/config/config'
-import { useMediaQuery } from 'usehooks-ts'
 import { useLHSession } from '@components/Contexts/LHSessionContext'
 import { useTranslation } from 'react-i18next'
 import AccountGeneral from '@components/Objects/Account/subpages/AccountGeneral'
 import AccountProfile from '@components/Objects/Account/subpages/AccountProfile'
 import AccountSecurity from '@components/Objects/Account/subpages/AccountSecurity'
+import SchoolIdentity from '@components/Objects/Account/subpages/SchoolIdentity'
 import AccountPurchases from '@components/Objects/Account/subpages/AccountPurchases'
 import { useLHAnalytics, AnalyticsEvent } from '@services/analytics'
 
@@ -27,13 +27,13 @@ const getSubpageTitle = (subpage: string, t: (_key: string) => string): string =
     'general': t('account.general'),
     'profile': t('account.profile'),
     'security': t('account.security'),
+    'school-identity': t('account.school_identity'),
     'purchases': t('account.purchases'),
   }
   return titles[subpage] || t('account.title')
 }
 
 const AccountClient = ({ orgslug, org_id, subpage }: AccountClientProps) => {
-  const isMobile = useMediaQuery('(max-width: 768px)')
   const session = useLHSession() as any
   const user = session?.data?.user
   const { t } = useTranslation()
@@ -57,6 +57,8 @@ const AccountClient = ({ orgslug, org_id, subpage }: AccountClientProps) => {
         return <AccountProfile />
       case 'security':
         return <AccountSecurity />
+      case 'school-identity':
+        return <SchoolIdentity />
       case 'purchases':
         return <AccountPurchases orgId={org_id} orgslug={orgslug} />
       default:
@@ -94,9 +96,9 @@ const AccountClient = ({ orgslug, org_id, subpage }: AccountClientProps) => {
           <div className="flex-1 min-w-0">
             {/* Mobile only shows user name */}
             <div className="md:hidden mb-4">
-              <h1 className="text-xl font-bold text-gray-900">
+              <p className="text-xl font-bold text-gray-900">
                 {user?.first_name} {user?.last_name}
-              </h1>
+              </p>
               <p className="mt-1 text-sm text-gray-500">@{user?.username}</p>
             </div>
 
@@ -105,14 +107,10 @@ const AccountClient = ({ orgslug, org_id, subpage }: AccountClientProps) => {
           </div>
         </div>
 
-        {/* Bottom padding for mobile action bar */}
-        {isMobile && <div className="h-24" />}
       </GeneralWrapperStyled>
 
       {/* Mobile Actions Bar */}
-      {isMobile && (
-        <AccountActionsMobile orgslug={orgslug} currentSubpage={subpage} />
-      )}
+      <AccountActionsMobile orgslug={orgslug} currentSubpage={subpage} />
     </>
   )
 }

@@ -1,0 +1,7 @@
+# API-only fix; retain the validated Continue with Google web/runtime unchanged.
+ARG NATIVE_IMAGE=coursemax-learnhouse:24329525
+FROM ${NATIVE_IMAGE}
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.source="https://github.com/jakkzz/coursemax-learnhouse" \
+      org.opencontainers.image.revision=$SOURCE_REVISION
+COPY apps/api/src/services/auth/native_google.py /app/api/src/services/auth/native_google.py

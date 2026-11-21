@@ -3,6 +3,7 @@ import { useLHSession } from '@components/Contexts/LHSessionContext'
 import { updatePassword } from '@services/settings/password'
 import { Formik, Form } from 'formik'
 import React from 'react'
+import SignInMethods from './SignInMethods'
 import {
   AlertTriangle,
   Monitor,
@@ -110,8 +111,12 @@ function TwoFactorAuthSection() {
   // out mid-enrolment.
   const mfaFetch = React.useCallback(
     async (path: string, method: 'GET' | 'POST', body?: any) => {
+      // Turning 2FA on or off signs out every session, this one included, and
+      // returns a fresh pair. Those calls go through the auth proxy so the new
+      // pair lands in this site's cookies (the handlers then reload the session).
+      const rotates = path === '/confirm' || path === '/disable'
       const result = await fetch(
-        `${getAPIUrl()}auth/mfa${path}`,
+        rotates ? `/api/auth/mfa${path}` : `${getAPIUrl()}auth/mfa${path}`,
         RequestBodyWithAuthHeader(method, body ?? null, null, access_token)
       )
       return getResponseMetadata(result)
@@ -308,6 +313,7 @@ function TwoFactorAuthSection() {
     try {
       const res = await mfaFetch('/confirm', 'POST', { code })
       if (res.success) {
+        await session?.update?.(true)
         setBackupCodes(Array.isArray(res.data?.backup_codes) ? res.data.backup_codes : [])
         setCodesAcknowledged(false)
         setCode('')
@@ -386,6 +392,7 @@ function TwoFactorAuthSection() {
         status?.has_password ? { password, code } : { code }
       )
       if (res.success) {
+        await session?.update?.(true)
         toast.success(
           t('user.settings.security.mfa.disabled_toast', {
             defaultValue: 'Two-factor authentication has been turned off.',
@@ -478,19 +485,19 @@ function TwoFactorAuthSection() {
   )
 
   const sectionHeader = (
-    <div className="flex flex-col bg-gray-50 -space-y-1 px-5 py-3 mx-3 my-3 rounded-md">
-      <h1 className="font-bold text-xl text-gray-800 flex items-center gap-2">
+    <div className="space-y-1">
+      <h2 id="account-mfa-title" className="font-semibold text-lg text-neutral-900 flex items-center gap-2">
         <ShieldCheck size={18} className="text-gray-500" />
         {t('user.settings.security.mfa.title', {
           defaultValue: 'Two-factor authentication',
         })}
-      </h1>
-      <h2 className="text-gray-500 text-md ps-7">
+      </h2>
+      <p className="text-sm leading-relaxed text-neutral-600">
         {t('user.settings.security.mfa.subtitle', {
           defaultValue:
             'Ask for a one-time code from your authenticator app whenever you sign in.',
         })}
-      </h2>
+      </p>
     </div>
   )
 
@@ -1040,10 +1047,10 @@ function TwoFactorAuthSection() {
   }
 
   return (
-    <>
+    <section aria-labelledby="account-mfa-title" className="border-t border-neutral-200 pt-6">
       {sectionHeader}
-      <div className="mx-5 mb-6">{body}</div>
-    </>
+      <div className="mt-4">{body}</div>
+    </section>
   )
 }
 
@@ -1110,18 +1117,21 @@ function AccountSecurity() {
   return (
     <>
     <div className="bg-white rounded-xl nice-shadow">
-      <div className="flex flex-col gap-0">
+      <div className="space-y-6 p-4 sm:p-6 [&_button]:min-h-11">
+        <h1 className="text-xl font-semibold text-neutral-900">{t('account.security')}</h1>
+        <SignInMethods />
         {/* Current session / device */}
-        <div className="flex flex-col bg-gray-50 -space-y-1 px-5 py-3 mx-3 mt-3 rounded-md">
-          <h1 className="font-bold text-xl text-gray-800">
+        <section className="border-t border-neutral-200 pt-6" aria-labelledby="current-session-title">
+        <div className="space-y-1">
+          <h2 id="current-session-title" className="font-semibold text-lg text-neutral-900">
             {t('user.settings.security.current_session_title', { defaultValue: 'Current session' })}
-          </h1>
-          <h2 className="text-gray-500 text-md">
-            {t('user.settings.security.current_session_subtitle', { defaultValue: 'The device you are signed in from right now.' })}
           </h2>
+          <p className="text-sm leading-relaxed text-neutral-600">
+            {t('user.settings.security.current_session_subtitle', { defaultValue: 'The device you are signed in from right now.' })}
+          </p>
         </div>
-        <div className="mx-5 mt-3 mb-6">
-          <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+        <div className="mt-4">
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 p-4">
             <div className="flex items-center gap-3 min-w-0">
               <Monitor className="text-gray-400 shrink-0" size={20} />
               <div className="min-w-0">
@@ -1144,16 +1154,18 @@ function AccountSecurity() {
           </div>
         </div>
 
-        <div className="flex flex-col bg-gray-50 -space-y-1 px-5 py-3 mx-3 my-3 rounded-md">
-          <h1 className="font-bold text-xl text-gray-800">
+        </section>
+        <section className="border-t border-neutral-200 pt-6" aria-labelledby="password-title">
+        <div className="space-y-1">
+          <h2 id="password-title" className="font-semibold text-lg text-neutral-900">
             {t('user.settings.password.title')}
-          </h1>
-          <h2 className="text-gray-500 text-md">
-            {t('user.settings.password.subtitle')}
           </h2>
+          <p className="text-sm leading-relaxed text-neutral-600">
+            {t('user.settings.password.subtitle')}
+          </p>
         </div>
 
-        <div className="mx-5 mb-5">
+        <div className="mt-4">
           <Formik
             initialValues={{ old_password: '', new_password: '' }}
             validationSchema={validationSchema}
@@ -1169,7 +1181,7 @@ function AccountSecurity() {
             }}
           >
             {({ isSubmitting, handleChange, errors, touched }) => (
-              <Form className="w-full max-w-2xl mx-auto space-y-6">
+              <Form className="w-full max-w-2xl space-y-6">
                 <div>
                   <Label htmlFor="old_password">{t('user.settings.password.current_password')}</Label>
                   <Input
@@ -1200,7 +1212,7 @@ function AccountSecurity() {
                   )}
                 </div>
 
-                <div className="flex items-center space-x-2 text-amber-600 bg-amber-50 p-3 rounded-md">
+                <div className="flex items-center space-x-2 text-amber-900 bg-amber-50 p-3 rounded-md">
                   <AlertTriangle size={16} />
                   <span className="text-sm">{t('user.settings.password.logout_warning')}</span>
                 </div>
@@ -1219,6 +1231,7 @@ function AccountSecurity() {
           </Formik>
         </div>
 
+        </section>
         {/* Two-factor authentication (TOTP) */}
         <TwoFactorAuthSection />
       </div>

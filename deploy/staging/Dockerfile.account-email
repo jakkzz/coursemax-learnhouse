@@ -1,0 +1,9 @@
+# API-only owner account-settings email projection. Validated web unchanged.
+ARG PROFILE_IMAGE=coursemax-learnhouse:28d4519c
+FROM ${PROFILE_IMAGE}
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.source="https://github.com/jakkzz/coursemax-learnhouse" \
+      org.opencontainers.image.revision=$SOURCE_REVISION
+COPY apps/api/src/db/users.py /app/api/src/db/users.py
+COPY apps/api/src/services/users/users.py /app/api/src/services/users/users.py
+COPY apps/api/src/routers/users.py /app/api/src/routers/users.py

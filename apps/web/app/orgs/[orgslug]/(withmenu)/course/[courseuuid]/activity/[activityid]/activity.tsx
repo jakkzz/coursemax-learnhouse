@@ -7,9 +7,13 @@ import { markActivityAsComplete, unmarkActivityAsComplete } from '@services/cour
 import { usePathname, useRouter } from 'next/navigation'
 import AuthenticatedClientElement from '@components/Security/AuthenticatedClientElement'
 import { getCourseThumbnailMediaDirectory, getUserAvatarMediaDirectory } from '@services/media/media'
+import './theater.css'
 import { useOrg, useOrgMembership } from '@components/Contexts/OrgContext'
 import { CourseProvider } from '@components/Contexts/CourseContext'
 import { useLHSession } from '@components/Contexts/LHSessionContext'
+import { useShortcut } from '@/lib/shortcuts/ShortcutsContext'
+import { Keys } from '@components/Objects/Shortcuts/Kbd'
+import { ShortcutHint } from '@components/Objects/Shortcuts/ShortcutHint'
 import React, { useEffect, useRef, useMemo, lazy, Suspense } from 'react'
 import { getAssignmentFromActivityUUID, getFinalGrade, retryAssignmentSubmission, submitAssignmentForGrading } from '@services/courses/assignments'
 import { AssignmentProvider } from '@components/Contexts/Assignments/AssignmentContext'
@@ -21,7 +25,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/query/keys'
 import { useTrail } from '@/hooks/queries/useTrail'
 import { useCourseMeta } from '@/hooks/queries/useCourses'
-import { useActivity } from '@/hooks/queries/useActivity'
+import { activityQueryOptions, useActivity } from '@/hooks/queries/useActivity'
 import CourseAccessError from '@components/Objects/Courses/CourseAccessError/CourseAccessError'
 import ConfirmationModal from '@components/Objects/StyledElements/ConfirmationModal/ConfirmationModal'
 import Modal from '@components/Objects/StyledElements/Modal/Modal'
@@ -141,6 +145,8 @@ interface ActivityActionsProps {
   assignment: any
   showNavigation?: boolean
   trailData?: any
+  /** Dark styling, for the video theater band. */
+  dark?: boolean
 }
 
 // Custom hook for activity position
@@ -170,7 +176,7 @@ function useActivityPosition(course: any, activityId: string) {
   }, [course, activityId]);
 }
 
-function ActivityActions({ activity, activityid, course, orgslug, assignment, showNavigation = true, trailData }: ActivityActionsProps) {
+function ActivityActions({ activity, activityid, course, orgslug, assignment, showNavigation = true, trailData, dark = false }: ActivityActionsProps) {
 
   const { t: _t } = useTranslation();
   const _org = useOrg() as any;
@@ -190,6 +196,7 @@ function ActivityActions({ activity, activityid, course, orgslug, assignment, sh
                 course={course}
                 orgslug={orgslug}
                 trailData={trailData}
+                dark={dark}
               />
             </>
           )}
@@ -207,7 +214,7 @@ function ActivityActions({ activity, activityid, course, orgslug, assignment, sh
             </>
           )}
           {showNavigation && (
-            <NextActivityButton course={course} currentActivityId={activity.id} orgslug={orgslug} />
+            <NextActivityButton course={course} currentActivityId={activity.id} orgslug={orgslug} dark={dark} />
           )}
         </AuthenticatedClientElement>
       )}
@@ -218,7 +225,7 @@ function ActivityActions({ activity, activityid, course, orgslug, assignment, sh
 function ActivityClient(props: ActivityClientProps) {
   const { t, i18n } = useTranslation()
   // Slide offsets are physical pixels; flip their sign in RTL.
-  const { x: dx } = useDirection()
+  const { x: dx, isRTL } = useDirection()
   const activityid = props.activityid
 
   function getRelativeTime(date: Date): string {
@@ -393,6 +400,83 @@ function ActivityClient(props: ActivityClientProps) {
     router.push(getUriWithOrg(orgslug, '') + `/course/${cleanCourseUuid}/activity/${activity.cleanUuid}`);
   };
 
+  // Keyboard: j / k (or the arrow pointing forward / back in the reading
+  // direction) step through lessons, ] / [ jump a whole chapter, f toggles
+  // focus mode and Esc leaves it, Space drives a video, c goes back to the
+  // course. Registered only once the course is known, and never on the
+  // course-end screen, where there is no lesson to step from.
+  const shortcutsReady = !!course && activityid !== 'end'
+  const forwardArrow = isRTL ? 'arrowleft' : 'arrowright'
+  const backArrow = isRTL ? 'arrowright' : 'arrowleft'
+  useShortcut(
+    { id: 'activity.next', keys: 'j', aliases: [forwardArrow], label: t('shortcuts.next_lesson'), group: 'page',
+      run: () => navigateToActivity(nextActivity) },
+    shortcutsReady && (!!nextActivity || isLastActivity),
+  )
+  useShortcut(
+    { id: 'activity.prev', keys: 'k', aliases: [backArrow], label: t('shortcuts.previous_lesson'), group: 'page',
+      run: () => navigateToActivity(prevActivity) },
+    shortcutsReady && !!prevActivity,
+  )
+
+  // First lesson of the neighbouring chapters, skipping empty chapters.
+  const chapterNeighbours = useMemo(() => {
+    const chapters: any[] = course?.chapters ?? []
+    const cleanId = activityid.replace('activity_', '')
+    const here = chapters.findIndex((ch) =>
+      (ch.activities ?? []).some((a: any) => a.activity_uuid?.replace('activity_', '') === cleanId))
+    const firstOf = (ch: any) => {
+      const a = (ch?.activities ?? [])[0]
+      return a ? { ...a, cleanUuid: a.activity_uuid?.replace('activity_', '') } : null
+    }
+    const pick = (from: number, step: 1 | -1) => {
+      for (let i = from; i >= 0 && i < chapters.length; i += step) {
+        const a = firstOf(chapters[i])
+        if (a) return a
+      }
+      return null
+    }
+    return here < 0
+      ? { next: null, prev: null }
+      : { next: pick(here + 1, 1), prev: pick(here - 1, -1) }
+  }, [course, activityid])
+  useShortcut(
+    { id: 'activity.nextChapter', keys: ']', label: t('shortcuts.next_chapter'), group: 'page',
+      run: () => navigateToActivity(chapterNeighbours.next) },
+    shortcutsReady && !!chapterNeighbours.next,
+  )
+  useShortcut(
+    { id: 'activity.prevChapter', keys: '[', label: t('shortcuts.previous_chapter'), group: 'page',
+      run: () => navigateToActivity(chapterNeighbours.prev) },
+    shortcutsReady && !!chapterNeighbours.prev,
+  )
+
+  useShortcut(
+    { id: 'activity.focus', keys: 'f', label: t('shortcuts.toggle_focus'), group: 'page',
+      run: () => setIsFocusMode((v) => !v) },
+    shortcutsReady,
+  )
+  useShortcut(
+    { id: 'activity.exitFocus', keys: 'escape', label: t('shortcuts.exit_focus'), group: 'page',
+      hideFromPalette: true, run: () => setIsFocusMode(false) },
+    shortcutsReady && isFocusMode,
+  )
+  useShortcut(
+    { id: 'activity.playPause', keys: 'space', label: t('shortcuts.play_pause'), group: 'page',
+      run: () => {
+        const video = document.querySelector<HTMLVideoElement>('.video-js video, video')
+        if (!video) return
+        if (video.paused) void video.play()
+        else video.pause()
+      } },
+    shortcutsReady && activity?.activity_type === 'TYPE_VIDEO',
+  )
+  useShortcut(
+    { id: 'activity.course', keys: 'c', label: t('shortcuts.back_to_course'), group: 'page',
+      run: () => router.push(getUriWithOrg(orgslug, `/course/${course?.course_uuid?.replace('course_', '')}`)) },
+    !!course,
+  )
+
   // Initialize focus mode from localStorage
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -440,6 +524,10 @@ function ActivityClient(props: ActivityClientProps) {
       setMarkStatusButtonActive(false);
       setBgColor(isFocusMode ? 'bg-white' : 'bg-white nice-shadow');
       getAssignmentUI();
+    }
+    else if (activity.activity_type == 'TYPE_VIDEO') {
+      // The player is the whole surface; no dark card around it.
+      setBgColor('');
     }
     else {
       setBgColor(isFocusMode ? 'bg-zinc-950' : 'bg-zinc-950 nice-shadow');
@@ -635,13 +723,16 @@ function ActivityClient(props: ActivityClientProps) {
                                     )
                                   : '/empty_thumbnail.png'
                                 }
+                                onError={(e) => {
+                                  if (!e.currentTarget.src.endsWith('/empty_thumbnail.png')) e.currentTarget.src = '/empty_thumbnail.png'
+                                }}
                                 alt=""
                               />
                             </Link>
                           </div>
                           <div className="flex flex-col -space-y-1">
                             <p className="font-bold text-gray-700 text-sm">{t('search.course')} </p>
-                            <h1 className="font-bold text-gray-950 text-lg first-letter:uppercase">
+                            <h1 className="font-bold text-gray-950 text-lg">
                               {course.name}
                             </h1>
                           </div>
@@ -672,15 +763,17 @@ function ActivityClient(props: ActivityClientProps) {
                             orgslug={orgslug}
                             trailData={trailData}
                           />
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => setIsFocusMode(false)}
-                            className="bg-white nice-shadow p-2 rounded-full cursor-pointer hover:bg-gray-50"
-                            title={t('activities.exit_focus_mode')}
-                          >
-                            <Minimize2 size={16} className="text-gray-700" />
-                          </motion.button>
+                          <ShortcutHint label={t('activities.exit_focus_mode')} keys="escape">
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => setIsFocusMode(false)}
+                              className="bg-white nice-shadow p-2 rounded-full cursor-pointer hover:bg-gray-50"
+                              aria-label={t('activities.exit_focus_mode')}
+                            >
+                              <Minimize2 size={16} className="text-gray-700" />
+                            </motion.button>
+                          </ShortcutHint>
                         </motion.div>
                       </div>
                     </div>
@@ -698,7 +791,7 @@ function ActivityClient(props: ActivityClientProps) {
                               initial={isInitialRender.current ? false : { scale: 0.95, opacity: 0 }}
                               animate={{ scale: 1, opacity: 1 }}
                               transition={{ delay: 0.3 }}
-                              className={`${activity.activity_type === 'TYPE_SCORM' ? 'rounded-xl overflow-hidden' : 'p-7 rounded-lg'} ${bgColor} mt-4`}
+                              className={`${activity.activity_type === 'TYPE_SCORM' ? 'rounded-xl overflow-hidden' : activity.activity_type === 'TYPE_VIDEO' ? '' : 'p-7 rounded-lg'} ${bgColor} mt-4`}
                             >
                               {/* Activity Types */}
                               <div className={activity.activity_type === 'TYPE_SCORM' ? 'overflow-hidden' : ''}>
@@ -735,6 +828,7 @@ function ActivityClient(props: ActivityClientProps) {
                               title={prevActivity ? `${t('common.previous')}: ${prevActivity.name}` : t('activities.no_previous_activity')}
                             >
                               <ChevronLeft size={20} className="text-gray-800 shrink-0" />
+                              <Keys keys="k" tone="muted" className="hidden sm:inline-flex" />
                               <div className="flex flex-col items-start">
                                 <span className="text-xs text-gray-500">{t('common.previous')}</span>
                                 <span className="text-sm capitalize font-semibold text-start">
@@ -779,6 +873,7 @@ function ActivityClient(props: ActivityClientProps) {
                                       : t('activities.no_next_activity')}
                                 </span>
                               </div>
+                              <Keys keys="j" tone="muted" className="hidden sm:inline-flex" />
                               <ChevronRight size={20} className="text-gray-800 shrink-0" />
                             </button>
                           </div>
@@ -826,13 +921,16 @@ function ActivityClient(props: ActivityClientProps) {
                                       )
                                     : '/empty_thumbnail.png'
                                   }
+                                  onError={(e) => {
+                                    if (!e.currentTarget.src.endsWith('/empty_thumbnail.png')) e.currentTarget.src = '/empty_thumbnail.png'
+                                  }}
                                   alt=""
                                 />
                               </Link>
                             </div>
                             <div className="flex flex-col -space-y-1">
                               <p className="font-bold text-gray-700 text-xs sm:text-md">{t('search.course')} </p>
-                              <h1 className="font-bold text-gray-950 text-lg sm:text-3xl first-letter:uppercase">
+                              <h1 className="font-bold text-gray-950 text-lg sm:text-3xl">
                                 {course.name}
                               </h1>
                             </div>
@@ -866,7 +964,7 @@ function ActivityClient(props: ActivityClientProps) {
                               <p className="font-bold text-gray-700 text-xs sm:text-md">
                                 {getChapterNameByActivityId(course, activity?.id) ?? chapterNameFromCourse}
                               </p>
-                              <h1 className="font-bold text-gray-950 text-base sm:text-2xl first-letter:uppercase">
+                              <h1 className="font-bold text-gray-950 text-base sm:text-2xl">
                                 {displayName}
                               </h1>
                               {/* Authors and Dates Section */}
@@ -989,8 +1087,26 @@ function ActivityClient(props: ActivityClientProps) {
                           {activity.content.paid_access == false ? (
                             <PaidCourseActivityDisclaimer course={course} />
                           ) : (
+                            // Video activities sit on a dark theater band (theater.css).
+                            <div className={activity.activity_type === 'TYPE_VIDEO' ? 'lh-theater-band py-8 sm:py-12' : ''}>
+                            {activity.activity_type === 'TYPE_VIDEO' && (
+                              <button
+                                onClick={() => setIsFocusMode(true)}
+                                className="absolute top-0 end-0 -translate-y-1/2 hidden sm:flex bg-white nice-shadow p-2 rounded-full cursor-pointer transition-all duration-200 group overflow-hidden"
+                                style={{ zIndex: 'var(--z-interactive)' }}
+                                title={t('activities.focus_mode')}
+                              >
+                                <div className="flex items-center">
+                                  <Maximize2 size={16} className="text-gray-700" />
+                                  <span className="text-xs font-bold text-gray-700 opacity-0 group-hover:opacity-100 transition-all duration-200 w-0 group-hover:w-auto group-hover:ms-2 whitespace-nowrap">
+                                    {t('activities.focus_mode')}
+                                  </span>
+                                </div>
+                              </button>
+                            )}
                             <div className="flex gap-6">
-                              <div className={`flex-1 min-w-0 ${activity.activity_type === 'TYPE_SCORM' ? 'rounded-xl overflow-hidden' : 'p-3 sm:p-7 rounded-lg'} ${bgColor} relative isolate`} style={{ zIndex: 'var(--z-base)' }}>
+                              <div className={`flex-1 min-w-0 ${activity.activity_type === 'TYPE_SCORM' ? 'rounded-xl overflow-hidden' : activity.activity_type === 'TYPE_VIDEO' ? '' : 'p-3 sm:p-7 rounded-lg'} ${bgColor} relative isolate`} style={{ zIndex: 'var(--z-base)' }}>
+                                {activity.activity_type !== 'TYPE_VIDEO' && (
                                 <button
                                   onClick={() => setIsFocusMode(true)}
                                   className={`absolute ${activity.activity_type === 'TYPE_SCORM' ? 'top-2 end-2' : 'top-4 end-4'} hidden sm:flex bg-white/80 hover:bg-white nice-shadow p-2 rounded-full cursor-pointer transition-all duration-200 group overflow-hidden pointer-events-auto`}
@@ -1004,11 +1120,13 @@ function ActivityClient(props: ActivityClientProps) {
                                     </span>
                                   </div>
                                 </button>
+                                )}
                                 {activityContent}
                               </div>
                               <Suspense fallback={null}>
                                 <AISidePanelInline activity={activity} />
                               </Suspense>
+                            </div>
                             </div>
                           )}
                         </>
@@ -1022,6 +1140,7 @@ function ActivityClient(props: ActivityClientProps) {
                               course={course}
                               currentActivityId={activity.id}
                               orgslug={orgslug}
+                              dark={activity.activity_type === 'TYPE_VIDEO'}
                             />
                           </div>
                           <div className="flex items-center justify-between sm:justify-end space-x-2 order-2 sm:order-none">
@@ -1033,11 +1152,13 @@ function ActivityClient(props: ActivityClientProps) {
                               assignment={assignment}
                               showNavigation={false}
                               trailData={trailData}
+                              dark={activity.activity_type === 'TYPE_VIDEO'}
                             />
                             <NextActivityButton
                               course={course}
                               currentActivityId={activity.id}
                               orgslug={orgslug}
+                              dark={activity.activity_type === 'TYPE_VIDEO'}
                             />
                           </div>
                         </div>
@@ -1050,6 +1171,7 @@ function ActivityClient(props: ActivityClientProps) {
                           currentActivityId={activityid}
                           orgslug={orgslug}
                           activity={activity}
+                          dark={activity.activity_type === 'TYPE_VIDEO'}
                         />
                       )}
                       
@@ -1074,6 +1196,7 @@ export function MarkStatus(props: {
   course: any
   orgslug: string,
   trailData: any
+  dark?: boolean
 }) {
   const { t } = useTranslation()
   const router = useRouter()
@@ -1158,10 +1281,10 @@ export function MarkStatus(props: {
   const findNextActivity = () => {
     const flat: any[] = [];
     let currentIndex = -1;
-    props.course.chapters.forEach((chapter: any) => {
-      chapter.activities.forEach((activity: any) => {
+    props.course?.chapters?.forEach((chapter: any) => {
+      chapter.activities?.forEach((activity: any) => {
         flat.push(activity);
-        if (activity.id === props.activity.id) {
+        if (activity.id === props.activity?.id) {
           currentIndex = flat.length - 1;
         }
       });
@@ -1169,20 +1292,60 @@ export function MarkStatus(props: {
     return currentIndex >= 0 && currentIndex < flat.length - 1 ? flat[currentIndex + 1] : null;
   };
 
+  // Completing an activity moves the learner to the next one, so warm its data
+  // and route now; the navigation then renders from cache.
+  const nextActivityUuid = findNextActivity()?.activity_uuid?.replace('activity_', '');
+  const accessToken = session.data?.tokens?.access_token;
+  useEffect(() => {
+    if (!isUserPartOfTheOrg || !nextActivityUuid) return;
+    const cleanCourseUuid = props.course.course_uuid.replace('course_', '');
+    router.prefetch(getUriWithOrg(props.orgslug, '') + `/course/${cleanCourseUuid}/activity/${nextActivityUuid}`);
+    queryClient.prefetchQuery(activityQueryOptions(nextActivityUuid, accessToken));
+  }, [isUserPartOfTheOrg, nextActivityUuid, accessToken, props.course.course_uuid, props.orgslug, queryClient, router]);
+
   async function markActivityAsCompleteFront() {
+    const trailKey = queryKeys.trail.org(org?.id);
+    // A refetch already in flight would land after the optimistic write below
+    // and briefly undo it.
+    await queryClient.cancelQueries({ queryKey: trailKey });
+    const previousTrail = queryClient.getQueryData(trailKey);
     try {
       const willCompleteAll = areAllActivitiesCompleted();
       const nextActivity = findNextActivity();
+      const cleanCourseUuid = props.course.course_uuid.replace('course_', '');
       setIsLoading(true);
 
-      await markActivityAsComplete(
+      // Show the activity as done right away; the server's trail replaces this
+      // once the request settles.
+      queryClient.setQueryData(trailKey, (trail: any) => trail && {
+        ...trail,
+        runs: trail.runs?.map((run: any) =>
+          run.course?.course_uuid?.replace('course_', '') === cleanCourseUuid
+            ? { ...run, steps: [...(run.steps || []), { activity_id: props.activity.id, course_id: run.course_id, complete: true }] }
+            : run
+        ),
+      });
+
+      const request = markActivityAsComplete(
         props.orgslug,
         props.course.course_uuid,
         props.activity.activity_uuid,
         session.data?.tokens?.access_token
-      );
+      ).then((trail: any) => {
+        // The response is the updated trail, so no refetch is needed.
+        if (trail?.runs) queryClient.setQueryData(trailKey, trail);
+      });
 
-      await queryClient.invalidateQueries({ queryKey: queryKeys.trail.org(org?.id) });
+      // The end page shows the certificate, which the request creates, so only
+      // that navigation waits for it. Moving on to the next activity does not.
+      if (willCompleteAll || !nextActivity) {
+        await request;
+      } else {
+        request.catch(() => {
+          queryClient.setQueryData(trailKey, previousTrail);
+          toast.error(t('activities.failed_mark_complete'));
+        });
+      }
 
       track(AnalyticsEvent.ActivityMarkedComplete, {
         activity_uuid: props.activity.activity_uuid,
@@ -1198,8 +1361,6 @@ export function MarkStatus(props: {
         });
       }
 
-      const cleanCourseUuid = props.course.course_uuid.replace('course_', '');
-      await queryClient.invalidateQueries({ queryKey: queryKeys.courses.meta(cleanCourseUuid) });
       if (willCompleteAll || !nextActivity) {
         router.push(getUriWithOrg(props.orgslug, '') + `/course/${cleanCourseUuid}/activity/end`);
       } else {
@@ -1208,6 +1369,7 @@ export function MarkStatus(props: {
       }
     } catch (error) {
       console.error('Error marking activity as complete:', error);
+      queryClient.setQueryData(trailKey, previousTrail);
       toast.error(t('activities.failed_mark_complete'));
     } finally {
       setIsLoading(false);
@@ -1218,15 +1380,20 @@ export function MarkStatus(props: {
     try {
       setIsLoading(true);
       
-      await unmarkActivityAsComplete(
+      const trail = await unmarkActivityAsComplete(
         props.orgslug,
         props.course.course_uuid,
         props.activity.activity_uuid,
         session.data?.tokens?.access_token
       );
 
-      await queryClient.invalidateQueries({ queryKey: queryKeys.trail.org(org?.id) });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.courses.meta(props.course.course_uuid.replace('course_', '')) });
+      // The response is the updated trail, and course metadata carries no
+      // progress, so neither needs a refetch.
+      if (trail?.runs) {
+        queryClient.setQueryData(queryKeys.trail.org(org?.id), trail);
+      } else {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.trail.org(org?.id) });
+      }
     } catch (_error) {
       toast.error(t('activities.failed_unmark_complete'));
     } finally {
@@ -1253,6 +1420,14 @@ export function MarkStatus(props: {
     }
     return false;
   }
+
+  const completed = !!props.trailData && !!isActivityCompleted()
+  // Unmarking stays behind its confirmation dialog, so `m` only ever marks.
+  useShortcut(
+    { id: 'activity.complete', keys: 'm', label: t('shortcuts.mark_complete'), group: 'page',
+      run: () => { if (!isLoading) markActivityAsCompleteFront() } },
+    !!props.trailData && isUserPartOfTheOrg && !completed,
+  )
 
   // Don't render until we have trail data
   if (!props.trailData) {
@@ -1313,7 +1488,7 @@ export function MarkStatus(props: {
         <div className="flex items-center space-x-2">
           <div className="relative">
             <div
-              className={`${isLoading ? 'opacity-90' : ''} bg-gray-800 rounded-md px-4 nice-shadow flex flex-col p-2.5 text-white hover:cursor-pointer transition-all duration-200 ${isLoading ? 'cursor-not-allowed' : 'hover:bg-gray-700'}`}
+              className={`${isLoading ? 'opacity-90' : ''} rounded-md px-4 flex flex-col p-2.5 text-white hover:cursor-pointer transition-all duration-200 ${props.dark ? 'bg-white/10 ring-1 ring-white/10' : 'bg-gray-800 nice-shadow'} ${isLoading ? 'cursor-not-allowed' : props.dark ? 'hover:bg-white/15' : 'hover:bg-gray-700'}`}
               onClick={!isLoading ? markActivityAsCompleteFront : undefined}
             >
               <span className="text-[10px] font-bold mb-1 uppercase">{t('common.status')}</span>
@@ -1348,6 +1523,7 @@ export function MarkStatus(props: {
                   </svg>
                 )}
                 <span className="text-xs font-bold min-w-[90px]">{isLoading ? t('activities.marking') : t('activities.mark_as_complete')}</span>
+                <Keys keys="m" tone="onDark" className="hidden sm:inline-flex" />
               </div>
             </div>
             {showUnmarkedTooltip && (
@@ -1367,7 +1543,7 @@ export function MarkStatus(props: {
   )
 }
 
-function NextActivityButton({ course, currentActivityId, orgslug }: { course: any, currentActivityId: string, orgslug: string }) {
+function NextActivityButton({ course, currentActivityId, orgslug, dark = false }: { course: any, currentActivityId: string, orgslug: string, dark?: boolean }) {
   const { t } = useTranslation();
   const router = useRouter();
   const _isMobile = useMediaQuery('(max-width: 768px)');
@@ -1418,9 +1594,13 @@ function NextActivityButton({ course, currentActivityId, orgslug }: { course: an
   return (
     <div
       onClick={navigateToActivity}
-      className="bg-gray-200 rounded-md px-3 sm:px-4 shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] flex flex-col p-2 sm:p-2.5 text-gray-600 hover:cursor-pointer transition delay-150 duration-300 ease-in-out hover:bg-gray-200"
+      className={`rounded-md px-3 sm:px-4 flex flex-col p-2 sm:p-2.5 hover:cursor-pointer transition delay-150 duration-300 ease-in-out ${
+        dark
+          ? 'bg-white/10 text-white ring-1 ring-white/10 hover:bg-white/15'
+          : 'bg-gray-200 shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] text-gray-600 hover:bg-gray-200'
+      }`}
     >
-      <span className="text-[10px] font-bold text-gray-500 mb-1 uppercase">{t('common.next')}</span>
+      <span className={`text-[10px] font-bold mb-1 uppercase ${dark ? 'text-white/50' : 'text-gray-500'}`}>{t('common.next')}</span>
       <div className="flex items-center space-x-1">
         <span className="text-xs sm:text-sm font-semibold truncate max-w-[120px] sm:max-w-[200px]">
           {isLastActivity ? t('course.finish_course', 'Finish course') : nextActivity.name}
@@ -1431,7 +1611,7 @@ function NextActivityButton({ course, currentActivityId, orgslug }: { course: an
   );
 }
 
-function PreviousActivityButton({ course, currentActivityId, orgslug }: { course: any, currentActivityId: string, orgslug: string }) {
+function PreviousActivityButton({ course, currentActivityId, orgslug, dark = false }: { course: any, currentActivityId: string, orgslug: string, dark?: boolean }) {
   const { t } = useTranslation();
   const router = useRouter();
   const _isMobile = useMediaQuery('(max-width: 768px)');
@@ -1473,9 +1653,11 @@ function PreviousActivityButton({ course, currentActivityId, orgslug }: { course
   return (
     <div
       onClick={navigateToActivity}
-      className="bg-white rounded-md px-3 sm:px-4 nice-shadow flex flex-col p-2 sm:p-2.5 text-gray-600 hover:cursor-pointer transition delay-150 duration-300 ease-in-out"
+      className={`rounded-md px-3 sm:px-4 flex flex-col p-2 sm:p-2.5 hover:cursor-pointer transition delay-150 duration-300 ease-in-out ${
+        dark ? 'bg-white/5 text-white/85 ring-1 ring-white/10 hover:bg-white/10' : 'bg-white nice-shadow text-gray-600'
+      }`}
     >
-      <span className="text-[10px] font-bold text-gray-500 mb-1 uppercase">{t('common.previous')}</span>
+      <span className={`text-[10px] font-bold mb-1 uppercase ${dark ? 'text-white/50' : 'text-gray-500'}`}>{t('common.previous')}</span>
       <div className="flex items-center space-x-1">
         <ChevronLeft size={17} className="shrink-0" />
         <span className="text-xs sm:text-sm font-semibold truncate max-w-[120px] sm:max-w-[200px]">{previousActivity.name}</span>

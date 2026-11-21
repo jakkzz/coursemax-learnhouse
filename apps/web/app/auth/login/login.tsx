@@ -11,11 +11,13 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@components/Contexts/AuthContext'
 import { removeQueryParamsFromAddressBar } from '@services/utils/ts/scrubUrl'
-import { getLEARNHOUSE_TOP_DOMAIN_VAL, getDeploymentMode, isOnCustomDomain } from '@services/config/config'
+import { getDeploymentMode } from '@services/config/config'
 import { useLHSession } from '@components/Contexts/LHSessionContext'
 import { useTranslation } from 'react-i18next'
 import { resendVerificationEmail } from '@services/auth/auth'
 import AuthLayout from '@components/Auth/AuthLayout'
+import LineSignIn from '@components/Auth/LineSignIn'
+import ProviderButton from '@components/Auth/ProviderButton'
 import TurnstileWidget, { useTurnstileRequired, verifyTurnstileToken, type TurnstileWidgetHandle } from '@components/Auth/TurnstileWidget'
 import { useLHAnalytics, AnalyticsEvent } from '@services/analytics'
 import { getAllowedAuthMethods } from '@services/auth/authMethods'
@@ -46,18 +48,22 @@ const LoginClient = (props: LoginClientProps) => {
   )
   const passwordAllowed = allowedMethods.has('password')
   const magicLoginAllowed = allowedMethods.has('magic_login')
-  const googleAllowed = allowedMethods.has('google')
+  const [googleCapability, setGoogleCapability] = useState({ google: false, registration: false, public_registration: false })
+  const [googleLoading, setGoogleLoading] = useState(false)
+  const [lineBusy, setLineBusy] = useState(false)
+  const googleAllowed = googleCapability.google && allowedMethods.has('google')
+  useEffect(() => {
+    let active = true
+    fetch('/api/auth/google/capabilities', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (active && data) setGoogleCapability({ google: data.google === true, registration: data.registration === true, public_registration: data.public_registration === true }) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
   const ssoAllowed = allowedMethods.has('sso')
   // SSO counts only once it is actually configured for the org (ssoEnabled).
-  const hasAlternativeMethods = googleAllowed || magicLoginAllowed || (ssoAllowed && ssoEnabled)
-
-  // A signed-in user has nothing to do on /login → bounce to the hub. The proxy
-  // does this best-effort, but pages must self-handle it too (mirrors signup.tsx).
-  // Guarded by !isSubmitting so a FRESH login (which flips the session to
-  // authenticated) doesn't race the onSubmit's own post-login navigation.
-  useEffect(() => {
-    if (isAuthenticated && !isSubmitting) router.replace('/home')
-  }, [isAuthenticated, isSubmitting, router])
+  const [lineAvailable, setLineAvailable] = useState(false)
+  const hasAlternativeMethods = googleAllowed || (allowedMethods.has('line') && lineAvailable) || magicLoginAllowed || (ssoAllowed && ssoEnabled)
 
   // Error state with type information
   const [error, setError] = useState('')
@@ -72,6 +78,7 @@ const LoginClient = (props: LoginClientProps) => {
   // replaced in place by the code step. Same route, so the ?next redirect and
   // the org context survive without being threaded through a navigation.
   const [mfaToken, setMfaToken] = useState<string | null>(null)
+  const arrivedWithMfaRef = React.useRef(false)
   const [mfaCode, setMfaCode] = useState('')
   const [useBackupCode, setUseBackupCode] = useState(false)
   const [mfaError, setMfaError] = useState('')
@@ -118,16 +125,47 @@ const LoginClient = (props: LoginClientProps) => {
     setMagicSent(true)
   }
 
-  // An admin magic link for a 2FA-enabled user lands here with a pending token
-  // in the query string instead of a session (see /admin/{org}/auth/magic-consume).
+  // A sign-in link for a 2FA-enabled user lands here with a pending token in
+  // the query string instead of a session (see /auth/magic).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const token = params.get('mfa_token')
+    const googlePending = sessionStorage.getItem('lh_provider_mfa') ?? sessionStorage.getItem('lh_google_mfa')
+    if (googlePending) {
+      sessionStorage.removeItem('lh_provider_mfa')
+      sessionStorage.removeItem('lh_google_mfa')
+      try {
+        const pending = JSON.parse(googlePending)
+        if (typeof pending.token === 'string') {
+          arrivedWithMfaRef.current = true
+          setMfaToken(pending.token)
+        }
+        if (typeof pending.next === 'string' && pending.next.startsWith('/') && !pending.next.startsWith('//')) {
+          const url = new URL(window.location.href)
+          url.searchParams.set('next', pending.next)
+          window.history.replaceState(null, '', url)
+        }
+      } catch { /* A corrupt tab handoff restarts normal login. */ }
+    }
     if (token) {
+      arrivedWithMfaRef.current = true
       setMfaToken(token)
       removeQueryParamsFromAddressBar(['mfa_token'])
     }
   }, [])
+
+  // A signed-in user has nothing to do on /login → bounce to the hub. The proxy
+  // does this best-effort, but pages must self-handle it too (mirrors signup.tsx).
+  // Guarded by !isSubmitting so a FRESH login (which flips the session to
+  // authenticated) doesn't race the onSubmit's own post-login navigation.
+  // Not while a second factor is pending: a sign-in link for another account
+  // hands its 2FA step over here (see /auth/magic). The ref covers the render
+  // before the mfaToken state lands.
+  useEffect(() => {
+    if (isAuthenticated && !isSubmitting && !mfaToken && !arrivedWithMfaRef.current) {
+      router.replace('/home')
+    }
+  }, [isAuthenticated, isSubmitting, mfaToken, router])
 
   // Honor a post-login redirect via ?next / ?redirect, sanitized to an
   // internal same-origin path (no open-redirect), defaulting to /home.
@@ -206,23 +244,28 @@ const LoginClient = (props: LoginClientProps) => {
     }
   }, [mfaCode, useBackupCode, mfaSubmitting, mfaToken]) // eslint-disable-line
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async (intent: 'signin' | 'register' = 'signin') => {
+    if (googleLoading || lineBusy || isSubmitting) return
+    setGoogleLoading(true)
     track(AnalyticsEvent.LoginGoogleClicked)
-    // Store org context in cookies before OAuth redirect
-    if (props.org?.slug) {
-      const topDomain = getLEARNHOUSE_TOP_DOMAIN_VAL();
-      const isSecure = window.location.protocol === 'https:';
-      const secureAttr = isSecure ? '; secure' : '';
-      const baseAttributes = `; path=/; SameSite=Lax${secureAttr}`;
-      // Host-only on custom domains: a `.{platformTopDomain}` cookie can't be set
-      // from learn.acme.org (Domain not a suffix of host) → the browser drops it
-      // and the callback loses org context. Omit the Domain there.
-      const domainAttr = (topDomain === 'localhost' || isOnCustomDomain()) ? '' : `; domain=.${topDomain}`;
-      document.cookie = `LH_oauth_orgslug=${props.org.slug}${baseAttributes}${domainAttr}`;
-      document.cookie = `LH_oauth_org_id=${props.org.id}${baseAttributes}${domainAttr}`;
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const returnPath = params.get('next') ?? params.get('redirect') ?? '/home'
+      const response = await fetch('/api/auth/google/start', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ intent, return_path: returnPath }),
+      })
+      const data = await response.json()
+      if (!response.ok || typeof data.url !== 'string') throw new Error('start_failed')
+      const authorization = new URL(data.url)
+      if (authorization.origin !== 'https://accounts.google.com') throw new Error('start_failed')
+      sessionStorage.setItem('lh_google_intent', intent)
+      window.location.assign(authorization.toString())
+    } catch {
+      setError(t('auth.google_restart', { defaultValue: 'Google sign-in could not start. Please try again.' }))
+      setShowErrorModal(true)
+      setGoogleLoading(false)
     }
-    // Use absolute URL with current origin for custom domain support
-    signIn('google', { callbackUrl: buildCallbackUrl() });
   };
 
   // Check if SSO is enabled for this organization (requires enterprise plan)
@@ -313,6 +356,7 @@ const LoginClient = (props: LoginClientProps) => {
     validateOnBlur: true,
     validateOnChange: true,
     onSubmit: async (values, {validateForm, setErrors, setSubmitting}) => {
+      if (googleLoading || lineBusy) return
       setIsSubmitting(true)
       setError('')
       setErrorType(null)
@@ -725,9 +769,9 @@ const LoginClient = (props: LoginClientProps) => {
             ) : (
               <>
             {/* Header */}
-            <h1 className="text-[28px] md:text-[32px] font-black text-black tracking-tight leading-tight">{t('auth.welcome_back')}</h1>
-            <p className="mt-2 text-black/45 text-[15px] font-medium">
-              {passwordAllowed
+            <h1 className="text-[28px] md:text-[32px] font-black text-black tracking-tight leading-tight">{googleCapability.public_registration ? t('auth.google_welcome') : t('auth.welcome_back')}</h1>
+            <p className="mt-2 text-black/70 text-[15px] font-medium">
+              {googleCapability.public_registration ? t('auth.google_create_or_signin') : passwordAllowed
                 ? t('auth.enter_credentials')
                 : t('auth.choose_sign_in_method', {
                     defaultValue: 'Choose how you’d like to sign in.',
@@ -735,6 +779,17 @@ const LoginClient = (props: LoginClientProps) => {
             </p>
 
             <div className="mt-8">
+              <div className="space-y-3">
+                {googleAllowed && (
+                  <ProviderButton provider="google" primary
+                    onClick={() => handleGoogleSignIn(googleCapability.public_registration ? 'register' : 'signin')}
+                    disabled={isSubmitting || googleLoading || lineBusy} aria-busy={googleLoading}>
+                    {googleLoading ? t('common.loading') : googleCapability.public_registration ? t('auth.google_continue') : t('auth.sign_in_with_google')}
+                  </ProviderButton>
+                )}
+                {allowedMethods.has('line') && <LineSignIn disabled={isSubmitting || googleLoading} onAvailabilityChange={setLineAvailable} onBusyChange={setLineBusy} />}
+              </div>
+              {passwordAllowed && hasAlternativeMethods && <p className="my-6 text-center text-sm text-neutral-600">{t('auth.google_password_alternative')}</p>}
               {passwordAllowed && (
               <FormLayout onSubmit={formik.handleSubmit}>
                 <FormField name="email">
@@ -794,8 +849,8 @@ const LoginClient = (props: LoginClientProps) => {
 
                 <Form.Submit asChild>
                   <button
-                    disabled={isSubmitting || (turnstileRequired && !turnstileToken)}
-                    className="box-border w-full inline-flex h-[44px] rounded-lg items-center justify-center bg-black hover:bg-black/85 text-white px-[15px] font-bold text-[14px] leading-none mt-2 transition-all disabled:opacity-50"
+                    disabled={isSubmitting || googleLoading || lineBusy || (turnstileRequired && !turnstileToken)}
+                    className="box-border w-full inline-flex min-h-12 rounded-lg items-center justify-center bg-black hover:bg-black/85 text-white px-4 py-3 font-semibold text-base mt-2 transition-colors focus-visible:outline-2 focus-visible:outline-neutral-900! focus-visible:outline-offset-2 disabled:opacity-50"
                   >
                     {isSubmitting ? (
                       <span className="flex items-center space-x-2">
@@ -811,7 +866,7 @@ const LoginClient = (props: LoginClientProps) => {
               )}
 
               {/* Divider: only earns its place between two sets of options. */}
-              {passwordAllowed && hasAlternativeMethods && (
+              {passwordAllowed && (ssoEnabled || magicLoginAllowed) && (
                 <div className="relative my-6">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-neutral-200" />
@@ -824,15 +879,11 @@ const LoginClient = (props: LoginClientProps) => {
 
               {/* Social & SSO Buttons */}
               <div className="space-y-2.5">
-                {googleAllowed && (
-                <button
-                  onClick={handleGoogleSignIn}
-                  disabled={isSubmitting}
-                  className="flex justify-center items-center w-full bg-white hover:bg-neutral-50 text-black space-x-3 font-medium p-3 rounded-lg border border-neutral-200 transition-all text-sm disabled:opacity-50"
-                >
-                  <img src="https://fonts.gstatic.com/s/i/productlogos/googleg/v6/24px.svg" alt="" className="w-4 h-4" />
-                  <span>{t('auth.sign_in_with_google')}</span>
-                </button>
+                {googleAllowed && googleCapability.registration && !googleCapability.public_registration && (
+                  <button type="button" onClick={() => handleGoogleSignIn('register')} disabled={isSubmitting || googleLoading}
+                    className="w-full rounded-lg p-3 text-sm font-medium text-black underline underline-offset-4 disabled:opacity-50">
+                    {t('auth.google_create_account', { defaultValue: 'Sign up with Google' })}
+                  </button>
                 )}
 
                 {ssoEnabled && (

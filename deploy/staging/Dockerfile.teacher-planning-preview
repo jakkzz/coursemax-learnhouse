@@ -1,0 +1,6 @@
+# Fictional, memory-only teacher planning preview; no backend/schema change.
+FROM coursemax-learnhouse:4d9b24e0
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.source="https://github.com/jakkzz/coursemax-learnhouse" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}"
+ADD web-delta.tar.gz /app/web/

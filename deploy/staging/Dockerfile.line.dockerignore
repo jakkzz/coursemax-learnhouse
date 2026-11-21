@@ -1,0 +1,8 @@
+# Validated runtime artifacts must retain traced node_modules and .next files.
+**/.git
+**/.env
+**/.env.*
+**/__pycache__
+**/*.pyc
+apps/web/node_modules
+apps/web/.next

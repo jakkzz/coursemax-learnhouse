@@ -1,0 +1,9 @@
+# Code-only UI release on the reviewed LINE image; no pulls, migrations or flags.
+# web-delta.tar.gz is generated from the validated full build and exact parent.
+# All required baked files are checked against its private complete-tree manifest.
+FROM coursemax-learnhouse:5625764a
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.source="https://github.com/jakkzz/coursemax-learnhouse" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}"
+COPY apps/api/src/routers/google_subject_auth.py /app/api/src/routers/google_subject_auth.py
+ADD web-delta.tar.gz /app/web/

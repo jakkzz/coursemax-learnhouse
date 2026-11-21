@@ -1,4 +1,9 @@
 {
+  "classes_preview": {
+    "nav": "Classes preview",
+    "admin_only": "This design preview is available to organization managers.",
+    "admin_only_help": "It does not grant teacher or student permissions. Ordinary account access is unchanged."
+  },
   "common": {
     "hello": "Hello",
     "home": "Home",
@@ -254,6 +259,61 @@
     "login_to": "Welcome back",
     "sign_up": "Sign up",
     "sign_in_with_google": "Sign in with Google",
+    "google_create_account": "Sign up with Google",
+    "google_continue": "Continue with Google",
+    "google_welcome": "Welcome",
+    "google_create_or_signin": "Use Google to create an account or sign in.",
+    "google_password_alternative": "Or use your existing password",
+    "logout_retry": "Sign-out could not be completed. Please try again.",
+    "google_restart": "Google sign-in could not be completed. Please try again.",
+    "google_link_existing": "Sign in using your existing method, then link Google from your account. Your accounts will not be merged automatically.",
+    "google_completing": "Completing secure sign-in…",
+    "google_back_to_login": "Back to sign in",
+    "line_policy_name": "LINE (linked accounts only)",
+    "line_policy_hint": "Requires explicit linking from Google. Does not register new users.",
+    "line_signin": "Sign in with LINE",
+    "line_linked_only": "For accounts already linked to LINE. New here? Continue with Google first.",
+    "line_link_title": "Connect LINE to your account",
+    "line_link_description": "LINE adds another way to sign in. Your email, courses and results stay unchanged.",
+    "line_google_required": "Confirm your Google account before connecting or disconnecting LINE. This confirmation lasts five minutes.",
+    "line_confirm_google": "Confirm with Google",
+    "line_choose_account": "Choose the LINE account to connect",
+    "line_connected": "LINE is connected to this account.",
+    "line_manage": "Manage LINE connection",
+    "methods_title": "Sign-in methods",
+    "methods_description": "Check your connections or add another way to sign in. Your email, role and course access stay the same.",
+    "methods_loading": "Checking connection…",
+    "methods_error": "Could not check this connection.",
+    "methods_connected": "Connected",
+    "methods_not_connected": "Not connected",
+    "methods_unavailable": "Sign-in with this method is not available here.",
+    "methods_retry": "Check connections again",
+    "google_connected_help": "Use Google to sign in and confirm changes to your LINE connection.",
+    "google_connect_help": "Choose the Google account you want to use to sign in.",
+    "line_connected_help": "Use your connected LINE account to sign in. Confirm with Google to manage the connection.",
+    "google_connect": "Connect Google",
+    "line_connect": "Connect LINE",
+    "line_disconnect": "Disconnect LINE",
+    "line_disconnect_confirm": "Confirm disconnect",
+    "line_disconnect_warning": "LINE sessions will stop working. You can still sign in with Google. This LINE identity cannot be connected again; disconnect only if you no longer want to use it.",
+    "line_disconnected": "LINE is disconnected. Continue using Google to sign in.",
+    "line_back_security": "Back to account security",
+    "line_disabled": "LINE is not enabled yet. Continue using Google.",
+    "line_retry": "This action could not complete. Sign in with Google again, then return here to review your LINE connection.",
+    "line_callback_title": "Completing LINE sign-in",
+    "line_callback_wait": "Checking your LINE account. Please wait.",
+    "line_callback_retry": "LINE sign-in was cancelled or could not be verified. Sign in with Google to review your connection, then try LINE again.",
+    "line_try_again": "Return and try again",
+    "line_app_title": "Open LearnHouse in LINE",
+    "line_app_description": "Use your connected LINE account to open LearnHouse. Course access still follows your existing LearnHouse account.",
+    "line_app_continue": "Continue with my connected LINE account",
+    "line_app_retry": "LINE access could not complete. This account may not be connected, or its sign-in token may have expired or already been used. Continue with Google to review your connection.",
+    "line_use_google": "Continue with Google instead",
+    "google_link_title": "Link Google to your account",
+    "google_link_description": "Sign in to your existing account first. Linking adds Google as a sign-in method without changing your email, role or course access.",
+    "google_confirm_password": "Confirm your existing password",
+    "google_link_retry": "Linking could not start. Sign in again, confirm your password, then retry. Your account has not changed.",
+    "google_link_continue": "Choose the Google account to link",
     "wrong_email_password": "Wrong Email or password",
     "turnstile_failed": "Verification failed. Please try again.",
     "error_generic": "Something went wrong. Please try again.",
@@ -472,6 +532,7 @@
     "course_count_plural": "{{count}} courses",
     "authors_and_updates": "Authors & Updates",
     "course_updates": "Course Updates",
+    "rss_feed": "RSS feed of course updates",
     "no_updates_yet": "No updates yet",
     "no_updates_desc": "Updates about this course will appear here",
     "quit_course": "Quit Course",
@@ -615,7 +676,61 @@
       "import_partial": "Import Partially Complete",
       "import_summary": "{{successful}} of {{total}} course(s) imported successfully",
       "created": "Created",
-      "done": "Done"
+      "done": "Done",
+      "open_course": "Open course",
+      "lms_courses": "Another LMS",
+      "lms_description": "Moodle, Canvas, Blackboard, Brightspace, Open edX or Common Cartridge",
+      "lms_source": "Source platform",
+      "lms_auto_detect": "Auto-detect",
+      "lms_hint_auto": "Detect the platform from the uploaded file",
+      "lms_hint_moodle": "Course backup (.mbz)",
+      "lms_hint_canvas": "Course export (.imscc)",
+      "lms_hint_blackboard": "Export/Archive package (.zip)",
+      "lms_hint_brightspace": "Export package (.zip)",
+      "lms_hint_openedx": "Studio course export (.tar.gz)",
+      "lms_hint_common_cartridge": ".imscc / .zip",
+      "lms_quiz_mode": "Quizzes",
+      "lms_quiz_assignment": "Graded assignments",
+      "lms_quiz_assignment_hint": "Each quiz becomes an assignment with graded tasks",
+      "lms_quiz_page": "Interactive quiz blocks in pages",
+      "lms_quiz_page_hint": "Each quiz becomes a page with quiz blocks",
+      "lms_format": "Course export (.mbz, .imscc, .zip, .tar.gz)",
+      "lms_ready_to_convert": "Ready to convert",
+      "lms_invalid_file_format": "Please upload a .mbz, .imscc, .zip or .tar.gz file",
+      "lms_file_too_large": "The export is larger than the {{size}} MB upload limit",
+      "lms_info": "The export is converted into LearnHouse content on the server. Large courses can take a few minutes, keep this window open until it finishes.",
+      "lms_start": "Upload and Convert",
+      "lms_uploading": "Uploading... {{progress}}%",
+      "lms_upload_finishing": "Finishing upload...",
+      "lms_upload_progress": "Upload progress",
+      "lms_upload_failed": "Failed to upload the export",
+      "lms_converting": "Converting course...",
+      "lms_converting_hint": "This can take a few minutes for large courses. Keep this window open.",
+      "lms_conversion_failed": "Conversion Failed",
+      "lms_conversion_failed_generic": "The export could not be converted.",
+      "lms_status_failed": "Could not get the conversion status",
+      "lms_unknown_course": "Unknown course",
+      "lms_retry": "Try again",
+      "lms_converted": "Course Converted Successfully",
+      "lms_detected": "From {{source}}",
+      "lms_no_courses": "No course was found in this export",
+      "lms_count_pages": "Pages",
+      "lms_count_videos": "Videos",
+      "lms_count_documents": "Documents",
+      "lms_count_assignments": "Assignments",
+      "lms_count_scorm": "SCORM packages",
+      "lms_count_questions": "Questions",
+      "lms_count_assignment_tasks": "Assignment tasks",
+      "lms_count_images": "Images",
+      "lms_count_video_files": "Video files",
+      "lms_count_audio_files": "Audio files",
+      "lms_count_pdfs": "PDF files",
+      "lms_count_files": "Downloadable files",
+      "lms_count_due_dates_removed": "Past due dates removed",
+      "lms_count_transcoded": "Transcoded media",
+      "lms_skipped": "Skipped items ({{count}})",
+      "lms_warnings": "Warnings ({{count}})",
+      "lms_and_more": "and {{count}} more"
     },
     "scorm": {
       "upload_package": "Upload SCORM Package",
@@ -1100,6 +1215,13 @@
       "page_of": "Page {{current}} of {{total}}",
       "results": "{{count}} result for \"{{query}}\"",
       "results_plural": "{{count}} results for \"{{query}}\""
+    },
+    "connection": {
+      "access_revoked_title": "You no longer have access to this board",
+      "access_revoked_description": "Your access was removed while the board was open. Reload to check again.",
+      "too_large_title": "This board is too large to keep syncing",
+      "too_large_description": "It passed the size limit, so live editing has stopped. Your most recent changes may not have been saved.",
+      "reload": "Reload"
     }
   },
   "podcasts": {
@@ -1405,6 +1527,7 @@
     }
   },
   "activities": {
+    "video_chapters": "Chapters",
     "video": "Video",
     "document": "Document",
     "page": "Page",
@@ -1605,10 +1728,104 @@
       "communities": "Communities",
       "discussions": "Discussions",
       "playgrounds": "Playgrounds",
-      "podcasts": "Podcasts"
+      "podcasts": "Podcasts",
+      "activities": "Lessons",
+      "folders": "Folders"
     },
     "course": "Course",
-    "user": "Member"
+    "user": "Member",
+    "lesson_location": "{{course}} · {{chapter}}",
+    "palette": {
+      "trigger": "Search",
+      "placeholder": "Search lessons, courses, people…",
+      "hint_mac": "⌘K",
+      "hint_other": "Ctrl K",
+      "loading": "Searching…",
+      "no_results": "No matches for \"{{query}}\"",
+      "empty_hint": "Type to search this space, or jump somewhere",
+      "view_all": "See all results for \"{{query}}\"",
+      "groups": {
+        "pages": "Go to",
+        "courses": "Courses",
+        "activities": "Lessons",
+        "folders": "Folders",
+        "communities": "Communities",
+        "discussions": "Discussions",
+        "playgrounds": "Playgrounds",
+        "podcasts": "Podcasts",
+        "users": "Members"
+      },
+      "keys": {
+        "navigate": "Navigate",
+        "open": "Open",
+        "new_tab": "New tab",
+        "close": "Close"
+      },
+      "entries": {
+        "home": {
+          "description": "Back to the start page",
+          "keywords": "home, start, landing, front page, main"
+        },
+        "courses": {
+          "description": "Browse every course",
+          "keywords": "courses, catalog, classes, lessons, learn, training, curriculum"
+        },
+        "library": {
+          "description": "Folders of grouped content",
+          "keywords": "library, folders, collections, bundles, paths"
+        },
+        "podcasts": {
+          "description": "Listen to episodes",
+          "keywords": "podcasts, audio, episodes, shows, listen"
+        },
+        "communities": {
+          "description": "Discussions with other members",
+          "keywords": "communities, forums, discussions, posts, threads, members"
+        },
+        "playgrounds": {
+          "description": "Interactive coding spaces",
+          "keywords": "playgrounds, code, sandbox, repl, practice, programming"
+        },
+        "store": {
+          "description": "Paid courses and bundles",
+          "keywords": "store, shop, buy, pricing, plans, offers, purchase"
+        },
+        "trail": {
+          "description": "Your progress across courses",
+          "keywords": "trail, progress, my courses, continue, history, enrolled"
+        },
+        "boards": {
+          "description": "Your boards",
+          "keywords": "boards, kanban, tasks, planning, notes"
+        },
+        "copilot": {
+          "title": "Copilot",
+          "description": "Ask the AI assistant",
+          "keywords": "copilot, ai, assistant, chat, ask, help"
+        },
+        "search": {
+          "description": "Full search with filters",
+          "keywords": "search, find, results, filter, browse"
+        },
+        "account_general": {
+          "title": "Account settings",
+          "description": "Email, name and language",
+          "keywords": "account, settings, email, name, language, preferences"
+        },
+        "account_profile": {
+          "description": "Your public profile and bio",
+          "keywords": "profile, bio, avatar, picture, public"
+        },
+        "account_security": {
+          "description": "Password, 2FA and sessions",
+          "keywords": "password, security, 2fa, mfa, sessions, sign out"
+        },
+        "account_purchases": {
+          "description": "Purchases and subscriptions",
+          "keywords": "purchases, subscriptions, billing, receipts, invoices"
+        }
+      }
+    }
   },
   "ai": {
     "ask_ai": "Ask AI",
@@ -1626,6 +1843,10 @@
     "one_time_payment": "One-time payment",
     "per_month": "(per month)",
     "per_month_short": "/month",
+    "billing_per_month": "per month",
+    "billing_per_year": "per year",
+    "billing_suffix_month": "/ month",
+    "billing_suffix_year": "/ year",
     "subscribe_now": "Subscribe Now",
     "purchase_now": "Purchase Now",
     "failed_checkout": "Failed to initiate checkout process",
@@ -1647,6 +1868,9 @@
     "general": "General",
     "profile": "Profile",
     "security": "Security",
+    "school_identity": "School identity",
+    "school": "School",
+    "classes": "Classes",
     "my_courses": "My Courses",
     "purchases": "Purchases",
     "no_purchased_courses": "No purchased courses yet",
@@ -2085,6 +2309,8 @@
       "import_learnhouse": "Import LearnHouse Course",
       "import_learnhouse_description": "Import a course exported from LearnHouse",
       "import_select_type": "Select the type of course to import",
+      "import_lms": "Import from Another LMS",
+      "import_lms_description": "Convert a course exported from another learning platform",
       "no_courses": "No courses yet",
       "create_course_placeholder": "Create a course to add content",
       "no_courses_available": "No courses available yet",
@@ -6695,7 +6921,46 @@
     },
     "pricing": {
       "from": "from",
-      "subscription": "subscription"
+      "subscription": "subscription",
+      "per_month": "/ month",
+      "per_year": "/ year"
     }
+  },
+  "shortcuts": {
+    "help_title": "Keyboard shortcuts",
+    "help_subtitle": "Press ? anywhere to open this sheet.",
+    "then": "then",
+    "groups": {
+      "global": "Everywhere",
+      "navigation": "Go to",
+      "page": "On this page"
+    },
+    "open_help": "Keyboard shortcuts",
+    "open_search": "Search",
+    "go_to": "Go to {{page}}",
+    "next_lesson": "Next lesson",
+    "previous_lesson": "Previous lesson",
+    "mark_complete": "Mark lesson complete",
+    "unmark_complete": "Unmark lesson",
+    "toggle_focus": "Toggle focus mode",
+    "back_to_course": "Back to course",
+    "start_course": "Start course",
+    "continue_course": "Continue where you left off",
+    "palette_actions": "Actions",
+    "help": "Help",
+    "next_item": "Next item",
+    "previous_item": "Previous item",
+    "open_item": "Open selected item",
+    "next_page": "Next page",
+    "previous_page": "Previous page",
+    "next_chapter": "Next chapter",
+    "previous_chapter": "Previous chapter",
+    "exit_focus": "Exit focus mode",
+    "play_pause": "Play or pause video",
+    "expand_chapters": "Expand all chapters",
+    "collapse_chapters": "Collapse all chapters",
+    "new_discussion": "New discussion",
+    "play_pause_podcast": "Play or pause podcast",
+    "or": "or"
   }
 }

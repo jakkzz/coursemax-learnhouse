@@ -50,6 +50,10 @@ from src.security.features_utils.plan_check import require_plan, require_plan_fo
 
 v1_router = APIRouter(prefix="/api/v1")
 
+# One reviewed extension integration seam; feature logic stays extension-owned.
+from src.route66_ext.bootstrap import build_router
+v1_router.include_router(build_router())
+
 # Helper dependency to reject API token access (still admits AnonymousUser;
 # use on routers that contain at least one deliberately-public endpoint).
 async def get_non_api_token_user(user = Depends(get_current_user)):

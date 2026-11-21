@@ -18,6 +18,7 @@ from src.security.security import ALGORITHM, SECRET_KEY, security_hash_password
 from src.security.session_context import (
     AMR_CLAIM,
     AUTH_METHOD_API_TOKEN,
+    CUSTOM_DOMAIN_CLAIM,
     LEGACY_GRACE_CLAIM,
     SORG_CLAIM,
     SessionProvenance,
@@ -25,7 +26,7 @@ from src.security.session_context import (
 )
 
 
-def _publish_session_provenance(amr, org_id, legacy_grace_expires=None) -> None:
+def _publish_session_provenance(amr, org_id, legacy_grace_expires=None, custom_domain=False) -> None:
     """Store the current request's session provenance for the org-policy gates.
 
     Coerces ``sorg`` to int defensively (JWT numbers survive as int, but a
@@ -41,7 +42,12 @@ def _publish_session_provenance(amr, org_id, legacy_grace_expires=None) -> None:
     except (TypeError, ValueError):  # pragma: no cover - defensive coercion of a hand-crafted claim
         parsed_grace = None
     set_session_provenance(
-        SessionProvenance(amr=amr, org_id=parsed_org, legacy_grace_expires=parsed_grace)
+        SessionProvenance(
+            amr=amr,
+            org_id=parsed_org,
+            legacy_grace_expires=parsed_grace,
+            custom_domain=custom_domain is True,
+        )
     )
 
 
@@ -117,14 +123,19 @@ def decode_jwt(token: str) -> Optional[dict]:
         # SECURITY: Always require sub and exp claims, always verify expiration.
         # Dev mode no longer bypasses JWT expiration to prevent leaked tokens
         # from being valid forever if dev mode is accidentally left on.
-        decode_options = {"require": ["exp", "sub"]}
-
-        payload = jwt.decode(
-            token,
-            JWT_SECRET_KEY,
-            algorithms=[ALGORITHM],  # Explicit algorithm prevents confusion attacks
-            options=decode_options
-        )
+        decode_options = {"require": ["exp", "sub"], "verify_aud": False}
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[ALGORITHM], options=decode_options)
+        if "lhv" in payload:
+            from src.security.provider_session import AUDIENCE, issuer, validate_claims
+            payload = jwt.decode(
+                token, JWT_SECRET_KEY, algorithms=[ALGORITHM], issuer=issuer(), audience=AUDIENCE,
+                options={"require": ["exp", "sub", "iat", "iss", "aud", "lhv", "lh_identity", "lh_uuid", "amr", "sorg"]},
+            )
+            if not validate_claims(payload):
+                return None
+        elif payload.get("amr") in ("google", "line") or "aud" in payload:
+            # Never admit old Google/email sessions alongside subject-owned login.
+            return None
         return payload
     except PyJWTError:
         return None
@@ -194,7 +205,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     else:
         # SECURITY: Always set expiration (8 hours default)
         expire = now + JWT_ACCESS_TOKEN_EXPIRES
-    to_encode.update({"exp": expire, "iat": now})
+    to_encode.update({"exp": expire, "iat": now.timestamp()})
     # setdefault, not update: a caller that deliberately names its own type wins.
     to_encode.setdefault("type", "access")
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -252,7 +263,7 @@ def create_refresh_token(data: dict, expires_delta: timedelta | None = None):
         expire = now + JWT_REFRESH_TOKEN_EXPIRES
     to_encode.update({
         "exp": expire,
-        "iat": now,
+        "iat": now.timestamp(),
         "type": "refresh",
         "jti": _secrets.token_urlsafe(16),
     })
@@ -280,7 +291,7 @@ def revoke_user_sessions_before(user_id: int, cutoff: Optional[datetime] = None)
     call on every logout; the key is written with a TTL that matches the
     longest possible session so old keys garbage-collect themselves.
     """
-    ts = (cutoff or datetime.now(timezone.utc)).replace(microsecond=0)
+    ts = cutoff or datetime.now(timezone.utc)
     r = _get_revocation_redis_client()
     if r is None:
         return False
@@ -288,7 +299,7 @@ def revoke_user_sessions_before(user_id: int, cutoff: Optional[datetime] = None)
         r.setex(
             f"jwt_revoked_before:{user_id}",
             int(JWT_REFRESH_TOKEN_EXPIRES.total_seconds()),
-            int(ts.timestamp()),
+            ts.timestamp(),
         )
         return True
     except Exception:
@@ -319,10 +330,10 @@ def _is_token_revoked_for_user(user_id: int, token_iat: Optional[datetime]) -> b
     if raw is None:
         return False
     try:
-        cutoff_ts = int(raw)
+        cutoff_ts = float(raw)
     except (TypeError, ValueError):
         return False
-    return int(token_iat.timestamp()) < cutoff_ts
+    return token_iat.timestamp() < cutoff_ts
 
 
 def decode_refresh_token(token: str) -> Optional[dict]:
@@ -333,23 +344,15 @@ def decode_refresh_token(token: str) -> Optional[dict]:
     Dev mode does not affect refresh token validation.
     """
     try:
-        # SECURITY: Always verify expiration for refresh tokens
-        decode_options = {"require": ["exp", "sub"]}
-
-        payload = jwt.decode(
-            token,
-            JWT_SECRET_KEY,
-            algorithms=[ALGORITHM],
-            options=decode_options
-        )
-        if payload.get("type") != "refresh":
+        payload = decode_jwt(token)
+        if not payload or payload.get("type") != "refresh":
             return None
         return payload
     except PyJWTError:
         return None
 
 
-def _mark_refresh_jti_used(user_id: int, jti: str) -> bool:
+def _mark_refresh_jti_used(user_id: int, jti: str, *, strict: bool = False) -> bool:
     """
     Atomically record a refresh token jti as consumed. Returns True on the
     first call for a given jti and False for every subsequent replay.
@@ -359,9 +362,9 @@ def _mark_refresh_jti_used(user_id: int, jti: str) -> bool:
     """
     r = _get_revocation_redis_client()
     if r is None:
-        # Redis unavailable: fail open for usability (tokens still honour exp
-        # and password_changed_at). This is the same defense-in-depth posture
-        # as the logout blocklist.
+        if strict:
+            raise HTTPException(503, "Session validation temporarily unavailable")
+        # Legacy password-session behavior remains compatible.
         return True
     try:
         # NX + TTL = set-if-not-exists, auto-cleanup after the full refresh
@@ -374,6 +377,8 @@ def _mark_refresh_jti_used(user_id: int, jti: str) -> bool:
         )
         return bool(ok)
     except Exception:
+        if strict:
+            raise HTTPException(503, "Session validation temporarily unavailable") from None
         return True
 
 
@@ -642,7 +647,11 @@ async def get_current_user(
     token_data = TokenData(username=username)
 
     if username:
-        user = await security_get_user(request, db_session, email=token_data.username)  # type: ignore # treated as an email
+        if payload.get("lhv") == 2:
+            from src.security.provider_session import resolve_provider_session
+            user = await resolve_provider_session(db_session, payload)
+        else:
+            user = await security_get_user(request, db_session, email=token_data.username)  # legacy password sessions
         if user is None:
             raise credentials_exception
 
@@ -680,6 +689,7 @@ async def get_current_user(
             payload.get(AMR_CLAIM),
             payload.get(SORG_CLAIM),
             payload.get(LEGACY_GRACE_CLAIM),
+            payload.get(CUSTOM_DOMAIN_CLAIM),
         )
         _record_activity_from_request(request, public_user.id)
         return public_user
@@ -720,6 +730,39 @@ async def get_authenticated_user(
     return user
 
 
+def api_token_user_from(api_token) -> APITokenUser:
+    """The request identity for an ``APIToken`` row."""
+    # Normalize rights to a plain dict of plain dicts so .get() works everywhere
+    raw_rights = api_token.rights
+    if raw_rights is None:
+        rights = None
+    elif isinstance(raw_rights, dict):
+        # Already a dict, but inner values might be Pydantic models
+        rights = {}
+        for k, v in raw_rights.items():
+            if isinstance(v, dict):
+                rights[k] = v
+            elif hasattr(v, 'model_dump'):
+                rights[k] = v.model_dump()
+            elif hasattr(v, 'dict'):
+                rights[k] = v.dict()
+            else:
+                rights[k] = v
+    else:
+        # Full Pydantic Rights model
+        rights = raw_rights.model_dump() if hasattr(raw_rights, 'model_dump') else raw_rights.dict()
+
+    return APITokenUser(
+        id=api_token.id,
+        user_uuid=api_token.token_uuid,
+        username=f"api_token_{api_token.name}",
+        org_id=api_token.org_id,
+        rights=rights,
+        token_name=api_token.name,
+        created_by_user_id=api_token.created_by_user_id,
+    )
+
+
 async def validate_api_token(
     token: str,
     db_session: AsyncSession,
@@ -742,36 +785,7 @@ async def validate_api_token(
     if not api_token:
         return None
 
-    # Normalize rights to a plain dict of plain dicts so .get() works everywhere
-    raw_rights = api_token.rights
-    if raw_rights is None:
-        rights = None
-    elif isinstance(raw_rights, dict):
-        # Already a dict, but inner values might be Pydantic models
-        rights = {}
-        for k, v in raw_rights.items():
-            if isinstance(v, dict):
-                rights[k] = v
-            elif hasattr(v, 'model_dump'):
-                rights[k] = v.model_dump()
-            elif hasattr(v, 'dict'):
-                rights[k] = v.dict()
-            else:
-                rights[k] = v
-    else:
-        # Full Pydantic Rights model
-        rights = raw_rights.model_dump() if hasattr(raw_rights, 'model_dump') else raw_rights.dict()
-
-    # Create and return an APITokenUser
-    return APITokenUser(
-        id=api_token.id,
-        user_uuid=api_token.token_uuid,
-        username=f"api_token_{api_token.name}",
-        org_id=api_token.org_id,
-        rights=rights,
-        token_name=api_token.name,
-        created_by_user_id=api_token.created_by_user_id,
-    )
+    return api_token_user_from(api_token)
 
 
 async def validate_superadmin_api_token(
@@ -790,6 +804,17 @@ async def validate_superadmin_api_token(
 
     api_token = await validate_superadmin_token_for_auth(token, db_session)
     if not api_token:
+        return None
+
+    # The token only carries its minter's authority: once that account is gone
+    # or no longer a superadmin, every token it minted stops working. Several
+    # core paths allow these tokens outright, so this can't be left to the
+    # require_superadmin dependency alone.
+    from src.security.superadmin import is_user_superadmin
+
+    if not api_token.created_by_user_id or not await is_user_superadmin(
+        api_token.created_by_user_id, db_session
+    ):
         return None
 
     return SuperadminAPITokenUser(

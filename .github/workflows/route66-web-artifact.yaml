@@ -1,0 +1,63 @@
+name: Route66 web artifact
+
+on:
+  push:
+    branches: [coursemax/staging]
+    paths:
+      - apps/web/**
+      - deploy/staging/Dockerfile.upstream-143
+      - .github/workflows/route66-web-artifact.yaml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: route66-web-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  web:
+    if: github.repository == 'jakkzz/coursemax-learnhouse'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v4.4.1
+        with:
+          name: vps-limited
+          driver: docker-container
+          driver-opts: |
+            image=moby/buildkit@sha256:cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd917527fea5ff2e3dea
+            memory=4g
+            memory-swap=4g
+            cpu-period=100000
+            cpu-quota=200000
+          buildkitd-config-inline: |
+            [worker.oci]
+              max-parallelism = 1
+      - name: Build full frontend and check types
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx build --builder vps-limited --platform linux/amd64 --progress plain \
+            --target web-artifact --output "type=local,dest=$RUNNER_TEMP/web-artifact" \
+            --build-arg "SOURCE_REVISION=$GITHUB_SHA" \
+            -f deploy/staging/Dockerfile.upstream-143 .
+          test "$(cat "$RUNNER_TEMP/web-artifact/app/.next/standalone/.next/BUILD_ID")" = "$GITHUB_SHA"
+          cd "$RUNNER_TEMP"
+          printf '%s\n' "$GITHUB_SHA" > source-revision
+          tar -czf web-artifact.tar.gz -C web-artifact .
+          sha256sum web-artifact.tar.gz > web-artifact.sha256
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: web-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/web-artifact.tar.gz
+            ${{ runner.temp }}/web-artifact.sha256
+            ${{ runner.temp }}/source-revision
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

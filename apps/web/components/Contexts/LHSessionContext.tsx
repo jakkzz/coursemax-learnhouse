@@ -2,6 +2,8 @@
 import PageLoading from '@components/Objects/Loaders/PageLoading';
 import { useSession, UseSessionReturn } from '@components/Contexts/AuthContext';
 import React, { useContext, createContext } from 'react'
+import { usePathname } from 'next/navigation'
+import { attendanceEntryPath } from '@/extensions/route66/components/Objects/Classes/attendance-client'
 
 export const SessionContext = createContext<UseSessionReturn | null>(null)
 
@@ -27,8 +29,9 @@ function LHSessionProvider({ children }: { children: React.ReactNode }) {
  */
 export function SessionGate({ children, fallback }: { children: React.ReactNode; fallback?: React.ReactNode }) {
     const session = useContext(SessionContext)
+    const canReserve = attendanceEntryPath(usePathname())
 
-    if (session && session.status === 'loading') {
+    if (session && session.status === 'loading' && !canReserve) {
         return fallback ? <>{fallback}</> : <PageLoading />
     }
 

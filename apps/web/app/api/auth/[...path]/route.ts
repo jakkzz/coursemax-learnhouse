@@ -18,7 +18,7 @@ const BACKEND_URL = (getConfig('NEXT_PUBLIC_LEARNHOUSE_BACKEND_URL') || 'http://
 // it returns tokens just like login/signup and its cookies must be mirrored.
 // `magic-link` covers /magic-link/verify, which mints a session (or an mfa_token)
 // from a passwordless login link.
-const TOKEN_RESPONSE_PATHS = ['login', 'refresh', 'oauth', 'signup', 'verify-email', 'magic-link']
+const TOKEN_RESPONSE_PATHS = ['login', 'refresh', 'oauth', 'signup', 'verify-email', 'magic-link', 'mfa/confirm', 'mfa/disable', 'google/complete', 'line/complete', 'line/liff/session']
 
 function shouldExtractTokens(path: string): boolean {
   return TOKEN_RESPONSE_PATHS.some(p => path.startsWith(p))
@@ -129,6 +129,57 @@ function appendClearAuthCookies(response: NextResponse, request: NextRequest) {
 // requests that reach the API directly.
 const CLIENT_IDENTITY_HEADERS = ['x-forwarded-for', 'x-real-ip', 'user-agent']
 
+// Same-origin policy for state-changing requests, shared by every path this
+// proxy serves (login, signup, refresh, logout, MFA, magic links...). Compares
+// HOST rather than full origin because protocol detection behind a
+// TLS-terminating proxy is unreliable. A browser always sends Origin on a
+// cross-site POST; when it is absent we fall back to Sec-Fetch-Site, and a
+// request carrying neither did not come from a browser page at all.
+function requestHosts(request: NextRequest): string[] {
+  return [request.headers.get('x-forwarded-host'), request.headers.get('host')]
+    .map((h) => (h || '').split(',')[0].trim().toLowerCase())
+    .filter(Boolean)
+}
+
+const CLIENT_HOST_HEADER = 'x-learnhouse-client-host'
+
+/** The host the browser addressed (the proxy's x-forwarded-host, else Host). */
+function browserHost(request: NextRequest): string | null {
+  return requestHosts(request)[0] ?? null
+}
+
+function isCrossSiteRequest(request: NextRequest): boolean {
+  const origin = request.headers.get('origin')
+  if (origin) {
+    let originHost = ''
+    try {
+      originHost = new URL(origin).host.toLowerCase()
+    } catch {
+      /* "null" or malformed: treated as cross-origin */
+    }
+    return !originHost || !requestHosts(request).includes(originHost)
+  }
+  const fetchSite = request.headers.get('sec-fetch-site')
+  return fetchSite !== null && fetchSite !== 'same-origin' && fetchSite !== 'none'
+}
+
+function stripRefreshToken(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value
+  const { refresh_token: _refreshToken, ...rest } = value as Record<string, unknown>
+  return rest
+}
+
+// Remove refresh_token from both response shapes the backend uses: top-level
+// ({ access_token, refresh_token }) and nested ({ user, tokens: {...} }).
+function withoutRefreshToken(data: unknown): unknown {
+  const stripped = stripRefreshToken(data)
+  if (stripped && typeof stripped === 'object' && 'tokens' in stripped) {
+    const record = stripped as Record<string, unknown>
+    return { ...record, tokens: stripRefreshToken(record.tokens) }
+  }
+  return stripped
+}
+
 async function proxyRequest(
   request: NextRequest,
   method: string
@@ -156,6 +207,12 @@ async function proxyRequest(
     if (value) headers[ipHeader] = value
   }
 
+  // Provider mutations require the exact browser Origin at the native API.
+  if (pathSegments.startsWith('google/') || pathSegments.startsWith('line/')) {
+    const origin = request.headers.get('origin')
+    if (origin) headers['Origin'] = origin
+  }
+
   // Forward content-type
   const contentType = request.headers.get('content-type')
   if (contentType) {
@@ -171,6 +228,20 @@ async function proxyRequest(
   for (const name of CLIENT_IDENTITY_HEADERS) {
     const value = request.headers.get(name)
     if (value) headers[name] = value
+  }
+
+  // The host the browser is on. The backend can't see it through this proxy,
+  // and needs it to hold a session signed in on an org's custom domain to that
+  // org (and to refuse platform superadmins there).
+  const clientHost = browserHost(request)
+  if (clientHost) headers[CLIENT_HOST_HEADER] = clientHost
+
+  // Login CSRF: every state-changing call here can mint or destroy session
+  // cookies, and the backend never sees the browser's Origin, so its own CSRF
+  // check cannot run. A cross-site form POST to /api/auth/login would otherwise
+  // sign the victim in to an attacker-controlled account.
+  if (method !== 'GET' && method !== 'HEAD' && isCrossSiteRequest(request)) {
+    return NextResponse.json({ error: 'Cross-origin request rejected' }, { status: 403 })
   }
 
   // Forward cookies to backend
@@ -203,29 +274,13 @@ async function proxyRequest(
     }
   }
 
-  // Handle logout locally: clear cookies and return 200
-  // Try backend invalidation but don't fail if it errors
+  // Do not report successful logout before the backend confirms revocation.
   if (pathSegments === 'logout' || pathSegments.endsWith('/logout')) {
     // POST only, same-origin when the browser says where it came from: a GET
     // (or cross-site POST) would let any page or <img> log users out.
+    // (The cross-site check itself runs for every non-GET request above.)
     if (method !== 'POST') {
       return NextResponse.json({ error: 'Method not allowed' }, { status: 405, headers: { Allow: 'POST' } })
-    }
-    const origin = request.headers.get('origin')
-    if (origin) {
-      let originHost = ''
-      try {
-        originHost = new URL(origin).host.toLowerCase()
-      } catch {
-        /* "null" or malformed: treated as cross-origin */
-      }
-      const requestHost = (request.headers.get('x-forwarded-host') || request.headers.get('host') || '')
-        .split(',')[0]
-        .trim()
-        .toLowerCase()
-      if (!originHost || originHost !== requestHost) {
-        return NextResponse.json({ error: 'Cross-origin logout rejected' }, { status: 403 })
-      }
     }
 
     // Best-effort backend token invalidation
@@ -256,11 +311,11 @@ async function proxyRequest(
         headers: logoutHeaders,
         signal: AbortSignal.timeout(3000),
       }).catch(() => null)
-      if (logoutRes && !logoutRes.ok) {
-        console.warn(`[auth] backend logout returned ${logoutRes.status}; server session may not be revoked`)
+      if (!logoutRes || (!logoutRes.ok && logoutRes.status !== 401)) {
+        return NextResponse.json({ error: 'Logout temporarily unavailable; please retry' }, { status: 503 })
       }
     } catch {
-      // Backend logout failed. That's fine, cookies are cleared below
+      return NextResponse.json({ error: 'Logout temporarily unavailable; please retry' }, { status: 503 })
     }
 
     const response = NextResponse.json({ ok: true })
@@ -275,7 +330,12 @@ async function proxyRequest(
   if (refreshToken?.value) {
     cookieParts.push(`${REFRESH_TOKEN_COOKIE}=${refreshToken.value}`)
   }
-  if (cookieParts.length > 0) {
+  if (pathSegments.startsWith('google/') || pathSegments.startsWith('line/')) {
+    // Preserve the raw header so the API can reject duplicate security cookies
+    // rather than Next.js selecting an arbitrary one before validation.
+    const rawCookie = request.headers.get('cookie')
+    if (rawCookie) headers['Cookie'] = rawCookie
+  } else if (cookieParts.length > 0) {
     headers['Cookie'] = cookieParts.join('; ')
   }
 
@@ -313,7 +373,9 @@ async function proxyRequest(
 
   if (responseContentType?.includes('application/json')) {
     responseData = await backendResponse.json()
-    responseBody = JSON.stringify(responseData)
+    // The refresh token lives only in its httpOnly cookie (set below). Relaying
+    // it in the body would hand any script on the page a 30-day credential.
+    responseBody = JSON.stringify(withoutRefreshToken(responseData))
   } else {
     responseBody = await backendResponse.text()
   }
@@ -327,6 +389,15 @@ async function proxyRequest(
   // Copy relevant headers
   if (responseContentType) {
     response.headers.set('content-type', responseContentType)
+  }
+
+  if (pathSegments.startsWith('google/') || pathSegments.startsWith('line/')) {
+    response.headers.set('cache-control', 'no-store')
+    for (const cookie of backendResponse.headers.getSetCookie()) {
+      if (cookie.startsWith('__Host-LH_oauth_binding=')) {
+        response.headers.append('set-cookie', cookie)
+      }
+    }
   }
 
   // Extract and set auth cookies if this is a token-returning endpoint

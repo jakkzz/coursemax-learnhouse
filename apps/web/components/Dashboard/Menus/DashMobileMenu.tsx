@@ -44,6 +44,7 @@ import { usePlan } from '@components/Hooks/usePlan'
 import { planMeetsRequirement } from '@services/plans/plans'
 import { FeedbackModal } from '@components/Objects/Modals/FeedbackModal'
 import { useCommandPalette } from '@components/Dashboard/CommandPalette/CommandPaletteContext'
+import useAdminStatus from '@components/Hooks/useAdminStatus'
 
 function DashMobileMenu() {
   const org = useOrg() as any
@@ -51,6 +52,7 @@ function DashMobileMenu() {
   const { t, i18n } = useTranslation()
   const pathname = usePathname() || ''
   const plan = usePlan()
+  const { canManageOrg } = useAdminStatus()
   const { toggle: openSearch } = useCommandPalette()
   const [menuOpen, setMenuOpen] = useState(false)
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false)
@@ -264,7 +266,7 @@ function DashMobileMenu() {
                   <Book size={15} weight="fill" />
                   <span className="text-sm font-medium">{t('common.help_menu.documentation')}</span>
                 </a>
-                <a href="https://discord.gg/learnhouse" target="_blank" rel="noopener noreferrer"
+                <a href="http://learnhouse.to/discord" target="_blank" rel="noopener noreferrer"
                   className="flex items-center w-full rounded-lg px-2.5 py-2 gap-2.5 text-white/40 hover:text-white/80 hover:bg-white/[0.05] transition-all"
                 >
                   <DiscordIcon size={15} />

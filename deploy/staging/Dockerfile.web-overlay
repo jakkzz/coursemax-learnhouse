@@ -1,0 +1,6 @@
+# Use an explicitly selected, verified parent for frontend-only releases.
+ARG PARENT
+FROM ${PARENT}
+ARG SOURCE_REVISION
+ADD --chown=1000:1000 web-delta.tar.gz /app/web/
+LABEL org.opencontainers.image.revision="${SOURCE_REVISION}"

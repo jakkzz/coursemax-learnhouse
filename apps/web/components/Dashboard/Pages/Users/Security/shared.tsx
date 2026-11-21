@@ -89,7 +89,7 @@ export const GRACE_OPTIONS = [0, 7, 14, 30]
 // The complete set of sign-in methods. Selecting all of them = unrestricted,
 // which is also what an absent policy falls back to. Kept in sync with the
 // backend's allowed_auth_methods contract.
-export const ALL_AUTH_METHODS = ['password', 'magic_login', 'google', 'sso'] as const
+export const ALL_AUTH_METHODS = ['password', 'magic_login', 'google', 'line', 'sso'] as const
 
 export const AUTH_METHOD_OPTIONS: {
   key: string
@@ -118,6 +118,13 @@ export const AUTH_METHOD_OPTIONS: {
     labelDefault: 'Google',
     hintKey: 'dashboard.organization.security.method_google_hint',
     hintDefault: 'Sign in with a Google account.',
+  },
+  {
+    key: 'line',
+    labelKey: 'auth.line_policy_name',
+    labelDefault: 'LINE (linked accounts only)',
+    hintKey: 'auth.line_policy_hint',
+    hintDefault: 'Requires explicit linking from Google. Does not register new users.',
   },
   {
     key: 'sso',

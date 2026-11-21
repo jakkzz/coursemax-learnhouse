@@ -1,3 +1,4 @@
+import contextlib
 import logging
 from datetime import timedelta, datetime, timezone
 from typing import Literal, Optional
@@ -107,20 +108,12 @@ def get_cookie_domain_for_request(request: Request) -> str | None:
     if tenancy == "single":
         return None
 
-    origin = request.headers.get("origin", "")
-    referer = request.headers.get("referer", "")
-    host = request.headers.get("host", "")
-
     config_domain = config.hosting_config.domain
     config_cookie_domain = config.hosting_config.cookie_config.domain
 
-    check_value = origin or referer or host
-    if not check_value:
+    check_value = _request_hostname(request)
+    if check_value is None:
         return config_cookie_domain
-
-    # Strip protocol, path, and port for hostname comparison.
-    check_value = check_value.replace("https://", "").replace("http://", "")
-    check_value = check_value.split("/")[0].split(":")[0]
 
     # In multi mode, localhost should not appear in practice (would indicate
     # misconfig). Treat it as host-only as a safety net.
@@ -152,6 +145,96 @@ def get_cookie_domain_for_request(request: Request) -> str | None:
     # Host header), enforce it in a dedicated dependency on the login/oauth
     # routes, not in this cookie-scope resolver.
     return None
+
+
+# Set by the web app's auth proxy to the host the browser is on. The proxy
+# rebuilds request headers, so without it a sign-in made through the proxy only
+# shows the backend's own host here. A client can send it too, but it can only
+# narrow its own session (bind it to an org, or refuse a superadmin), never widen it.
+CLIENT_HOST_HEADER = "x-learnhouse-client-host"
+
+
+def _request_hostname(request: Request, *, trust_client_host: bool = False) -> Optional[str]:
+    """The browser-facing hostname of a request (Origin, else Referer, else
+    Host), without protocol, path or port. None when none is present.
+
+    ``trust_client_host`` also consults the auth proxy's client-host header,
+    after Origin; only for checks where a forged value can only restrict."""
+    check_value = (
+        request.headers.get("origin", "")
+        or (request.headers.get(CLIENT_HOST_HEADER, "") if trust_client_host else "")
+        or request.headers.get("referer", "")
+        or request.headers.get("host", "")
+    )
+    if not check_value:
+        return None
+    # Strip protocol, path, and port for hostname comparison.
+    check_value = check_value.replace("https://", "").replace("http://", "")
+    return check_value.split("/")[0].split(":")[0]
+
+
+async def custom_domain_org_id(request: Request, db_session: AsyncSession) -> Optional[int]:
+    """The org whose custom domain this sign-in request arrived on, or None.
+
+    Same host classification as :func:`get_cookie_domain_for_request`: only a
+    multi-tenant deployment has custom domains, and the platform's own hosts
+    (and localhost) never count as one.
+    """
+    config = get_learnhouse_config()
+    if config.hosting_config.tenancy == "single":
+        return None
+    hostname = (_request_hostname(request, trust_client_host=True) or "").lower()
+    if not hostname or "localhost" in hostname or "127.0.0.1" in hostname:
+        return None
+    config_domain = config.hosting_config.domain
+    if hostname == config_domain or hostname.endswith(f".{config_domain}"):
+        return None
+    from src.db.custom_domains import CustomDomain
+
+    domain = (
+        await db_session.execute(
+            select(CustomDomain).where(
+                CustomDomain.domain == hostname,
+                CustomDomain.status.in_(("verified", "active")),  # type: ignore[union-attr]
+            )
+        )
+    ).scalars().first()
+    return domain.org_id if domain else None
+
+
+async def _bind_session_to_custom_domain(
+    request: Request,
+    db_session: AsyncSession,
+    user_id: int,
+    org_id: Optional[int],
+    method: str,
+) -> tuple[Optional[int], bool]:
+    """The org a new session is minted for, and whether it is custom-domain bound.
+
+    A sign-in on an org's custom domain goes through a host that org controls,
+    so the session is bound to that org whatever the page said, and a platform
+    superadmin may not sign in there at all: their session would be readable by
+    one tenant and valid in every other.
+    """
+    domain_org_id = await custom_domain_org_id(request, db_session)
+    if domain_org_id is None:
+        return org_id, False
+
+    from src.security.superadmin import is_user_superadmin
+
+    if await is_user_superadmin(user_id, db_session):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "PLATFORM_SIGN_IN_REQUIRED",
+                "message": "Platform administrators must sign in on the platform's own sign-in page.",
+            },
+        )
+    if domain_org_id != org_id:
+        from src.services.orgs.auth_policy import enforce_login_auth_method
+
+        await enforce_login_auth_method(db_session, domain_org_id, method)
+    return domain_org_id, True
 
 
 def is_request_secure(request: Request | None) -> bool:
@@ -189,7 +272,20 @@ def is_request_secure(request: Request | None) -> bool:
 
 
 def set_auth_cookies(response: Response, access_token: str, refresh_token: str, request: Request = None):
-    """Helper to set authentication cookies."""
+    """Set the httpOnly token cookies on a JSON response the web app's auth
+    route relays to the browser.
+
+    Only that route (``apps/web/app/api/auth/[...path]``) produces a session
+    the web client recognises: it re-sets these cookies from the host the
+    browser is on and adds the readable ``LH_session`` marker the client checks
+    before it will even try to restore a session. Setting these cookies here on
+    a ``RedirectResponse`` the browser follows directly leaves the user
+    signed in server-side and anonymous client-side, with the cookie domain
+    guessed from headers a custom-domain hairpin does not carry. Sign-in flows
+    that start from a link therefore land on a web page that posts the
+    credential to the API; see ``/auth/magic``.
+    ``test_session_cookies_only_on_json_responses`` enforces this.
+    """
     is_secure = is_request_secure(request)
     cookie_domain = get_cookie_domain_for_request(request) if request else None
 
@@ -348,7 +444,20 @@ async def refresh(
         _log_refresh_outcome("no_subject")
         raise credentials_exception
 
-    user = await security_get_user(request, db_session, email=email)
+    if payload.get("lhv") == 2:
+        from src.security.provider_session import resolve_provider_session
+        user = await resolve_provider_session(db_session, payload)
+        # Provider rotation must fail closed rather than use the legacy fail-open helper.
+        from src.core.redis import get_redis_client
+        try:
+            redis_client = get_redis_client()
+            if redis_client is None:
+                raise RuntimeError()
+            redis_client.ping()
+        except Exception:
+            raise HTTPException(503, "Session validation temporarily unavailable") from None
+    else:
+        user = await security_get_user(request, db_session, email=email)
     if user is None or user.id is None:
         _log_refresh_outcome("user_not_found", token_age_seconds=_token_age_seconds(payload))
         raise credentials_exception
@@ -393,7 +502,10 @@ async def refresh(
     jti = payload.get("jti")
     reused_pair = None
     if jti:
-        first_use = _mark_refresh_jti_used(user.id, jti)
+        if payload.get("lhv") == 2:
+            first_use = _mark_refresh_jti_used(user.id, jti, strict=True)
+        else:
+            first_use = _mark_refresh_jti_used(user.id, jti)
         if not first_use:
             # Poll briefly for the grace entry: a truly simultaneous request may
             # lose the NX race before the winner has written its cached pair.
@@ -427,6 +539,9 @@ async def refresh(
         # claim-less one that bypasses the org auth-method / sharing policy.
         # A session that records no method also picks up its grace deadline here.
         carried = carry_session_claims(payload)
+        if payload.get("lhv") == 2:
+            from src.security.provider_session import carried_claims
+            carried.update(carried_claims(payload))
         new_access_token = create_access_token(
             data={"sub": email, **carried},
             expires_delta=JWT_ACCESS_TOKEN_EXPIRES,
@@ -570,7 +685,13 @@ async def login(
     # the refusal can never be used to probe which orgs exist.
     from src.services.orgs.auth_policy import enforce_login_auth_method
 
-    session_org_id = await _resolve_org_id_from_slug(org_slug, db_session)
+    session_org_id, on_custom_domain = await _bind_session_to_custom_domain(
+        request,
+        db_session,
+        user.id,
+        await _resolve_org_id_from_slug(org_slug, db_session),
+        AUTH_METHOD_PASSWORD,
+    )
     await enforce_login_auth_method(db_session, session_org_id, AUTH_METHOD_PASSWORD)
 
     # Step 6: Reset failed attempts and update login info
@@ -594,7 +715,11 @@ async def login(
     # must complete /auth/login/mfa. No cookies and no user object are returned
     # on that branch: nothing is authenticated until the code is verified.
     issue = await issue_session_or_challenge(
-        db_session, user, amr=AUTH_METHOD_PASSWORD, org_id=session_org_id
+        db_session,
+        user,
+        amr=AUTH_METHOD_PASSWORD,
+        org_id=session_org_id,
+        custom_domain=on_custom_domain,
     )
     if issue.mfa_required:
         return {
@@ -654,6 +779,9 @@ async def third_party_login(
     current_user: AnonymousUser = Depends(get_current_user),
     db_session: AsyncSession = Depends(get_db_session),
 ):
+    # The old Google/access-token/email bridge must never run alongside the new flow.
+    if body.provider == "google":
+        raise HTTPException(410, "Restart sign-in using the server-owned Google flow")
     import logging
     import redis as _redis
     _logger = logging.getLogger(__name__)
@@ -872,8 +1000,15 @@ async def third_party_login(
     # entirely, and the org-wide require_2fa policy did not catch it either,
     # because the factor exists and so the user counts as compliant. The
     # provenance (amr/sorg) is stamped either way for the org auth-method policy.
+    session_org_id, on_custom_domain = await _bind_session_to_custom_domain(
+        request, db_session, user.id, org_id, AUTH_METHOD_GOOGLE
+    )
     issue = await issue_session_or_challenge(
-        db_session, user, amr=AUTH_METHOD_GOOGLE, org_id=org_id
+        db_session,
+        user,
+        amr=AUTH_METHOD_GOOGLE,
+        org_id=session_org_id,
+        custom_domain=on_custom_domain,
     )
     if issue.mfa_required:
         return {
@@ -1015,6 +1150,53 @@ async def magic_link_request(
     return generic
 
 
+async def _verify_admin_magic_link(
+    request: Request, response: Response, token: str, db_session: AsyncSession
+):
+    """Redeem an admin-issued sign-in link for the /auth/magic page.
+
+    Not subject to the org's self-service magic-login toggle: the org issued
+    this link itself through its API token. Refusals carry the same
+    ``{"code", "message"}`` detail as the emailed link, so the page shows them
+    the same way.
+    """
+    from src.services.admin.admin import consume_magic_link_token
+
+    user, access_token, refresh_token, redirect_to, mfa_token = await consume_magic_link_token(
+        token=token, db_session=db_session
+    )
+    user_read = UserRead.model_validate(user)
+    await _record_login_quietly(user, request, db_session)
+
+    # The page that redeems the link opens redirect_to afterwards when its URL
+    # carries no ?next (an integration that built the URL from the raw token).
+    if mfa_token:
+        return {"mfa_required": True, "mfa_token": mfa_token, "redirect_to": redirect_to}
+
+    set_auth_cookies(response, access_token, refresh_token, request)
+    return {
+        "user": user_read,
+        "tokens": {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "expiry": get_token_expiry_ms(),
+        },
+        "redirect_to": redirect_to,
+    }
+
+
+async def _record_login_quietly(user: User, request: Request, db_session: AsyncSession) -> None:
+    """Last-login bookkeeping for a link sign-in. The link is already spent by
+    now, so a failure here must not cost the user their sign-in. Callers read
+    anything they need from ``user`` first: the rollback expires it."""
+    try:
+        await update_login_info(user, get_client_ip(request), db_session)
+    except Exception:
+        logging.getLogger(__name__).warning("Could not record last login", exc_info=True)
+        with contextlib.suppress(Exception):
+            await db_session.rollback()
+
+
 @router.post(
     "/magic-link/verify",
     summary="Complete a passwordless login",
@@ -1035,7 +1217,13 @@ async def magic_link_verify(
     from src.security.session_context import AUTH_METHOD_MAGIC_LOGIN
     from src.services.orgs.auth_policy import enforce_login_auth_method
 
-    email, org_id = consume_magic_login_token(body.token)
+    # The sign-in page redeems both kinds of link: this emailed one and the
+    # admin/integration one, which an org's API token issues for a member.
+    peek = decode_jwt(body.token) or {}
+    if peek.get("purpose") == "magic_link":
+        return await _verify_admin_magic_link(request, response, body.token, db_session)
+
+    email, org_id = await consume_magic_login_token(body.token, db_session)
 
     # A link issued before the org turned magic login off must not still work.
     await enforce_login_auth_method(db_session, org_id, AUTH_METHOD_MAGIC_LOGIN)
@@ -1049,18 +1237,27 @@ async def magic_link_verify(
             detail={"code": "MAGIC_LINK_INVALID", "message": "This login link is no longer valid."},
         )
 
-    client_ip = get_client_ip(request)
-    await update_login_info(user, client_ip, db_session)
-
-    issue = await issue_session_or_challenge(
-        db_session, user, amr=AUTH_METHOD_MAGIC_LOGIN, org_id=org_id
+    org_id, on_custom_domain = await _bind_session_to_custom_domain(
+        request, db_session, user.id, org_id, AUTH_METHOD_MAGIC_LOGIN
     )
+
+    # Issue first, then the bookkeeping: its rollback on failure expires
+    # ``user``, which issuing reads.
+    user_read = UserRead.model_validate(user)
+    issue = await issue_session_or_challenge(
+        db_session,
+        user,
+        amr=AUTH_METHOD_MAGIC_LOGIN,
+        org_id=org_id,
+        custom_domain=on_custom_domain,
+    )
+    await _record_login_quietly(user, request, db_session)
     if issue.mfa_required:
         return {"mfa_required": True, "mfa_token": issue.mfa_token}
 
     set_auth_cookies(response, issue.access_token, issue.refresh_token, request)
     return {
-        "user": UserRead.model_validate(user),
+        "user": user_read,
         "tokens": {
             "access_token": issue.access_token,
             "refresh_token": issue.refresh_token,
@@ -1112,18 +1309,20 @@ async def logout(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Best-effort resolve the user to revoke every session they have across
-    # devices (not just the one tied to this cookie).
-    if payload and payload.get("sub"):
+    if payload and payload.get("lhv") == 2:
+        # Signed stable claims identify the owner even after membership loss,
+        # lockout or identity retirement. Logout grants no account access.
+        user_record = await db_session.get(User, int(payload["sub"].removeprefix("lh:user:")))
+        if user_record is not None and user_record.user_uuid == payload["lh_uuid"]:
+            if not revoke_user_sessions_before(user_record.id):
+                raise HTTPException(503, "Logout temporarily unavailable; please retry")
+    elif payload and payload.get("sub"):
+        # Preserve legacy password-session compatibility.
         try:
-            user_record = await security_get_user(
-                request, db_session, email=payload["sub"]
-            )
+            user_record = await security_get_user(request, db_session, email=payload["sub"])
             if user_record is not None and user_record.id is not None:
                 revoke_user_sessions_before(user_record.id)
         except Exception:
-            # Never block logout on a revocation-store hiccup; cookies are
-            # still cleared below so the browser session ends.
             pass
 
     unset_auth_cookies(response, request)
@@ -1196,17 +1395,39 @@ async def api_verify_email(
     # session here meant a freshly-verified member could not be matched against
     # the org's allowed-method policy at all.
     from src.security.session_context import AUTH_METHOD_MAGIC_LOGIN
+    from src.services.orgs.auth_policy import is_login_method_allowed
 
     verified_org = (
         await db_session.execute(
             select(Organization).where(Organization.org_uuid == body.org_uuid)
         )
     ).scalars().first()
+
+    # The address is verified either way; the automatic sign-in is held to the
+    # same gates as any other sign-in (account lockout, the org's allowed
+    # methods, no superadmin session on a custom domain). When one refuses, the
+    # user simply signs in normally afterwards.
+    try:
+        session_org_id, on_custom_domain = await _bind_session_to_custom_domain(
+            request,
+            db_session,
+            user.id,
+            verified_org.id if verified_org else None,
+            AUTH_METHOD_MAGIC_LOGIN,
+        )
+    except HTTPException:
+        return {"message": message}
+    if check_account_locked(user)[0] or not await is_login_method_allowed(
+        db_session, session_org_id, AUTH_METHOD_MAGIC_LOGIN
+    ):
+        return {"message": message}
+
     issue = await issue_session_or_challenge(
         db_session,
         user,
         amr=AUTH_METHOD_MAGIC_LOGIN,
-        org_id=verified_org.id if verified_org else None,
+        org_id=session_org_id,
+        custom_domain=on_custom_domain,
     )
     if issue.mfa_required:  # pragma: no cover - same 2FA branch as /login, exercised there
         return {

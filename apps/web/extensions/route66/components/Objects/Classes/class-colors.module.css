@@ -1,0 +1,90 @@
+/* Existing LearnHouse/School blue, scoped to class tasks rather than the shell. */
+.workspace {
+  --color-primary: #1d4ed8;
+  --color-primary-foreground: #ffffff;
+  --color-accent: #eff6ff;
+  --color-accent-foreground: #1e40af;
+  --color-ring: #1d4ed8;
+}
+.status {
+  --status-foreground: #1e40af;
+  --status-surface: #eff6ff;
+  --status-border: #bfdbfe;
+  padding: 20px;
+  border: 1px solid var(--status-border);
+  border-radius: 8px;
+  background: var(--status-surface);
+  color: var(--status-foreground);
+}
+.status[data-state='connected'], .status[data-state='ready-access'] {
+  --status-foreground: #166534;
+  --status-surface: #f0fdf4;
+  --status-border: #86efac;
+}
+.status[data-state='requested'], .status[data-state='needs_course'], .status[data-state='needs_repair'] {
+  --status-foreground: #92400e;
+  --status-surface: #fffbeb;
+  --status-border: #fcd34d;
+}
+.status[data-state='conflict'], .status[data-state='error'] {
+  --status-foreground: #991b1b;
+  --status-surface: #fef2f2;
+  --status-border: #fca5a5;
+}
+.status[data-state='loading'] {
+  --status-foreground: #525252;
+  --status-surface: #fafafa;
+  --status-border: #d4d4d4;
+}
+.status :is(p, label, h2, h3) { color: inherit; }
+.status :is(input, select) { accent-color: #1d4ed8; }
+.statusHeading { display: flex; align-items: flex-start; gap: 10px; }
+.statusHeading > svg { flex-shrink: 0; margin-top: 3px; }
+.status p[role='alert'] { color: #991b1b; }
+.workspace .link { color: #1d4ed8; text-underline-offset: 4px; }
+.workspace .link:hover { color: #1e40af; }
+.classRow { border-radius: 8px; transition: background-color 150ms ease-out; }
+.classRow:hover, .classRow:focus-within { background: #eff6ff; }
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  border-radius: 4px;
+  padding: 3px 7px;
+  background: #f5f5f5;
+  color: #525252;
+  line-height: 1.5;
+}
+.badge > svg { flex-shrink: 0; }
+.badge[data-state='matched'], .badge[data-state='active'] { background: #f0fdf4; color: #166534; }
+.badge[data-state='conflict'] { background: #fffbeb; color: #92400e; }
+.rosterFilters { padding: 16px; border: 1px solid var(--interior-line, #dedede); border-radius: 12px; background: var(--interior-sub, #fafafa); color: var(--interior-secondary, #454545); box-shadow: var(--interior-inset); }
+.rosterFilters :is(input, select) { background: #ffffff; border-color: #64748b; color: #171717; }
+.roster { container-type: inline-size; border: 1px solid #cbd5e1; border-radius: 8px; }
+.rosterHeader { display: none; padding: 14px 16px; border-radius: 7px 7px 0 0; border-bottom: 1px solid #bfdbfe; background: #eff6ff; color: #1e40af; font-size: 12px; font-weight: 600; }
+.rosterRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px 16px; padding: 16px; border: 1px solid transparent; border-bottom-color: #e2e8f0; background: #ffffff; transition: background-color 150ms ease-out; }
+.rosterRow > div:first-child { grid-column: 1 / -1; }
+.rosterRow:nth-of-type(even) { background: #f8fafc; }
+.rosterRow:last-child { border-bottom-color: transparent; border-radius: 0 0 7px 7px; }
+.rosterRow:hover, .rosterRow:focus-within { background: #eff6ff; }
+.rosterRow[data-selected='true'] { border-color: #1d4ed8; background: #dbeafe; }
+.rosterRow[data-selected='true'] h3 { color: #1e40af; }
+.rosterSource { color: #525252; }
+.rosterSource[data-source='manual'] { color: #1d4ed8; }
+.rosterAction { justify-self: end; color: #1d4ed8; }
+@container (min-width: 700px) {
+  .rosterHeader, .rosterRow { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) 148px; column-gap: 16px; }
+  .rosterHeader { display: grid; }
+  .rosterHeader > span:last-child { text-align: right; }
+  .rosterRow > div:first-child { grid-column: auto; }
+}
+.workspace ::selection { background: #dbeafe; color: #1e3a8a; }
+.workspace :is(input, textarea) { caret-color: #1d4ed8; }
+@media (max-width: 600px) { .status { padding: 16px; } }
+@media (prefers-reduced-motion: reduce) { .classRow, .rosterRow { transition: none; } }
+@media (forced-colors: active) {
+  .status, .badge, .roster, .rosterHeader { border: 1px solid CanvasText; }
+  .rosterRow[data-selected='true'] { outline: 2px solid Highlight; outline-offset: -2px; }
+  .workspace .link { color: LinkText; }
+}

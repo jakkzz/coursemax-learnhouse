@@ -1,0 +1,13 @@
+ARG PARENT_IMAGE=coursemax-learnhouse:learning-access-396d1a01
+FROM ${PARENT_IMAGE}
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.revision=${SOURCE_REVISION}
+COPY --chown=0:0 --chmod=0600 apps/api/src/route66_ext/adapters/native_learning_access.py /app/api/src/route66_ext/adapters/native_learning_access.py
+COPY --chown=0:0 --chmod=0600 apps/api/src/route66_ext/services/learning_access.py /app/api/src/route66_ext/services/learning_access.py
+COPY --chown=0:0 --chmod=0600 apps/api/src/route66_ext/services/learning_access_recovery.py /app/api/src/route66_ext/services/learning_access_recovery.py
+COPY --chown=0:0 --chmod=0600 apps/api/src/route66_ext/services/academic_projection.py /app/api/src/route66_ext/services/academic_projection.py
+COPY --chown=0:0 --chmod=0600 apps/api/src/route66_ext/routers/academic_classes.py /app/api/src/route66_ext/routers/academic_classes.py
+COPY --chown=0:0 --chmod=0600 apps/api/src/route66_ext/routers/learning_access.py /app/api/src/route66_ext/routers/learning_access.py
+COPY --chown=0:0 --chmod=0600 apps/api/src/route66_ext/routers/class_connections.py /app/api/src/route66_ext/routers/class_connections.py
+COPY --chown=0:0 --chmod=0600 apps/api/src/route66_ext/routers/school_identity.py /app/api/src/route66_ext/routers/school_identity.py
+ADD --chown=1000:1000 web-delta.tar.gz /app/web/

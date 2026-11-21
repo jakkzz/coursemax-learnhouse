@@ -25,9 +25,25 @@ Object.keys(env).forEach((key) => {
   }
 });
 
-// Write runtime config JSON file
+// Server-side requests may use a private API route behind an evaluator gateway.
+// Keep it OUT of the browser config: the browser must use the public origin.
+const serverRuntimeConfig = { ...runtimeConfig };
+for (const [privateKey, runtimeKey] of [
+  ['LEARNHOUSE_INTERNAL_API_URL', 'NEXT_PUBLIC_LEARNHOUSE_API_URL'],
+  ['LEARNHOUSE_INTERNAL_BACKEND_URL', 'NEXT_PUBLIC_LEARNHOUSE_BACKEND_URL'],
+]) {
+  if (!env[privateKey]) continue;
+  const internalUrl = new URL(env[privateKey]);
+  if (!['http:', 'https:'].includes(internalUrl.protocol) ||
+      internalUrl.username || internalUrl.password || internalUrl.search || internalUrl.hash) {
+    throw new Error(`${privateKey} must be a credential-free HTTP(S) URL`);
+  }
+  serverRuntimeConfig[runtimeKey] = internalUrl.toString().replace(/\/?$/, '/');
+}
+
+// Write server-only runtime config JSON file.
 const configPath = path.join(__dirname, 'runtime-config.json');
-fs.writeFileSync(configPath, JSON.stringify(runtimeConfig, null, 2), 'utf8');
+fs.writeFileSync(configPath, JSON.stringify(serverRuntimeConfig, null, 2), 'utf8');
 
 // Create client-side runtime config script for browser access
 // In Next.js standalone, public files are served from the public directory

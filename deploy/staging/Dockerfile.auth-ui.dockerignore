@@ -1,0 +1,10 @@
+**
+!deploy/
+!deploy/staging/
+!deploy/staging/Dockerfile.auth-ui
+!apps/
+!apps/api/
+!apps/api/src/
+!apps/api/src/routers/
+!apps/api/src/routers/google_subject_auth.py
+!web-delta.tar.gz

@@ -1,0 +1,6 @@
+# Opt-in only after explicit approval to remove evaluator authentication.
+# Compose >=2.24.4 supports !override. Apply only to gateway with --no-deps.
+services:
+  gateway:
+    volumes: !override
+      - ${LEARNHOUSE_RUNTIME_DIR:?Set private runtime directory}/gateway.conf:/etc/nginx/conf.d/default.conf:ro

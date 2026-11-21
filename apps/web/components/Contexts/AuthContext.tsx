@@ -15,8 +15,9 @@ import {
 } from '@services/config/config'
 import { isSubdomainOf, isSameHost, isLocalhost as isLocalhostCheck } from '@services/utils/ts/hostUtils'
 import { safeRedirectUrl } from '@services/auth/redirects'
-import { safeExternalUrl } from '@services/security/url'
+import i18n from '@/lib/i18n'
 import { AUTH_EXPIRED_EVENT, AUTH_REFRESHED_EVENT } from '@/lib/auth/events'
+import toast from 'react-hot-toast'
 
 // Types matching NextAuth's session structure
 export interface Session {
@@ -56,7 +57,6 @@ export interface SignInOptions {
   // SSO fields
   sso?: string
   sso_access_token?: string
-  sso_refresh_token?: string
   sso_user?: string
   sso_expiry?: number
   // For OAuth
@@ -74,6 +74,9 @@ export interface SignInResult {
   // `mfa_token` back to completeMfaLogin() along with a code.
   mfa_required?: boolean
   mfa_token?: string
+  // Sign-in links only: where the link itself asks to land, for a link URL
+  // that carries no ?next of its own.
+  redirect_to?: string | null
 }
 
 export interface SignOutOptions {
@@ -133,14 +136,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-// Generate cryptographically secure random string for CSRF protection
-function generateSecureToken(length: number = 32): string {
-  const array = new Uint8Array(length)
-  crypto.getRandomValues(array)
-  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
-}
-
-// Check if current hostname is a custom domain
+// Get cookie attributes based on current domain context
 function isCustomDomain(): boolean {
   if (typeof window === 'undefined') return false
   const hostname = window.location.hostname
@@ -148,7 +144,6 @@ function isCustomDomain(): boolean {
   return !isSubdomainOf(hostname, domain) && !isSameHost(hostname, domain) && !isLocalhostCheck(hostname)
 }
 
-// Get cookie attributes based on current domain context
 function getCookieAttributes(): { secureAttr: string; domainAttr: string; sameSiteAttr: string } {
   const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:'
   const secureAttr = isSecure ? '; Secure' : ''
@@ -168,29 +163,14 @@ function getCookieAttributes(): { secureAttr: string; domainAttr: string; sameSi
   return { secureAttr, domainAttr, sameSiteAttr }
 }
 
-// Store OAuth CSRF state in a cookie (shared across subdomains, unlike sessionStorage)
-// For custom domains, cookie is host-only so it stays on the same origin.
-// For subdomains, cookie is scoped to top domain so callback on main domain can read it.
-function setOAuthStateCookie(csrf: string): void {
-  const { secureAttr, domainAttr, sameSiteAttr } = getCookieAttributes()
-  // 5 minute expiry matching the state validation window
-  const expires = new Date(Date.now() + 5 * 60 * 1000).toUTCString()
-  const value = JSON.stringify({ csrf, timestamp: Date.now() })
-  document.cookie = `${OAUTH_STATE_COOKIE}=${encodeURIComponent(value)}; path=/${sameSiteAttr}${secureAttr}${domainAttr}; expires=${expires}`
-}
-
 function getOAuthStateCookie(): { csrf: string; timestamp: number } | null {
   try {
     const cookies = document.cookie.split(';')
     for (const cookie of cookies) {
       const [name, ...rest] = cookie.trim().split('=')
-      if (name === OAUTH_STATE_COOKIE) {
-        return JSON.parse(decodeURIComponent(rest.join('=')))
-      }
+      if (name === OAUTH_STATE_COOKIE) return JSON.parse(decodeURIComponent(rest.join('=')))
     }
-  } catch {
-    /* ignore */
-  }
+  } catch { /* legacy cookie ignored */ }
   return null
 }
 
@@ -206,6 +186,49 @@ function clearSessionMarker(): void {
   const expired = 'expires=Thu, 01 Jan 1970 00:00:00 GMT'
   document.cookie = `LH_session=; path=/${sameSiteAttr}${secureAttr}${domainAttr}; ${expired}`
   document.cookie = `LH_session=; path=/${sameSiteAttr}${secureAttr}; ${expired}`
+}
+
+async function startServerOwnedGoogle(callbackUrl?: string): Promise<SignInResult | void> {
+  let returnPath = '/'
+  try {
+    const target = new URL(callbackUrl || '/', window.location.origin)
+    if (target.origin === window.location.origin && target.pathname.startsWith('/') && !target.pathname.startsWith('//')) {
+      returnPath = `${target.pathname}${target.search}`
+    }
+  } catch {
+    returnPath = '/'
+  }
+
+  try {
+    const response = await fetch('/api/auth/google/start', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ intent: 'signin', return_path: returnPath }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok || typeof data.url !== 'string') {
+      return {
+        ok: false,
+        error: data.detail || 'Google sign-in could not start',
+        url: null,
+        status: response.status,
+      }
+    }
+    const authorization = new URL(data.url)
+    if (authorization.origin !== 'https://accounts.google.com' || authorization.protocol !== 'https:') {
+      throw new Error('Invalid Google authorization URL')
+    }
+    sessionStorage.setItem('lh_google_intent', 'signin')
+    window.location.assign(authorization.toString())
+  } catch (error: any) {
+    return {
+      ok: false,
+      error: error?.message || 'Google sign-in could not start',
+      url: null,
+      status: 500,
+    }
+  }
 }
 
 // Session Provider Component
@@ -602,12 +625,14 @@ export function SessionProvider({
   // drift apart: a session established one way must be identical to the other.
   const establishSession = useCallback(
     async (data: any, callbackUrl: string, redirect: boolean): Promise<SignInResult> => {
+      // A refresh still in flight for whoever was signed in before must not
+      // write its (older) session over this one when it resolves.
+      authEpochRef.current++
       const newSession: Session = {
         user: data.user,
         roles: [],
         tokens: {
           access_token: data.tokens.access_token,
-          refresh_token: data.tokens.refresh_token,
           expiry: data.tokens.expiry,
         },
       }
@@ -618,12 +643,18 @@ export function SessionProvider({
       setStatus('authenticated')
       sessionCacheRef.current = { data: newSession, timestamp: Date.now() }
 
-      // Fetch full session with roles
-      const fullSession = await fetchUserSession(data.tokens.access_token, data.tokens.expiry)
-      if (fullSession) {
-        fullSession.tokens = newSession.tokens
-        setSession(fullSession)
-        sessionCacheRef.current = { data: fullSession, timestamp: Date.now() }
+      // Fetch full session with roles. The sign-in already succeeded (cookies
+      // are set), so a failed lookup only means the roles arrive on the next
+      // session fetch; reporting it as a failed sign-in would misdescribe it.
+      try {
+        const fullSession = await fetchUserSession(data.tokens.access_token, data.tokens.expiry)
+        if (fullSession) {
+          fullSession.tokens = newSession.tokens
+          setSession(fullSession)
+          sessionCacheRef.current = { data: fullSession, timestamp: Date.now() }
+        }
+      } catch (error) {
+        console.warn('[auth] session lookup after sign-in failed, keeping session:', error)
       }
 
       // Notify other tabs
@@ -759,10 +790,13 @@ export function SessionProvider({
           credentials: 'include',
         })
 
-        const data = await response.json()
+        // A gateway error page is not JSON; keep its status so the caller can
+        // tell "try again" from "this link is dead".
+        const data = await response.json().catch(() => ({}))
 
         if (!response.ok) {
-          const errorData = data.detail || data
+          const detail = data.detail ?? data
+          const errorData = typeof detail === 'string' ? { message: detail } : detail
           return {
             ok: false,
             error: JSON.stringify({
@@ -784,6 +818,7 @@ export function SessionProvider({
             status: response.status,
             mfa_required: true,
             mfa_token: data.mfa_token,
+            redirect_to: data.redirect_to ?? null,
           }
         }
 
@@ -796,7 +831,10 @@ export function SessionProvider({
           }
         }
 
-        return await establishSession(data, callbackUrl, redirect)
+        return {
+          ...(await establishSession(data, callbackUrl, redirect)),
+          redirect_to: data.redirect_to ?? null,
+        }
       } catch (error) {
         console.error('Magic link verification error:', error)
         return {
@@ -828,7 +866,6 @@ export function SessionProvider({
               roles: [],
               tokens: {
                 access_token: options.sso_access_token,
-                refresh_token: options.sso_refresh_token,
                 expiry,
               },
             }
@@ -938,60 +975,7 @@ export function SessionProvider({
         }
 
         if (provider === 'google') {
-          // Store org context in cookies before OAuth redirect
-          const { secureAttr, domainAttr, sameSiteAttr } = getCookieAttributes()
-          const baseAttributes = `; path=/${sameSiteAttr}${secureAttr}`
-
-          if (options.orgSlug || options.orgId) {
-            if (options.orgSlug) {
-              document.cookie = `LH_oauth_orgslug=${options.orgSlug}${baseAttributes}${domainAttr}`
-            }
-            if (options.orgId) {
-              document.cookie = `LH_oauth_org_id=${options.orgId}${baseAttributes}${domainAttr}`
-            }
-          }
-
-          // Generate CSRF token for state parameter. The server signs the final
-          // state (with returnOrigin pinned to this request's origin) so the
-          // callback can trust where it bounces the code.
-          const csrfToken = generateSecureToken()
-          const stateData = {
-            callbackUrl,
-            csrf: csrfToken,
-            timestamp: Date.now(),
-          }
-
-          // For custom domains, ask for returnOrigin so the main domain callback can bounce back
-          const returnOrigin = isCustomDomain() ? window.location.origin : undefined
-
-          // Store CSRF token in cookie for validation on callback
-          setOAuthStateCookie(csrfToken)
-
-          // Always use main domain for redirect URI; only one URI registered with Google
-          const redirectUri = `${window.location.protocol}//${getLEARNHOUSE_DOMAIN_VAL()}/auth/callback/google`
-
-          // Get Google OAuth URL from server (client ID lives server-side only)
-          const authResponse = await fetch('/api/auth/google/authorize', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ redirect_uri: redirectUri, state: stateData, returnOrigin }),
-          })
-
-          if (!authResponse.ok) {
-            const errorData = await authResponse.json().catch(() => ({}))
-            console.error('Google OAuth initiation failed:', errorData)
-            return {
-              ok: false,
-              error: errorData.error || 'Google OAuth not configured',
-              url: null,
-              status: authResponse.status,
-            }
-          }
-
-          const { url: googleAuthUrl } = await authResponse.json()
-          const safeGoogleUrl = safeExternalUrl(googleAuthUrl)
-          if (safeGoogleUrl) window.location.href = safeGoogleUrl
-          return
+          return startServerOwnedGoogle(callbackUrl)
         }
 
         // Unknown provider
@@ -1018,16 +1002,19 @@ export function SessionProvider({
   const handleSignOut = useCallback(async (options: SignOutOptions = {}) => {
     const { callbackUrl = '/', redirect = true } = options
 
-    let logoutSuccess = false
     try {
-      // Use Next.js API route to ensure cookies are cleared correctly
       const response = await fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'include',
       })
-      logoutSuccess = response.ok
+      if (!response.ok) {
+        toast.error(i18n.t('auth.logout_retry', { defaultValue: 'Could not sign out. Please try again.' }))
+        return
+      }
     } catch (error) {
       console.error('Logout error:', error)
+      toast.error(i18n.t('auth.logout_retry', { defaultValue: 'Could not sign out. Please try again.' }))
+      return
     }
 
     // Clear local state regardless of backend response. Bump the auth epoch first
@@ -1050,8 +1037,6 @@ export function SessionProvider({
     document.cookie = `LH_oauth_orgslug=; path=/${expireAttr}${secureAttr}${domainAttr}`
     document.cookie = `LH_oauth_org_id=; path=/${expireAttr}${secureAttr}${domainAttr}`
 
-    // Clear OAuth state
-    clearOAuthStateCookie()
     clearSessionMarker()
 
     // Notify other tabs about logout
@@ -1061,10 +1046,6 @@ export function SessionProvider({
       window.location.href = safeRedirectUrl(callbackUrl)
     }
 
-    // If backend logout failed, log a warning (user is still logged out locally)
-    if (!logoutSuccess) {
-      console.warn('Backend logout may have failed. User logged out locally.')
-    }
   }, [])
 
   useEffect(() => {
@@ -1218,53 +1199,7 @@ export async function signIn(
   // For now, we'll handle it differently for Google OAuth which needs redirect
 
   if (provider === 'google') {
-    // Store org context from cookies if present (for compatibility)
-    // The options should contain orgSlug and orgId if needed
-
-    // Generate CSRF token for state parameter
-    const csrfToken = generateSecureToken()
-    const callbackUrl = options?.callbackUrl || '/'
-    const stateData: Record<string, any> = {
-      callbackUrl,
-      csrf: csrfToken,
-      timestamp: Date.now(),
-    }
-
-    // For custom domains, embed returnOrigin so the main domain callback can bounce back
-    if (isCustomDomain()) {
-      stateData.returnOrigin = window.location.origin
-    }
-
-    const state = btoa(JSON.stringify(stateData))
-
-    // Store CSRF token in cookie for validation on callback
-    setOAuthStateCookie(csrfToken)
-
-    // Always use main domain for redirect URI; only one URI registered with Google
-    const redirectUri = `${window.location.protocol}//${getLEARNHOUSE_DOMAIN_VAL()}/auth/callback/google`
-
-    // Get Google OAuth URL from server (client ID lives server-side only)
-    const authResponse = await fetch('/api/auth/google/authorize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ redirect_uri: redirectUri, state, scope: 'openid email profile' }),
-    })
-
-    if (!authResponse.ok) {
-      const errorData = await authResponse.json().catch(() => ({}))
-      console.error('Google OAuth initiation failed:', errorData)
-      return {
-        ok: false,
-        error: errorData.error || 'Google OAuth not configured',
-        url: null,
-        status: authResponse.status,
-      }
-    }
-
-    const { url: googleAuthUrl } = await authResponse.json()
-    const safeGoogleUrl = safeExternalUrl(googleAuthUrl)
-    if (safeGoogleUrl) window.location.href = safeGoogleUrl
-    return
+    return startServerOwnedGoogle(options?.callbackUrl)
   }
 
   // For credentials, we need context - this will be handled by the component
@@ -1282,13 +1217,18 @@ export async function signOut(options?: SignOutOptions): Promise<void> {
   const { callbackUrl = '/', redirect = true } = options || {}
 
   try {
-    // Use Next.js API route to ensure cookies are cleared correctly
-    await fetch('/api/auth/logout', {
+    const response = await fetch('/api/auth/logout', {
       method: 'POST',
       credentials: 'include',
     })
+    if (!response.ok) {
+      toast.error(i18n.t('auth.logout_retry', { defaultValue: 'Could not sign out. Please try again.' }))
+      return
+    }
   } catch (error) {
     console.error('Logout error:', error)
+    toast.error(i18n.t('auth.logout_retry', { defaultValue: 'Could not sign out. Please try again.' }))
+    return
   }
 
   // Clear cookies
@@ -1297,8 +1237,6 @@ export async function signOut(options?: SignOutOptions): Promise<void> {
   document.cookie = `LH_oauth_orgslug=; path=/${expireAttr}${secureAttr}${domainAttr}`
   document.cookie = `LH_oauth_org_id=; path=/${expireAttr}${secureAttr}${domainAttr}`
 
-  // Clear OAuth state
-  clearOAuthStateCookie()
   clearSessionMarker()
 
   // Try to notify other tabs (if BroadcastChannel is available)

@@ -1,0 +1,14 @@
+# API-only optional Google profile enrichment; parent web/runtime unchanged.
+ARG NATIVE_IMAGE=coursemax-learnhouse:80bdc5b7
+FROM ${NATIVE_IMAGE}
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.source="https://github.com/jakkzz/coursemax-learnhouse" \
+      org.opencontainers.image.revision=$SOURCE_REVISION
+COPY apps/api/src/services/auth/provider_profile.py /app/api/src/services/auth/provider_profile.py
+COPY apps/api/src/services/auth/provider_proof.py /app/api/src/services/auth/provider_proof.py
+COPY apps/api/src/services/auth/profile_import.py /app/api/src/services/auth/profile_import.py
+COPY apps/api/src/services/users/provider_avatar.py /app/api/src/services/users/provider_avatar.py
+COPY apps/api/src/services/users/users.py /app/api/src/services/users/users.py
+COPY apps/api/src/routers/google_subject_auth.py /app/api/src/routers/google_subject_auth.py
+COPY apps/api/src/db/provider_profile_import.py /app/api/src/db/provider_profile_import.py
+COPY apps/api/migrations/versions/e92d7f04ab16_optional_provider_profile_import.py /app/api/migrations/versions/e92d7f04ab16_optional_provider_profile_import.py

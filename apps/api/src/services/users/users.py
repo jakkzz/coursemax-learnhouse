@@ -36,6 +36,7 @@ from src.db.users import (
     UserCreate,
     UserRead,
     UserReadPublic,
+    UserReadSelf,
     UserRoleWithOrg,
     UserSession,
     UserUpdate,
@@ -49,6 +50,15 @@ from src.services.security.profile_validation import validate_profile_fields
 from src.services.analytics.analytics import track
 from src.services.analytics import events as analytics_events
 from src.services.webhooks.dispatch import dispatch_webhooks
+
+
+def _session_epoch_now() -> datetime:
+    """Value for ``password_changed_at`` that invalidates every earlier session.
+
+    Whole seconds: a session minted right after carries an integer ``iat`` and
+    must not count as issued before the stamp.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None, microsecond=0)
 
 
 def _reject_urls_in_profile_fields(**fields) -> None:
@@ -218,6 +228,9 @@ async def create_user(
 
     user.creation_date = str(datetime.now())
     user.update_date = str(datetime.now())
+    # Sessions are keyed by email, so a token left over from an earlier
+    # account with this address must not attach to the new one.
+    user.password_changed_at = _session_epoch_now()
 
     # Verifications
 
@@ -465,6 +478,9 @@ async def create_user_without_org(
 
     user.creation_date = str(datetime.now())
     user.update_date = str(datetime.now())
+    # Sessions are keyed by email, so a token left over from an earlier
+    # account with this address must not attach to the new one.
+    user.password_changed_at = _session_epoch_now()
 
     # SECURITY: this endpoint is public and has no org, so there are no declared
     # signup fields to validate against, so nothing may be stored. Dropping the
@@ -526,8 +542,8 @@ async def update_user(
     current_user: PublicUser | AnonymousUser,
     user_object: UserUpdate,
 ):
-    # Get user
-    statement = select(User).where(User.id == user_id)
+    # Serialize manual edits against optional provider avatar attachment.
+    statement = select(User).where(User.id == user_id).with_for_update()
     user = (await db_session.execute(statement)).scalars().first()
 
     if not user:
@@ -620,6 +636,12 @@ async def update_user(
     if email_changed:
         user.email_verified = False
         user.email_verified_at = None
+        # End sessions minted before an email change, including legacy tokens
+        # from an earlier owner of the address.
+        user.password_changed_at = _session_epoch_now()
+    if {'first_name', 'last_name', 'avatar_image'}.intersection(user_data):
+        from src.services.auth.profile_import import cancel_import
+        await cancel_import(db_session, user.id)
 
     for key, value in user_data.items():
         if key not in _PROTECTED_FIELDS:
@@ -756,8 +778,8 @@ async def update_user_avatar(
     current_user: PublicUser | AnonymousUser,
     avatar_file: UploadFile | None = None,
 ):
-    # Get user
-    statement = select(User).where(User.id == current_user.id)
+    # Serialize manual avatars against optional provider attachment.
+    statement = select(User).where(User.id == current_user.id).with_for_update()
     user = (await db_session.execute(statement)).scalars().first()
 
     if not user:
@@ -768,6 +790,8 @@ async def update_user_avatar(
 
     # RBAC check
     await rbac_check(request, current_user, "update", user.user_uuid, db_session)
+    from src.services.auth.profile_import import cancel_import
+    await cancel_import(db_session, user.id)
 
     # Upload avatar with security validation
     if avatar_file and avatar_file.filename:
@@ -928,7 +952,8 @@ async def read_user_by_id(
     Get user by ID.
 
     SECURITY: Returns 404 with generic message to prevent user enumeration.
-    Returns UserReadPublic to exclude sensitive fields (is_superadmin, signup_method).
+    The session owner receives their native email for Account Settings; other
+    callers receive only UserReadPublic. Internal/platform fields stay excluded.
     """
     # Get user
     statement = select(User).where(User.id == user_id)
@@ -940,6 +965,8 @@ async def read_user_by_id(
             detail="Resource not found",  # Generic message prevents enumeration
         )
 
+    if isinstance(current_user, PublicUser) and current_user.id == user.id and current_user.user_uuid == user.user_uuid:
+        return UserReadSelf.model_validate(user)
     return UserReadPublic.model_validate(user)
 
 
@@ -1024,15 +1051,21 @@ async def get_user_session(
             "User %s has 100+ org memberships, result truncated", user.id
         )
 
-    roles = []
+    # org.email defaults to the creator's personal address; only the people
+    # who can edit the org settings get it back. Same rights-based rule as the
+    # org reads, so a custom role holding organizations.update sees it and a
+    # role id alone never does.
+    from src.services.orgs.orgs import _redact_emails_for_member
 
-    for role, org in results:
-        roles.append(
-            UserRoleWithOrg(
-                role=RoleRead.model_validate(role),
-                org=OrganizationRead.model_validate(org),
-            )
-        )
+    org_reads = await _redact_emails_for_member(
+        [OrganizationRead.model_validate(org) for _role, org in results],
+        user.id,
+        db_session,
+    )
+    roles = [
+        UserRoleWithOrg(role=RoleRead.model_validate(role), org=org_read)
+        for (role, _org), org_read in zip(results, org_reads)
+    ]
 
     user_session = UserSession(
         user=user,
@@ -1059,14 +1092,23 @@ async def authorize_user_action(
             detail="User does not exist",
         )
 
-    # RBAC check
-    authorized = (
-        await authorization_verify_based_on_roles_and_authorship(
-            request, current_user.id, action, resource_uuid, db_session
-        )
+    # Same resource checker the content routes use: it scopes the answer to
+    # the resource's own org and visibility. The legacy role/authorship helper
+    # granted read on any group-less resource in any org, and its paywall
+    # branch answered 402 with offer details, turning this into a cross-org
+    # existence and pricing oracle.
+    from src.security.rbac import AccessAction, check_resource_access
+
+    decision = await check_resource_access(
+        request,
+        db_session,
+        current_user,
+        resource_uuid,
+        AccessAction(action),
+        raise_on_deny=False,
     )
 
-    if authorized:
+    if decision.allowed:
         return True
     else:
         raise HTTPException(

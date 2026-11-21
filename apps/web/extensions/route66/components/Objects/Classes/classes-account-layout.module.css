@@ -1,0 +1,8 @@
+/* Native AccountClient gets this space from the account route's outer shell.
+   Classes keeps its own URL, so reserve the same space using a scoped visual
+   adapter to the pinned native shell. No DOM mutation or other route styling. */
+@media (width < 48rem) {
+  :global(.lh-org-font-root):has(.accountWorkspace) {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+  }
+}

@@ -1,0 +1,7 @@
+# UI-only synthetic prototype overlay on the exact retained staging parent.
+# No API files, schema, runtime flags or account/roster writers change.
+FROM coursemax-learnhouse:c972fcb5
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.source="https://github.com/jakkzz/coursemax-learnhouse" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}"
+ADD web-delta.tar.gz /app/web/
